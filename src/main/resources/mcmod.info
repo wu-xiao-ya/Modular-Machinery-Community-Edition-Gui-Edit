@@ -1,0 +1,16 @@
+[
+  {
+    "modid": "mmceguiext",
+    "name": "Modular Machinery: Community Edition Gui Edit",
+    "description": "MMCEGE - Resizable and scrollable controller GUIs for ModularMachinery CE.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "",
+    "updateUrl": "",
+    "authorList": ["FUSHU"],
+    "credits": "",
+    "logoFile": "assets/mmceguiext/textures/logo.png",
+    "screenshots": [],
+    "dependencies": ["modularmachinery"]
+  }
+]
