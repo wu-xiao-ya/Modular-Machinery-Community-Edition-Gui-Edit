@@ -1,7 +1,9 @@
 package com.fushu.mmceguiext.client.gui;
 
+import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import com.fushu.mmceguiext.client.config.MachineGuiStyleManager;
+import com.fushu.mmceguiext.common.network.PktControllerSmartInterfaceUpdate;
 import github.kasuminova.mmce.common.event.client.ControllerGUIRenderEvent;
 import hellfirepvp.modularmachinery.ModularMachinery;
 import hellfirepvp.modularmachinery.client.gui.GuiContainerBase;
@@ -14,22 +16,32 @@ import hellfirepvp.modularmachinery.common.machine.factory.FactoryRecipeThread;
 import hellfirepvp.modularmachinery.common.tiles.TileFactoryController;
 import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
 import hellfirepvp.modularmachinery.common.util.MiscUtils;
+import hellfirepvp.modularmachinery.common.util.SmartInterfaceData;
+import hellfirepvp.modularmachinery.common.util.SmartInterfaceType;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.MathHelper;
 import org.lwjgl.input.Mouse;
+import org.lwjgl.input.Keyboard;
 
 import javax.annotation.Nullable;
+import java.awt.Rectangle;
 import java.io.IOException;
+import java.util.IllegalFormatException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFactoryController> {
     private static final int BASE_WIDTH = 280;
@@ -58,6 +70,13 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     private static final int RECIPE_QUEUE_OFFSET_X = 8;
     private static final int RECIPE_QUEUE_OFFSET_Y = 8;
     private static final int DEFAULT_SPECIAL_THREAD_BG_COLOR = 0xFFB2E5FF;
+    private static final int SMART_EDITOR_BUTTON_W = 10;
+    private static final int SMART_EDITOR_BUTTON_H = 12;
+    private static final int SMART_EDITOR_APPLY_W = 20;
+    private static final int SMART_EDITOR_INPUT_H = 12;
+    private static final int CUSTOM_EDITOR_BUTTON_ID_BASE = 6000;
+    private static final int DEFAULT_RENDER_PRIORITY = 0;
+    private static final int DEFAULT_SMART_EDITOR_PRIORITY = 10;
 
     private final GuiScrollbar recipeScrollbar = new GuiScrollbar();
     private final TileFactoryController factory;
@@ -75,6 +94,31 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     @Nullable
     private String draggingPanelId = null;
     private int infoScrollbarDragOffset = 0;
+    @Nullable
+    private GuiTextField smartInterfaceEditorInput = null;
+    @Nullable
+    private GuiButton smartInterfacePrevButton = null;
+    @Nullable
+    private GuiButton smartInterfaceNextButton = null;
+    @Nullable
+    private GuiButton smartInterfaceApplyButton = null;
+    private int smartInterfaceIndex = 0;
+    private int smartInterfaceEditorX = 0;
+    private int smartInterfaceEditorY = 0;
+    private int smartInterfaceEditorPriority = DEFAULT_SMART_EDITOR_PRIORITY;
+    private final Map<String, String> smartInterfaceVirtualInputCache = new HashMap<String, String>();
+    @Nullable
+    private String smartInterfaceActiveVirtualKey = null;
+    private boolean smartInterfaceHideInfoText = false;
+    private boolean smartInterfaceHideTitleText = false;
+    @Nullable
+    private String smartInterfaceCustomTitleText = null;
+    private boolean hideDefaultSmartInterfaceEditor = false;
+    private final List<CustomSmartEditor> customSmartEditors = new ArrayList<CustomSmartEditor>();
+    private final List<TextureLayerDef> backgroundTextureLayers = new ArrayList<TextureLayerDef>();
+    private final List<TextureLayerDef> foregroundTextureLayers = new ArrayList<TextureLayerDef>();
+    private final Map<String, LayerRuntimeState> layerRuntimeStates = new HashMap<String, LayerRuntimeState>();
+    private final Set<String> textureLayerIds = new HashSet<String>();
 
     public GuiFactoryControllerResizable(ContainerFactoryController container) {
         super(container);
@@ -87,10 +131,13 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         this.customBackgroundTexture = resolveCustomTexture();
         this.specialThreadBgColor = resolveSpecialThreadBgColor();
         super.initGui();
+        initTextureLayers(MMCEGuiExtConfig.factoryController);
         this.panelScroll.clear();
         this.panelMaxScroll.clear();
         this.draggingPanelId = null;
         this.infoScrollbarDragOffset = 0;
+        initSmartInterfaceEditor();
+        initCustomSmartInterfaceEditors(MMCEGuiExtConfig.factoryController);
     }
 
     @Override
@@ -100,8 +147,8 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         int baseTop = (this.height - BASE_HEIGHT) / 2;
         int maxWidth = Math.max(BASE_WIDTH, this.width - baseLeft - 8);
         int maxHeight = Math.max(BASE_HEIGHT, this.height - baseTop - 8);
-        int requestedWidth = styleOverride.guiWidth != null ? styleOverride.guiWidth.intValue() : cfg.guiWidth;
-        int requestedHeight = styleOverride.guiHeight != null ? styleOverride.guiHeight.intValue() : cfg.guiHeight;
+        int requestedWidth = getRequestedGuiWidth(cfg);
+        int requestedHeight = getRequestedGuiHeight(cfg);
         int targetWidth = getDisableRightExtension() ? BASE_WIDTH : requestedWidth;
         this.renderWidth = MathHelper.clamp(targetWidth, BASE_WIDTH, maxWidth);
         this.renderHeight = MathHelper.clamp(requestedHeight, BASE_HEIGHT, maxHeight);
@@ -112,11 +159,35 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
 
     @Override
     protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
-        drawRecipeQueue();
-        if (isUsingDefaultBackground(MMCEGuiExtConfig.factoryController)) {
-            drawDefaultFactoryStatus();
-        } else {
-            drawStatusPanels();
+        resetSmartInterfaceEditorHints();
+        MMCEGuiExtConfig.FactoryController cfg = MMCEGuiExtConfig.factoryController;
+        int contentPriority = resolveForegroundContentPriority();
+        int mouseScreenX = mouseX + this.guiLeft;
+        int mouseScreenY = mouseY + this.guiTop;
+        TreeSet<Integer> priorities = collectForegroundRenderPriorities();
+        for (Integer priorityValue : priorities) {
+            int priority = priorityValue.intValue();
+            if (priority == contentPriority) {
+                drawRecipeQueue();
+                if (isUsingDefaultBackground(cfg)) {
+                    drawDefaultFactoryStatus();
+                } else {
+                    drawStatusPanels();
+                }
+            }
+            drawConfiguredTextureLayers(true, cfg, Integer.valueOf(priority));
+            if (this.smartInterfaceEditorPriority == priority) {
+                GlStateManager.pushMatrix();
+                GlStateManager.translate(-this.guiLeft, -this.guiTop, 0.0F);
+                drawSmartInterfaceEditorBackground(mouseScreenX, mouseScreenY);
+                GlStateManager.popMatrix();
+                drawSmartInterfaceEditorForeground();
+            }
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(-this.guiLeft, -this.guiTop, 0.0F);
+            drawCustomSmartInterfaceEditorsBackground(mouseScreenX, mouseScreenY, Integer.valueOf(priority));
+            GlStateManager.popMatrix();
+            drawCustomSmartInterfaceEditorsForeground(Integer.valueOf(priority));
         }
     }
 
@@ -127,6 +198,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         if (isUsingDefaultBackground(cfg)) {
             this.mc.getTextureManager().bindTexture(DEFAULT_BACKGROUND);
             Gui.drawModalRectWithCustomSizedTexture(guiLeft, guiTop, 0, 0, BASE_WIDTH, BASE_HEIGHT, BASE_WIDTH, BASE_HEIGHT);
+            drawConfiguredTextureLayers(false, cfg);
             updateRecipeScrollbar(this.guiLeft, this.guiTop);
             recipeScrollbar.draw(this, mc);
             return;
@@ -134,20 +206,22 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
 
         boolean useNineSlice = getUseNineSlice(cfg);
         boolean hideDefaultBackground = getHideDefaultBackground(cfg);
-        int texW = Math.max(16, cfg.backgroundTextureWidth);
-        int texH = Math.max(16, cfg.backgroundTextureHeight);
+        int texW = getBackgroundTextureWidth(cfg);
+        int texH = getBackgroundTextureHeight(cfg);
+        int textureOffsetX = getBackgroundTextureOffsetX(cfg);
+        int textureOffsetY = getBackgroundTextureOffsetY(cfg);
 
         if (this.customBackgroundTexture != null) {
             this.mc.getTextureManager().bindTexture(this.customBackgroundTexture);
             drawResizableArea(
-                this.guiLeft,
-                this.guiTop,
-                this.renderWidth,
-                this.renderHeight,
+                this.guiLeft - textureOffsetX,
+                this.guiTop - textureOffsetY,
+                this.renderWidth + textureOffsetX,
+                this.renderHeight + textureOffsetY,
                 useNineSlice,
                 texW,
                 texH,
-                cfg.backgroundCorner
+                getBackgroundCorner(cfg)
             );
         } else {
             if (!hideDefaultBackground) {
@@ -161,6 +235,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
 
         // Custom panel backgrounds are intentionally not rendered.
         // Users should draw panel areas directly in their custom GUI textures.
+        drawConfiguredTextureLayers(false, cfg);
 
         updateRecipeScrollbar(this.guiLeft, this.guiTop);
         recipeScrollbar.draw(this, mc);
@@ -196,7 +271,37 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     }
 
     @Override
+    public void updateScreen() {
+        super.updateScreen();
+        if (this.smartInterfaceEditorInput != null) {
+            this.smartInterfaceEditorInput.updateCursorCounter();
+        }
+        for (CustomSmartEditor editor : this.customSmartEditors) {
+            if (editor.input != null) {
+                editor.input.updateCursorCounter();
+            }
+        }
+    }
+
+    @Override
+    protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (handleCustomSmartInterfaceKeyTyped(typedChar, keyCode)) {
+            return;
+        }
+        if (handleSmartInterfaceKeyTyped(typedChar, keyCode)) {
+            return;
+        }
+        super.keyTyped(typedChar, keyCode);
+    }
+
+    @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleCustomSmartInterfaceMouseClicked(mouseX, mouseY, mouseButton)) {
+            return;
+        }
+        if (handleSmartInterfaceMouseClicked(mouseX, mouseY, mouseButton)) {
+            return;
+        }
         if (isUsingDefaultBackground(MMCEGuiExtConfig.factoryController)) {
             recipeScrollbar.click(mouseX, mouseY);
             super.mouseClicked(mouseX, mouseY, mouseButton);
@@ -476,6 +581,9 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         if (extraInfo.length != 0) {
             List<String> waitForDraw = new ArrayList<String>();
             for (String s : extraInfo) {
+                if (consumeGuiDirective(s)) {
+                    continue;
+                }
                 RoutedText routed = parseRoutedText(s, "main");
                 waitForDraw.addAll(
                     this.fontRenderer.listFormattedStringToWidth(
@@ -577,19 +685,19 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             }
 
             int contentHeight = lines.size() * lineHeight;
-            int viewportHeight = Math.max(1, panel.rect.getHeight() - 4);
+            int viewportHeight = Math.max(1, panel.rect.height - 4);
             int maxScroll = Math.max(0, contentHeight - viewportHeight);
             panelMaxScroll.put(panel.id, maxScroll);
 
             int scroll = MathHelper.clamp(getPanelScroll(panel.id), 0, maxScroll);
             panelScroll.put(panel.id, scroll);
 
-            int textX = panel.rect.getX() + 3;
-            int textY = panel.rect.getY() + 2 - scroll;
-            int clipX = this.guiLeft + panel.rect.getX() + 1;
-            int clipY = this.guiTop + panel.rect.getY() + 1;
-            int clipWidth = panel.rect.getWidth() - 2;
-            int clipHeight = panel.rect.getHeight() - 2;
+            int textX = panel.rect.x + 3;
+            int textY = panel.rect.y + 2 - scroll;
+            int clipX = this.guiLeft + panel.rect.x + 1;
+            int clipY = this.guiTop + panel.rect.y + 1;
+            int clipWidth = panel.rect.width - 2;
+            int clipHeight = panel.rect.height - 2;
 
             GuiRenderUtils.enableScissor(this.mc, clipX, clipY, clipWidth, clipHeight);
             for (String line : lines) {
@@ -646,6 +754,103 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         Gui.drawModalRectWithCustomSizedTexture(x, y, 0, 0, width, height, texW, texH);
     }
 
+    private void drawLayerWithTransform(
+        int x,
+        int y,
+        int width,
+        int height,
+        boolean nineSlice,
+        int texW,
+        int texH,
+        int corner,
+        float scaleX,
+        float scaleY,
+        float rotation
+    ) {
+        float sx = Math.max(0.01F, scaleX);
+        float sy = Math.max(0.01F, scaleY);
+        boolean transformed = Math.abs(sx - 1.0F) > 1.0E-4F || Math.abs(sy - 1.0F) > 1.0E-4F || Math.abs(rotation) > 1.0E-4F;
+        if (!transformed) {
+            drawResizableArea(x, y, width, height, nineSlice, texW, texH, corner);
+            return;
+        }
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x + width * 0.5F, y + height * 0.5F, 0.0F);
+        if (Math.abs(rotation) > 1.0E-4F) {
+            GlStateManager.rotate(rotation, 0.0F, 0.0F, 1.0F);
+        }
+        GlStateManager.scale(sx, sy, 1.0F);
+        drawResizableArea(-width / 2, -height / 2, width, height, nineSlice, texW, texH, corner);
+        GlStateManager.popMatrix();
+    }
+
+    private int resolveLayerOffsetX(TextureLayerDef layer) {
+        LayerRuntimeState runtime = this.layerRuntimeStates.get(layer.id);
+        return runtime != null && runtime.offsetX != null ? runtime.offsetX.intValue() : layer.offsetX;
+    }
+
+    private int resolveLayerOffsetY(TextureLayerDef layer) {
+        LayerRuntimeState runtime = this.layerRuntimeStates.get(layer.id);
+        return runtime != null && runtime.offsetY != null ? runtime.offsetY.intValue() : layer.offsetY;
+    }
+
+    private float resolveLayerScaleX(TextureLayerDef layer) {
+        LayerRuntimeState runtime = this.layerRuntimeStates.get(layer.id);
+        if (runtime == null) {
+            return 1.0F;
+        }
+        if (runtime.scaleX != null) {
+            return runtime.scaleX.floatValue();
+        }
+        if (runtime.scale != null) {
+            return runtime.scale.floatValue();
+        }
+        return 1.0F;
+    }
+
+    private float resolveLayerScaleY(TextureLayerDef layer) {
+        LayerRuntimeState runtime = this.layerRuntimeStates.get(layer.id);
+        if (runtime == null) {
+            return 1.0F;
+        }
+        if (runtime.scaleY != null) {
+            return runtime.scaleY.floatValue();
+        }
+        if (runtime.scale != null) {
+            return runtime.scale.floatValue();
+        }
+        return 1.0F;
+    }
+
+    private float resolveLayerRotation(TextureLayerDef layer) {
+        LayerRuntimeState runtime = this.layerRuntimeStates.get(layer.id);
+        return runtime != null && runtime.rotation != null ? runtime.rotation.floatValue() : 0.0F;
+    }
+
+    private int resolveLayerPriority(TextureLayerDef layer) {
+        LayerRuntimeState runtime = this.layerRuntimeStates.get(layer.id);
+        return runtime != null && runtime.priority != null ? runtime.priority.intValue() : layer.priority;
+    }
+
+    private boolean isLayerVisible(TextureLayerDef layer) {
+        LayerRuntimeState runtime = this.layerRuntimeStates.get(layer.id);
+        return runtime == null || runtime.visible == null || runtime.visible.booleanValue();
+    }
+
+    private String allocateUniqueLayerId(String requested) {
+        if (!this.textureLayerIds.contains(requested)) {
+            return requested;
+        }
+        int suffix = 2;
+        String candidate = requested + "_" + suffix;
+        while (this.textureLayerIds.contains(candidate)) {
+            suffix++;
+            candidate = requested + "_" + suffix;
+        }
+        return candidate;
+    }
+
     private List<PanelDef> getActivePanels(MMCEGuiExtConfig.FactoryController cfg) {
         List<PanelDef> panels = new ArrayList<PanelDef>();
         if (isUsingDefaultBackground(cfg)) {
@@ -670,12 +875,12 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             int y = Math.max(4, cfg.panelY);
             int width = Math.max(48, this.renderWidth - x - 8);
             int height = Math.max(24, this.renderHeight - y - 4);
-            panels.add(new PanelDef("main", new PanelRect(x, y, width, height)));
+            panels.add(new PanelDef("main", new Rectangle(x, y, width, height)));
         }
         return panels;
     }
 
-    private PanelRect getDefaultPanelRect(MMCEGuiExtConfig.FactoryController cfg) {
+    private Rectangle getDefaultPanelRect(MMCEGuiExtConfig.FactoryController cfg) {
         int panelX = cfg.panelX > 0 ? cfg.panelX : 113;
         panelX = Math.max(0, Math.min(panelX, Math.max(0, BASE_WIDTH - 32)));
 
@@ -690,7 +895,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         int panelHeight = cfg.panelHeight > 0 ? cfg.panelHeight : 112;
         panelHeight = Math.max(24, Math.min(panelHeight, maxHeight));
 
-        return new PanelRect(panelX, panelY, panelWidth, panelHeight);
+        return new Rectangle(panelX, panelY, panelWidth, panelHeight);
     }
 
     @Nullable
@@ -732,7 +937,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             width = Math.max(24, Math.min(width, this.renderWidth - x - 2));
             height = Math.max(24, Math.min(height, this.renderHeight - y - 2));
 
-            return new PanelDef(id, new PanelRect(x, y, width, height));
+            return new PanelDef(id, new Rectangle(x, y, width, height));
         } catch (NumberFormatException ignored) {
             return null;
         }
@@ -777,6 +982,9 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             ControllerGUIRenderEvent event = new ControllerGUIRenderEvent(factory);
             event.postEvent();
             for (String extra : event.getExtraInfo()) {
+                if (consumeGuiDirective(extra)) {
+                    continue;
+                }
                 RoutedText routed = parseRoutedText(extra, defaultPanelId);
                 String targetPanel = panelMap.containsKey(routed.panelId) ? routed.panelId : defaultPanelId;
                 addWrapped(linesByPanel, panelMap, targetPanel, routed.text, defaultPanelId);
@@ -884,7 +1092,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         if (panel == null) {
             return;
         }
-        int wrapWidth = Math.max(24, panel.rect.getWidth() - 8);
+        int wrapWidth = Math.max(24, panel.rect.width - 8);
         target.addAll(this.fontRenderer.listFormattedStringToWidth(text, wrapWidth));
     }
 
@@ -1016,27 +1224,27 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                && localY >= barTop && localY < barTop + getPanelBarHeight(panel.rect);
     }
 
-    private int getPanelBarX(PanelRect panel) {
-        return panel.getRight() - 4;
+    private int getPanelBarX(Rectangle panel) {
+        return panel.x + panel.width - 4;
     }
 
-    private int getPanelBarTop(PanelRect panel) {
-        return panel.getY() + 1;
+    private int getPanelBarTop(Rectangle panel) {
+        return panel.y + 1;
     }
 
     private int getPanelBarWidth() {
         return 3;
     }
 
-    private int getPanelBarHeight(PanelRect panel) {
-        return panel.getHeight() - 2;
+    private int getPanelBarHeight(Rectangle panel) {
+        return panel.height - 2;
     }
 
-    private int getPanelThumbHeight(String panelId, PanelRect panel) {
-        return Math.max(12, (panel.getHeight() * panel.getHeight()) / (panel.getHeight() + getPanelMaxScroll(panelId) + 1));
+    private int getPanelThumbHeight(String panelId, Rectangle panel) {
+        return Math.max(12, (panel.height * panel.height) / (panel.height + getPanelMaxScroll(panelId) + 1));
     }
 
-    private int getPanelThumbY(String panelId, PanelRect panel) {
+    private int getPanelThumbY(String panelId, Rectangle panel) {
         int barTop = getPanelBarTop(panel);
         int barHeight = getPanelBarHeight(panel);
         int thumbHeight = getPanelThumbHeight(panelId, panel);
@@ -1044,7 +1252,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         return barTop + (getPanelScroll(panelId) * maxTravel) / Math.max(1, getPanelMaxScroll(panelId));
     }
 
-    private void updatePanelScrollFromMouse(String panelId, PanelRect panel, int localMouseY) {
+    private void updatePanelScrollFromMouse(String panelId, Rectangle panel, int localMouseY) {
         int barTop = getPanelBarTop(panel);
         int barHeight = getPanelBarHeight(panel);
         int thumbHeight = getPanelThumbHeight(panelId, panel);
@@ -1096,7 +1304,37 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     }
 
     private boolean getUseNineSlice(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.useNineSlice != null) {
+            return styleOverride.useNineSlice.booleanValue();
+        }
         return cfg.useNineSlice;
+    }
+
+    private int getBackgroundTextureWidth(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.backgroundTextureWidth != null) {
+            return Math.max(16, styleOverride.backgroundTextureWidth.intValue());
+        }
+        if (hasMachineStyleOverride() && this.customBackgroundTexture != null) {
+            return Math.max(16, this.renderWidth + getBackgroundTextureOffsetX(cfg));
+        }
+        return Math.max(16, cfg.backgroundTextureWidth);
+    }
+
+    private int getBackgroundTextureHeight(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.backgroundTextureHeight != null) {
+            return Math.max(16, styleOverride.backgroundTextureHeight.intValue());
+        }
+        if (hasMachineStyleOverride() && this.customBackgroundTexture != null) {
+            return Math.max(16, this.renderHeight + getBackgroundTextureOffsetY(cfg));
+        }
+        return Math.max(16, cfg.backgroundTextureHeight);
+    }
+
+    private int getBackgroundCorner(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.backgroundCorner != null) {
+            return Math.max(2, styleOverride.backgroundCorner.intValue());
+        }
+        return Math.max(2, cfg.backgroundCorner);
     }
 
     private boolean getHideDefaultBackground(MMCEGuiExtConfig.FactoryController cfg) {
@@ -1104,6 +1342,46 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             return styleOverride.hideDefaultBackground.booleanValue();
         }
         return cfg.hideDefaultBackground;
+    }
+
+    private int getBackgroundTextureOffsetX(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.backgroundTextureOffsetX != null) {
+            return Math.max(0, styleOverride.backgroundTextureOffsetX.intValue());
+        }
+        if (hasMachineStyleOverride()) {
+            return 0;
+        }
+        return Math.max(0, cfg.backgroundTextureOffsetX);
+    }
+
+    private int getBackgroundTextureOffsetY(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.backgroundTextureOffsetY != null) {
+            return Math.max(0, styleOverride.backgroundTextureOffsetY.intValue());
+        }
+        if (hasMachineStyleOverride()) {
+            return 0;
+        }
+        return Math.max(0, cfg.backgroundTextureOffsetY);
+    }
+
+    private int getRequestedGuiWidth(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.guiWidth != null) {
+            return styleOverride.guiWidth.intValue();
+        }
+        if (hasMachineStyleOverride()) {
+            return BASE_WIDTH;
+        }
+        return cfg.guiWidth;
+    }
+
+    private int getRequestedGuiHeight(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.guiHeight != null) {
+            return styleOverride.guiHeight.intValue();
+        }
+        if (hasMachineStyleOverride()) {
+            return BASE_HEIGHT;
+        }
+        return cfg.guiHeight;
     }
 
     private int resolveSpecialThreadBgColor() {
@@ -1126,6 +1404,955 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
 
     private boolean hasPerMachineSizeOverride() {
         return styleOverride.guiWidth != null || styleOverride.guiHeight != null;
+    }
+
+    private boolean hasMachineStyleOverride() {
+        return styleOverride != MachineGuiStyleManager.ControllerStyle.EMPTY;
+    }
+
+    @Nullable
+    public Rectangle getJeiRightExtensionArea() {
+        int extraWidth = this.renderWidth - BASE_WIDTH;
+        if (extraWidth <= 0) {
+            return null;
+        }
+        return new Rectangle(this.guiLeft + BASE_WIDTH, this.guiTop, extraWidth, this.renderHeight);
+    }
+
+    private void initTextureLayers(MMCEGuiExtConfig.FactoryController cfg) {
+        this.backgroundTextureLayers.clear();
+        this.foregroundTextureLayers.clear();
+        this.layerRuntimeStates.clear();
+        this.textureLayerIds.clear();
+        if (styleOverride.textureLayers == null || styleOverride.textureLayers.isEmpty()) {
+            return;
+        }
+        int bgIndex = 0;
+        int fgIndex = 0;
+        for (MachineGuiStyleManager.TextureLayerStyle layer : styleOverride.textureLayers) {
+            if (layer == null || layer.texture == null || layer.texture.trim().isEmpty()) {
+                continue;
+            }
+            ResourceLocation texture = GuiRenderUtils.parseOptionalTexture(layer.texture);
+            if (texture == null) {
+                continue;
+            }
+            TextureLayerDef def = new TextureLayerDef();
+            def.texture = texture;
+            def.offsetX = layer.offsetX == null ? 0 : layer.offsetX.intValue();
+            def.offsetY = layer.offsetY == null ? 0 : layer.offsetY.intValue();
+            def.width = layer.width;
+            def.height = layer.height;
+            def.textureWidth = layer.textureWidth;
+            def.textureHeight = layer.textureHeight;
+            def.corner = layer.corner;
+            def.useNineSlice = layer.useNineSlice;
+            def.priority = layer.priority == null ? DEFAULT_RENDER_PRIORITY : layer.priority.intValue();
+            boolean foreground = layer.foreground != null && layer.foreground.booleanValue();
+            String defaultId = foreground ? "fg_" + fgIndex++ : "bg_" + bgIndex++;
+            String requestedId = layer.id == null ? defaultId : layer.id.trim();
+            if (requestedId.isEmpty()) {
+                requestedId = defaultId;
+            }
+            def.id = allocateUniqueLayerId(requestedId);
+            this.textureLayerIds.add(def.id);
+            if (foreground) {
+                this.foregroundTextureLayers.add(def);
+            } else {
+                this.backgroundTextureLayers.add(def);
+            }
+        }
+    }
+
+    private void drawConfiguredTextureLayers(boolean foreground, MMCEGuiExtConfig.FactoryController cfg) {
+        drawConfiguredTextureLayers(foreground, cfg, null);
+    }
+
+    private void drawConfiguredTextureLayers(boolean foreground, MMCEGuiExtConfig.FactoryController cfg, @Nullable Integer priorityFilter) {
+        List<TextureLayerDef> layers = foreground ? this.foregroundTextureLayers : this.backgroundTextureLayers;
+        if (layers.isEmpty()) {
+            return;
+        }
+        List<TextureLayerDef> ordered = new ArrayList<TextureLayerDef>(layers);
+        ordered.sort((a, b) -> Integer.compare(resolveLayerPriority(a), resolveLayerPriority(b)));
+        for (TextureLayerDef layer : ordered) {
+            int renderPriority = resolveLayerPriority(layer);
+            if (priorityFilter != null && renderPriority != priorityFilter.intValue()) {
+                continue;
+            }
+            if (!isLayerVisible(layer)) {
+                continue;
+            }
+            this.mc.getTextureManager().bindTexture(layer.texture);
+            int offX = resolveLayerOffsetX(layer);
+            int offY = resolveLayerOffsetY(layer);
+            int width = layer.width == null ? this.renderWidth : Math.max(1, layer.width.intValue());
+            int height = layer.height == null ? this.renderHeight : Math.max(1, layer.height.intValue());
+            int texW = layer.textureWidth == null ? getBackgroundTextureWidth(cfg) : Math.max(16, layer.textureWidth.intValue());
+            int texH = layer.textureHeight == null ? getBackgroundTextureHeight(cfg) : Math.max(16, layer.textureHeight.intValue());
+            int corner = layer.corner == null ? getBackgroundCorner(cfg) : Math.max(2, layer.corner.intValue());
+            boolean useNineSlice = layer.useNineSlice == null ? getUseNineSlice(cfg) : layer.useNineSlice.booleanValue();
+            int drawX = foreground ? offX : this.guiLeft + offX;
+            int drawY = foreground ? offY : this.guiTop + offY;
+            float scaleX = resolveLayerScaleX(layer);
+            float scaleY = resolveLayerScaleY(layer);
+            float rotation = resolveLayerRotation(layer);
+            drawLayerWithTransform(drawX, drawY, width, height, useNineSlice, texW, texH, corner, scaleX, scaleY, rotation);
+        }
+    }
+
+    private void initCustomSmartInterfaceEditors(MMCEGuiExtConfig.FactoryController cfg) {
+        this.customSmartEditors.clear();
+        this.hideDefaultSmartInterfaceEditor = styleOverride.hideDefaultSmartInterfaceEditor != null
+            && styleOverride.hideDefaultSmartInterfaceEditor.booleanValue();
+        if (styleOverride.smartInterfaceEditors == null || styleOverride.smartInterfaceEditors.isEmpty()) {
+            return;
+        }
+
+        int buttonId = CUSTOM_EDITOR_BUTTON_ID_BASE;
+        for (MachineGuiStyleManager.SmartInterfaceEditorStyle style : styleOverride.smartInterfaceEditors) {
+            List<String> keys = parseVirtualKeys(style.virtualKey);
+            if (keys.isEmpty()) {
+                continue;
+            }
+            CustomSmartEditor editor = new CustomSmartEditor();
+            editor.id = style.id == null ? "editor_" + this.customSmartEditors.size() : style.id.trim();
+            editor.keys = keys;
+            editor.index = 0;
+            editor.showTitle = style.showTitle == null || style.showTitle.booleanValue();
+            editor.showInfo = style.showInfo == null || style.showInfo.booleanValue();
+            editor.showControls = style.showControls == null || style.showControls.booleanValue();
+            editor.inputBackground = style.inputBackground == null || style.inputBackground.booleanValue();
+            editor.title = style.title;
+            editor.priority = style.priority == null ? DEFAULT_SMART_EDITOR_PRIORITY : style.priority.intValue();
+
+            int inputWidth = style.inputWidth == null ? getSmartInterfaceEditorInputWidth(cfg) : Math.max(40, style.inputWidth.intValue());
+            int editorX = MathHelper.clamp(style.x, 2, Math.max(2, this.renderWidth - 2));
+            int editorY = MathHelper.clamp(style.y, 12, Math.max(12, this.renderHeight - SMART_EDITOR_INPUT_H - 2));
+            int absX = this.guiLeft + editorX;
+            int absY = this.guiTop + editorY;
+
+            editor.x = editorX;
+            editor.y = editorY;
+            editor.inputWidth = inputWidth;
+            int leftControls = editor.showControls ? (SMART_EDITOR_BUTTON_W * 2 + 3) : 0;
+            editor.input = new GuiTextField(0, this.fontRenderer, absX + leftControls, absY, inputWidth, SMART_EDITOR_INPUT_H);
+            editor.input.setEnableBackgroundDrawing(editor.inputBackground);
+            editor.input.setMaxStringLength(24);
+
+            if (editor.showControls) {
+                editor.prev = new GuiButton(buttonId++, absX, absY, SMART_EDITOR_BUTTON_W, SMART_EDITOR_BUTTON_H, "<");
+                editor.next = new GuiButton(buttonId++, absX + SMART_EDITOR_BUTTON_W + 1, absY, SMART_EDITOR_BUTTON_W, SMART_EDITOR_BUTTON_H, ">");
+                editor.apply = new GuiButton(
+                    buttonId++,
+                    absX + leftControls + inputWidth + 2,
+                    absY,
+                    SMART_EDITOR_APPLY_W,
+                    SMART_EDITOR_BUTTON_H,
+                    "OK"
+                );
+            }
+            syncCustomSmartEditorInput(editor);
+            this.customSmartEditors.add(editor);
+        }
+    }
+
+    private List<String> parseVirtualKeys(@Nullable String raw) {
+        List<String> keys = new ArrayList<String>();
+        if (raw == null) {
+            return keys;
+        }
+        String normalized = raw.replace('\r', ',')
+            .replace('\n', ',')
+            .replace(';', ',')
+            .replace('\uFF0C', ',')
+            .replace('\uFF1B', ',');
+        for (String split : normalized.split(",")) {
+            String key = split == null ? "" : split.trim();
+            if (key.isEmpty() || keys.contains(key)) {
+                continue;
+            }
+            keys.add(key);
+        }
+        return keys;
+    }
+
+    private void initSmartInterfaceEditor() {
+        MMCEGuiExtConfig.FactoryController cfg = MMCEGuiExtConfig.factoryController;
+        this.smartInterfaceEditorPriority = resolveSmartInterfaceEditorPriority();
+        this.hideDefaultSmartInterfaceEditor = styleOverride.hideDefaultSmartInterfaceEditor != null
+            && styleOverride.hideDefaultSmartInterfaceEditor.booleanValue();
+        if (!shouldRenderSmartInterfaceEditor(cfg)) {
+            this.smartInterfaceEditorInput = null;
+            this.smartInterfacePrevButton = null;
+            this.smartInterfaceNextButton = null;
+            this.smartInterfaceApplyButton = null;
+            return;
+        }
+
+        int inputWidth = getSmartInterfaceEditorInputWidth(cfg);
+        int totalWidth = SMART_EDITOR_BUTTON_W + 1 + SMART_EDITOR_BUTTON_W + 2 + inputWidth + 2 + SMART_EDITOR_APPLY_W;
+        this.smartInterfaceEditorX = resolveSmartInterfaceEditorX(cfg, totalWidth);
+        this.smartInterfaceEditorY = resolveSmartInterfaceEditorY(cfg);
+
+        int absX = this.guiLeft + this.smartInterfaceEditorX;
+        int absY = this.guiTop + this.smartInterfaceEditorY;
+        this.smartInterfaceEditorInput = new GuiTextField(0, this.fontRenderer, absX + SMART_EDITOR_BUTTON_W * 2 + 3, absY, inputWidth, SMART_EDITOR_INPUT_H);
+        this.smartInterfaceEditorInput.setMaxStringLength(24);
+
+        this.smartInterfacePrevButton = new GuiButton(201, absX, absY, SMART_EDITOR_BUTTON_W, SMART_EDITOR_BUTTON_H, "<");
+        this.smartInterfaceNextButton = new GuiButton(202, absX + SMART_EDITOR_BUTTON_W + 1, absY, SMART_EDITOR_BUTTON_W, SMART_EDITOR_BUTTON_H, ">");
+        this.smartInterfaceApplyButton = new GuiButton(
+            203,
+            absX + SMART_EDITOR_BUTTON_W * 2 + 5 + inputWidth,
+            absY,
+            SMART_EDITOR_APPLY_W,
+            SMART_EDITOR_BUTTON_H,
+            "OK"
+        );
+        syncSmartInterfaceEditorInput();
+    }
+
+    private boolean shouldRenderSmartInterfaceEditor(MMCEGuiExtConfig.FactoryController cfg) {
+        if (this.hideDefaultSmartInterfaceEditor) {
+            return false;
+        }
+        if (!getSmartInterfaceEditorEnabled(cfg)) {
+            return false;
+        }
+        int configuredX = getSmartInterfaceEditorX(cfg);
+        int configuredY = getSmartInterfaceEditorY(cfg);
+        if (configuredX >= 0 || configuredY >= 0) {
+            return true;
+        }
+        return this.renderWidth > BASE_WIDTH;
+    }
+
+    private int resolveSmartInterfaceEditorPriority() {
+        if (styleOverride.smartInterfaceEditorPriority != null) {
+            return styleOverride.smartInterfaceEditorPriority.intValue();
+        }
+        return DEFAULT_SMART_EDITOR_PRIORITY;
+    }
+
+    private int resolveForegroundContentPriority() {
+        if (styleOverride.foregroundContentPriority != null) {
+            return styleOverride.foregroundContentPriority.intValue();
+        }
+        return DEFAULT_RENDER_PRIORITY;
+    }
+
+    private SmartInterfaceData[] getSmartInterfaceDataList() {
+        if (this.factory == null || !this.factory.isStructureFormed()) {
+            return new SmartInterfaceData[0];
+        }
+        SmartInterfaceData[] list = this.factory.getSmartInterfaceDataList();
+        if (list == null) {
+            return new SmartInterfaceData[0];
+        }
+        return list;
+    }
+
+    private void drawSmartInterfaceEditorBackground(int mouseX, int mouseY) {
+        if (this.smartInterfaceEditorInput == null || this.smartInterfacePrevButton == null
+            || this.smartInterfaceNextButton == null || this.smartInterfaceApplyButton == null) {
+            return;
+        }
+
+        MMCEGuiExtConfig.FactoryController cfg = MMCEGuiExtConfig.factoryController;
+        SmartInterfaceData[] dataList = getSmartInterfaceDataList();
+        List<String> virtualKeys = getSmartInterfaceEditorVirtualKeys(cfg);
+        boolean useVirtualKeys = !virtualKeys.isEmpty();
+        boolean hasData = !useVirtualKeys && dataList.length > 0;
+        int selectableCount = hasData ? dataList.length : virtualKeys.size();
+        if (selectableCount > 0) {
+            clampSmartInterfaceIndex(selectableCount);
+        }
+
+        this.smartInterfacePrevButton.enabled = selectableCount > 1;
+        this.smartInterfaceNextButton.enabled = selectableCount > 1;
+        this.smartInterfaceApplyButton.enabled = hasData || useVirtualKeys;
+
+        this.smartInterfaceEditorInput.drawTextBox();
+        this.smartInterfacePrevButton.drawButton(this.mc, mouseX, mouseY, 0F);
+        this.smartInterfaceNextButton.drawButton(this.mc, mouseX, mouseY, 0F);
+        this.smartInterfaceApplyButton.drawButton(this.mc, mouseX, mouseY, 0F);
+    }
+
+    private void drawSmartInterfaceEditorForeground() {
+        if (this.smartInterfaceEditorInput == null) {
+            return;
+        }
+
+        MMCEGuiExtConfig.FactoryController cfg = MMCEGuiExtConfig.factoryController;
+        SmartInterfaceData[] dataList = getSmartInterfaceDataList();
+        List<String> virtualKeys = getSmartInterfaceEditorVirtualKeys(cfg);
+        boolean useVirtualKeys = !virtualKeys.isEmpty();
+        boolean hasData = !useVirtualKeys && dataList.length > 0;
+        int selectableCount = hasData ? dataList.length : virtualKeys.size();
+        if (selectableCount > 0) {
+            clampSmartInterfaceIndex(selectableCount);
+        }
+
+        SmartInterfaceData current = hasData ? dataList[this.smartInterfaceIndex] : null;
+        String virtualKey = useVirtualKeys ? getSelectedSmartInterfaceVirtualKey(virtualKeys) : "";
+        int currentIndexDisplay = selectableCount <= 0 ? 0 : (this.smartInterfaceIndex + 1);
+
+        String title = resolveSmartInterfaceEditorTitle(hasData, selectableCount, currentIndexDisplay, virtualKey);
+        if (!this.smartInterfaceHideTitleText) {
+            this.fontRenderer.drawStringWithShadow(title, this.smartInterfaceEditorX, this.smartInterfaceEditorY - 10, 0xE0E0E0);
+        }
+
+        if (!this.smartInterfaceHideInfoText) {
+            String infoText;
+            int infoColor;
+            if (hasData && current != null) {
+                infoText = buildSmartInterfaceValueInfo(current);
+                infoColor = 0xBFD3FF;
+            } else if (!virtualKey.isEmpty()) {
+                infoText = "Key: " + virtualKey;
+                infoColor = 0xBFD3FF;
+            } else {
+                infoText = "No DataPort bound";
+                infoColor = 0xB0B0B0;
+            }
+            this.fontRenderer.drawStringWithShadow(
+                infoText,
+                this.smartInterfaceEditorX,
+                this.smartInterfaceEditorY + SMART_EDITOR_INPUT_H + 2,
+                infoColor
+            );
+        }
+    }
+
+    private String buildSmartInterfaceValueInfo(SmartInterfaceData data) {
+        DynamicMachine machine = resolveMachine();
+        if (machine == null) {
+            return data.getType() + ": " + data.getValue();
+        }
+        SmartInterfaceType type = machine.getSmartInterfaceType(data.getType());
+        if (type == null) {
+            return data.getType() + ": " + data.getValue();
+        }
+
+        String valueInfo;
+        try {
+            valueInfo = type.getValueInfo().isEmpty()
+                        ? I18n.format("gui.smartinterface.value", data.getValue())
+                        : String.format(type.getValueInfo(), data.getValue());
+        } catch (IllegalFormatException ignored) {
+            valueInfo = I18n.format("gui.smartinterface.value", data.getValue());
+        }
+        return data.getType() + " | " + valueInfo;
+    }
+
+    private boolean handleSmartInterfaceMouseClicked(int mouseX, int mouseY, int mouseButton) {
+        if (mouseButton != 0) {
+            return false;
+        }
+        if (this.smartInterfaceEditorInput == null || this.smartInterfacePrevButton == null
+            || this.smartInterfaceNextButton == null || this.smartInterfaceApplyButton == null) {
+            return false;
+        }
+
+        MMCEGuiExtConfig.FactoryController cfg = MMCEGuiExtConfig.factoryController;
+        SmartInterfaceData[] dataList = getSmartInterfaceDataList();
+        List<String> virtualKeys = getSmartInterfaceEditorVirtualKeys(cfg);
+        boolean useVirtualKeys = !virtualKeys.isEmpty();
+        boolean hasData = !useVirtualKeys && dataList.length > 0;
+        int selectableCount = hasData ? dataList.length : virtualKeys.size();
+        if (selectableCount > 0) {
+            clampSmartInterfaceIndex(selectableCount);
+        }
+
+        if (this.smartInterfaceEditorInput.mouseClicked(mouseX, mouseY, mouseButton)) {
+            return true;
+        }
+        if (selectableCount > 1 && this.smartInterfacePrevButton.mousePressed(this.mc, mouseX, mouseY)) {
+            this.smartInterfaceIndex = (this.smartInterfaceIndex + selectableCount - 1) % selectableCount;
+            syncSmartInterfaceEditorInput();
+            return true;
+        }
+        if (selectableCount > 1 && this.smartInterfaceNextButton.mousePressed(this.mc, mouseX, mouseY)) {
+            this.smartInterfaceIndex = (this.smartInterfaceIndex + 1) % selectableCount;
+            syncSmartInterfaceEditorInput();
+            return true;
+        }
+        if ((hasData || useVirtualKeys) && this.smartInterfaceApplyButton.mousePressed(this.mc, mouseX, mouseY)) {
+            applySmartInterfaceEditorValue();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleSmartInterfaceKeyTyped(char typedChar, int keyCode) {
+        if (this.smartInterfaceEditorInput == null || !this.smartInterfaceEditorInput.isFocused()) {
+            return false;
+        }
+
+        if (keyCode == Keyboard.KEY_RETURN || keyCode == Keyboard.KEY_NUMPADENTER) {
+            applySmartInterfaceEditorValue();
+            return true;
+        }
+
+        if (Character.isDigit(typedChar) || typedChar == '.' || typedChar == '-' || typedChar == 'E' || typedChar == 'e'
+            || MiscUtils.isTextBoxKey(keyCode)) {
+            this.smartInterfaceEditorInput.textboxKeyTyped(typedChar, keyCode);
+            return true;
+        }
+        return true;
+    }
+
+    private void applySmartInterfaceEditorValue() {
+        if (this.smartInterfaceEditorInput == null) {
+            return;
+        }
+        MMCEGuiExtConfig.FactoryController cfg = MMCEGuiExtConfig.factoryController;
+        SmartInterfaceData[] dataList = getSmartInterfaceDataList();
+        List<String> virtualKeys = getSmartInterfaceEditorVirtualKeys(cfg);
+        boolean useVirtualKeys = !virtualKeys.isEmpty();
+        boolean hasData = !useVirtualKeys && dataList.length > 0;
+        int selectableCount = hasData ? dataList.length : virtualKeys.size();
+        if (selectableCount > 0) {
+            clampSmartInterfaceIndex(selectableCount);
+        }
+
+        String text = this.smartInterfaceEditorInput.getText();
+        if (text == null || text.trim().isEmpty()) {
+            return;
+        }
+
+        try {
+            float parsed = Float.parseFloat(text.trim());
+            if (!Float.isFinite(parsed)) {
+                return;
+            }
+
+            String interfaceType;
+            if (hasData) {
+                SmartInterfaceData current = dataList[this.smartInterfaceIndex];
+                current.setValue(parsed);
+                interfaceType = current.getType();
+            } else {
+                interfaceType = getSelectedSmartInterfaceVirtualKey(virtualKeys);
+                if (interfaceType.isEmpty()) {
+                    return;
+                }
+            }
+
+            MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerSmartInterfaceUpdate(this.factory.getPos(), interfaceType, parsed));
+            this.smartInterfaceEditorInput.setText(Float.toString(parsed));
+            if (useVirtualKeys) {
+                this.smartInterfaceVirtualInputCache.put(interfaceType, Float.toString(parsed));
+            }
+        } catch (NumberFormatException ignored) {
+        }
+    }
+
+    private void syncSmartInterfaceEditorInput() {
+        if (this.smartInterfaceEditorInput == null) {
+            return;
+        }
+        SmartInterfaceData[] dataList = getSmartInterfaceDataList();
+        MMCEGuiExtConfig.FactoryController cfg = MMCEGuiExtConfig.factoryController;
+        List<String> virtualKeys = getSmartInterfaceEditorVirtualKeys(cfg);
+        if (!virtualKeys.isEmpty()) {
+            clampSmartInterfaceIndex(virtualKeys.size());
+            String selectedKey = getSelectedSmartInterfaceVirtualKey(virtualKeys);
+            String cached = this.smartInterfaceVirtualInputCache.get(selectedKey);
+            boolean switched = this.smartInterfaceActiveVirtualKey == null || !this.smartInterfaceActiveVirtualKey.equals(selectedKey);
+            this.smartInterfaceActiveVirtualKey = selectedKey;
+            if (cached != null) {
+                this.smartInterfaceEditorInput.setText(cached);
+            } else if (switched || this.smartInterfaceEditorInput.getText() == null) {
+                this.smartInterfaceEditorInput.setText("");
+            }
+            return;
+        }
+        if (dataList.length <= 0) {
+            this.smartInterfaceActiveVirtualKey = null;
+            if (this.smartInterfaceEditorInput.getText() == null) {
+                this.smartInterfaceEditorInput.setText("");
+            }
+            return;
+        }
+        this.smartInterfaceActiveVirtualKey = null;
+        clampSmartInterfaceIndex(dataList.length);
+        this.smartInterfaceEditorInput.setText(Float.toString(dataList[this.smartInterfaceIndex].getValue()));
+    }
+
+    private void drawCustomSmartInterfaceEditorsBackground(int mouseX, int mouseY, @Nullable Integer priorityFilter) {
+        for (CustomSmartEditor editor : this.customSmartEditors) {
+            if (priorityFilter != null && editor.priority != priorityFilter.intValue()) {
+                continue;
+            }
+            if (editor.input == null) {
+                continue;
+            }
+            int keyCount = editor.keys.size();
+            if (editor.prev != null) {
+                editor.prev.enabled = keyCount > 1;
+                editor.prev.drawButton(this.mc, mouseX, mouseY, 0F);
+            }
+            if (editor.next != null) {
+                editor.next.enabled = keyCount > 1;
+                editor.next.drawButton(this.mc, mouseX, mouseY, 0F);
+            }
+            if (editor.apply != null) {
+                editor.apply.enabled = keyCount > 0;
+                editor.apply.drawButton(this.mc, mouseX, mouseY, 0F);
+            }
+            editor.input.drawTextBox();
+        }
+    }
+
+    private void drawCustomSmartInterfaceEditorsForeground(@Nullable Integer priorityFilter) {
+        for (CustomSmartEditor editor : this.customSmartEditors) {
+            if (priorityFilter != null && editor.priority != priorityFilter.intValue()) {
+                continue;
+            }
+            if (editor.input == null) {
+                continue;
+            }
+            String activeKey = getCustomEditorActiveKey(editor);
+            int index = editor.keys.isEmpty() ? 0 : editor.index + 1;
+            int count = editor.keys.size();
+            if (editor.showTitle) {
+                String title = editor.title == null || editor.title.trim().isEmpty()
+                    ? "Virtual DataPort (" + index + "/" + count + ")"
+                    : editor.title
+                        .replace("{index}", Integer.toString(index))
+                        .replace("{count}", Integer.toString(count))
+                        .replace("{key}", activeKey);
+                this.fontRenderer.drawStringWithShadow(title, editor.x, editor.y - 10, 0xE0E0E0);
+            }
+            if (editor.showInfo) {
+                this.fontRenderer.drawStringWithShadow("Key: " + activeKey, editor.x, editor.y + SMART_EDITOR_INPUT_H + 2, 0xBFD3FF);
+            }
+        }
+    }
+
+    private boolean handleCustomSmartInterfaceMouseClicked(int mouseX, int mouseY, int mouseButton) {
+        if (mouseButton != 0) {
+            return false;
+        }
+        for (CustomSmartEditor editor : this.customSmartEditors) {
+            if (editor.input == null) {
+                continue;
+            }
+            if (editor.input.mouseClicked(mouseX, mouseY, mouseButton)) {
+                return true;
+            }
+            if (editor.prev != null && editor.keys.size() > 1 && editor.prev.mousePressed(this.mc, mouseX, mouseY)) {
+                editor.index = (editor.index + editor.keys.size() - 1) % editor.keys.size();
+                syncCustomSmartEditorInput(editor);
+                return true;
+            }
+            if (editor.next != null && editor.keys.size() > 1 && editor.next.mousePressed(this.mc, mouseX, mouseY)) {
+                editor.index = (editor.index + 1) % editor.keys.size();
+                syncCustomSmartEditorInput(editor);
+                return true;
+            }
+            if (editor.apply != null && editor.apply.mousePressed(this.mc, mouseX, mouseY)) {
+                applyCustomSmartEditorValue(editor);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean handleCustomSmartInterfaceKeyTyped(char typedChar, int keyCode) {
+        for (CustomSmartEditor editor : this.customSmartEditors) {
+            if (editor.input == null || !editor.input.isFocused()) {
+                continue;
+            }
+            if (keyCode == Keyboard.KEY_RETURN || keyCode == Keyboard.KEY_NUMPADENTER) {
+                applyCustomSmartEditorValue(editor);
+                return true;
+            }
+            if (Character.isDigit(typedChar) || typedChar == '.' || typedChar == '-' || typedChar == 'E' || typedChar == 'e'
+                || MiscUtils.isTextBoxKey(keyCode)) {
+                editor.input.textboxKeyTyped(typedChar, keyCode);
+                return true;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private void applyCustomSmartEditorValue(CustomSmartEditor editor) {
+        if (editor.input == null || editor.keys.isEmpty()) {
+            return;
+        }
+        String key = getCustomEditorActiveKey(editor);
+        if (key.isEmpty()) {
+            return;
+        }
+        String text = editor.input.getText();
+        if (text == null || text.trim().isEmpty()) {
+            return;
+        }
+        try {
+            float parsed = Float.parseFloat(text.trim());
+            if (!Float.isFinite(parsed)) {
+                return;
+            }
+            MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerSmartInterfaceUpdate(this.factory.getPos(), key, parsed));
+            String normalized = Float.toString(parsed);
+            editor.input.setText(normalized);
+            this.smartInterfaceVirtualInputCache.put(key, normalized);
+        } catch (NumberFormatException ignored) {
+        }
+    }
+
+    private void syncCustomSmartEditorInput(CustomSmartEditor editor) {
+        if (editor.input == null || editor.keys.isEmpty()) {
+            return;
+        }
+        if (editor.index < 0 || editor.index >= editor.keys.size()) {
+            editor.index = 0;
+        }
+        String key = editor.keys.get(editor.index);
+        String cached = this.smartInterfaceVirtualInputCache.get(key);
+        boolean switched = editor.activeKey == null || !editor.activeKey.equals(key);
+        editor.activeKey = key;
+        if (cached != null) {
+            editor.input.setText(cached);
+        } else if (switched || editor.input.getText() == null) {
+            editor.input.setText("");
+        }
+    }
+
+    private String getCustomEditorActiveKey(CustomSmartEditor editor) {
+        if (editor.keys.isEmpty()) {
+            return "";
+        }
+        if (editor.index < 0 || editor.index >= editor.keys.size()) {
+            editor.index = 0;
+        }
+        return editor.keys.get(editor.index);
+    }
+
+    private TreeSet<Integer> collectForegroundRenderPriorities() {
+        TreeSet<Integer> priorities = new TreeSet<Integer>();
+        priorities.add(Integer.valueOf(resolveForegroundContentPriority()));
+        for (TextureLayerDef layer : this.foregroundTextureLayers) {
+            priorities.add(Integer.valueOf(resolveLayerPriority(layer)));
+        }
+        if (this.smartInterfaceEditorInput != null) {
+            priorities.add(Integer.valueOf(this.smartInterfaceEditorPriority));
+        }
+        for (CustomSmartEditor editor : this.customSmartEditors) {
+            priorities.add(Integer.valueOf(editor.priority));
+        }
+        return priorities;
+    }
+
+    private void clampSmartInterfaceIndex(int size) {
+        if (size <= 0) {
+            this.smartInterfaceIndex = 0;
+            return;
+        }
+        this.smartInterfaceIndex = MathHelper.clamp(this.smartInterfaceIndex, 0, size - 1);
+    }
+
+    private boolean getSmartInterfaceEditorEnabled(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.enableSmartInterfaceEditor != null) {
+            return styleOverride.enableSmartInterfaceEditor.booleanValue();
+        }
+        return cfg.enableSmartInterfaceEditor;
+    }
+
+    private int getSmartInterfaceEditorX(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.smartInterfaceEditorX != null) {
+            return styleOverride.smartInterfaceEditorX.intValue();
+        }
+        return cfg.smartInterfaceEditorX;
+    }
+
+    private int getSmartInterfaceEditorY(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.smartInterfaceEditorY != null) {
+            return styleOverride.smartInterfaceEditorY.intValue();
+        }
+        return cfg.smartInterfaceEditorY;
+    }
+
+    private int getSmartInterfaceEditorInputWidth(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.smartInterfaceEditorInputWidth != null) {
+            return Math.max(40, styleOverride.smartInterfaceEditorInputWidth.intValue());
+        }
+        return Math.max(40, cfg.smartInterfaceEditorInputWidth);
+    }
+
+    private List<String> getSmartInterfaceEditorVirtualKeys(MMCEGuiExtConfig.FactoryController cfg) {
+        String raw = styleOverride.smartInterfaceEditorVirtualKey != null
+            ? styleOverride.smartInterfaceEditorVirtualKey
+            : cfg.smartInterfaceEditorVirtualKey;
+        return parseVirtualKeys(raw);
+    }
+
+    private String getSelectedSmartInterfaceVirtualKey(List<String> virtualKeys) {
+        if (virtualKeys.isEmpty()) {
+            return "";
+        }
+        clampSmartInterfaceIndex(virtualKeys.size());
+        return virtualKeys.get(this.smartInterfaceIndex);
+    }
+
+    private String resolveSmartInterfaceEditorTitle(boolean hasData, int count, int currentIndex, @Nullable String virtualKey) {
+        if (this.smartInterfaceCustomTitleText != null && !this.smartInterfaceCustomTitleText.isEmpty()) {
+            String key = virtualKey == null ? "" : virtualKey;
+            return this.smartInterfaceCustomTitleText
+                .replace("{count}", Integer.toString(Math.max(0, count)))
+                .replace("{index}", Integer.toString(Math.max(0, currentIndex)))
+                .replace("{key}", key);
+        }
+        if (hasData) {
+            return I18n.format("gui.smartinterface.title", count, currentIndex);
+        }
+        if (virtualKey != null && !virtualKey.isEmpty()) {
+            if (count > 1) {
+                return "Virtual DataPort (" + currentIndex + "/" + count + ")";
+            }
+            return "Virtual DataPort";
+        }
+        return "Smart Interface (0/0)";
+    }
+
+    private int resolveSmartInterfaceEditorX(MMCEGuiExtConfig.FactoryController cfg, int totalWidth) {
+        int configured = getSmartInterfaceEditorX(cfg);
+        if (configured >= 0) {
+            return MathHelper.clamp(configured, 2, Math.max(2, this.renderWidth - 2));
+        }
+        int autoX = this.renderWidth - totalWidth - 6;
+        if (this.renderWidth > BASE_WIDTH) {
+            // Keep default auto placement in right extension area first.
+            return Math.max(BASE_WIDTH + 2, autoX);
+        }
+        return Math.max(2, autoX);
+    }
+
+    private int resolveSmartInterfaceEditorY(MMCEGuiExtConfig.FactoryController cfg) {
+        int configured = getSmartInterfaceEditorY(cfg);
+        if (configured >= 0) {
+            return MathHelper.clamp(configured, 12, Math.max(12, this.renderHeight - SMART_EDITOR_INPUT_H - 14));
+        }
+        int autoY = this.renderHeight - SMART_EDITOR_INPUT_H - 6;
+        return MathHelper.clamp(autoY, 12, Math.max(12, this.renderHeight - SMART_EDITOR_INPUT_H - 14));
+    }
+
+    private void resetSmartInterfaceEditorHints() {
+        this.smartInterfaceHideInfoText = false;
+        this.smartInterfaceHideTitleText = false;
+        this.smartInterfaceCustomTitleText = null;
+    }
+
+    private boolean consumeGuiDirective(@Nullable String raw) {
+        return consumeSmartInterfaceEditorDirective(raw) || consumeTextureLayerDirective(raw);
+    }
+
+    private boolean consumeTextureLayerDirective(@Nullable String raw) {
+        if (raw == null) {
+            return false;
+        }
+        String text = raw.trim();
+        if (!text.startsWith("[") || !text.endsWith("]") || text.length() <= 2) {
+            return false;
+        }
+        String body = text.substring(1, text.length() - 1).trim();
+        if (body.isEmpty()) {
+            return false;
+        }
+
+        String lowerBody = body.toLowerCase(Locale.ROOT);
+        String prefix = "mmcege:layer.";
+        if (!lowerBody.startsWith(prefix)) {
+            return false;
+        }
+
+        String payload = body.substring(prefix.length()).trim();
+        if (payload.isEmpty()) {
+            return true;
+        }
+        if ("reset_all".equalsIgnoreCase(payload) || "clear_all".equalsIgnoreCase(payload)) {
+            this.layerRuntimeStates.clear();
+            return true;
+        }
+
+        int eqIdx = payload.indexOf('=');
+        String left = eqIdx >= 0 ? payload.substring(0, eqIdx).trim() : payload;
+        String right = eqIdx >= 0 ? payload.substring(eqIdx + 1).trim() : "";
+
+        int dotIdx = left.lastIndexOf('.');
+        if (dotIdx <= 0 || dotIdx >= left.length() - 1) {
+            return true;
+        }
+
+        String layerId = left.substring(0, dotIdx).trim();
+        String action = left.substring(dotIdx + 1).trim().toLowerCase(Locale.ROOT);
+        if (layerId.isEmpty()) {
+            return true;
+        }
+        if (!this.textureLayerIds.contains(layerId)) {
+            return true;
+        }
+
+        if ("reset".equals(action) || "clear".equals(action)) {
+            this.layerRuntimeStates.remove(layerId);
+            return true;
+        }
+
+        LayerRuntimeState state = this.layerRuntimeStates.get(layerId);
+        if (state == null) {
+            state = new LayerRuntimeState();
+            this.layerRuntimeStates.put(layerId, state);
+        }
+
+        if ("x".equals(action)) {
+            Integer value = parseDirectiveInt(right);
+            if (value != null) {
+                state.offsetX = value;
+            }
+            return true;
+        }
+        if ("y".equals(action)) {
+            Integer value = parseDirectiveInt(right);
+            if (value != null) {
+                state.offsetY = value;
+            }
+            return true;
+        }
+        if ("scale".equals(action)) {
+            Float value = parseDirectiveFloat(right);
+            if (value != null) {
+                state.scale = value;
+            }
+            return true;
+        }
+        if ("scalex".equals(action) || "scale_x".equals(action)) {
+            Float value = parseDirectiveFloat(right);
+            if (value != null) {
+                state.scaleX = value;
+            }
+            return true;
+        }
+        if ("scaley".equals(action) || "scale_y".equals(action)) {
+            Float value = parseDirectiveFloat(right);
+            if (value != null) {
+                state.scaleY = value;
+            }
+            return true;
+        }
+        if ("rotation".equals(action) || "rotate".equals(action) || "rot".equals(action)) {
+            Float value = parseDirectiveFloat(right);
+            if (value != null) {
+                state.rotation = value;
+            }
+            return true;
+        }
+        if ("priority".equals(action) || "z".equals(action) || "zindex".equals(action) || "z_index".equals(action)) {
+            Integer value = parseDirectiveInt(right);
+            if (value != null) {
+                state.priority = value;
+            }
+            return true;
+        }
+        if ("visible".equals(action) || "show".equals(action)) {
+            Boolean value = parseDirectiveBoolean(right);
+            if (value != null) {
+                state.visible = value;
+            }
+            return true;
+        }
+        return true;
+    }
+
+    @Nullable
+    private Integer parseDirectiveInt(@Nullable String raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(Integer.parseInt(raw.trim()));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private Float parseDirectiveFloat(@Nullable String raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            float value = Float.parseFloat(raw.trim());
+            return Float.isFinite(value) ? Float.valueOf(value) : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private Boolean parseDirectiveBoolean(@Nullable String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String text = raw.trim().toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("1".equals(text) || "true".equals(text) || "yes".equals(text) || "on".equals(text) || "show".equals(text)) {
+            return Boolean.TRUE;
+        }
+        if ("0".equals(text) || "false".equals(text) || "no".equals(text) || "off".equals(text) || "hide".equals(text)) {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    private boolean consumeSmartInterfaceEditorDirective(@Nullable String raw) {
+        if (raw == null) {
+            return false;
+        }
+        String text = raw.trim();
+        if (!text.startsWith("[") || !text.endsWith("]") || text.length() <= 2) {
+            return false;
+        }
+        String body = text.substring(1, text.length() - 1).trim();
+        if (body.isEmpty()) {
+            return false;
+        }
+
+        String lower = body.toLowerCase(Locale.ROOT);
+        if ("mmcege:si.hide_key".equals(lower) || "mmcege:si.hide_info".equals(lower)) {
+            this.smartInterfaceHideInfoText = true;
+            return true;
+        }
+        if ("mmcege:si.show_key".equals(lower) || "mmcege:si.show_info".equals(lower)) {
+            this.smartInterfaceHideInfoText = false;
+            return true;
+        }
+        if ("mmcege:si.hide_title".equals(lower)) {
+            this.smartInterfaceHideTitleText = true;
+            return true;
+        }
+        if ("mmcege:si.show_title".equals(lower)) {
+            this.smartInterfaceHideTitleText = false;
+            return true;
+        }
+        if ("mmcege:si.clear_title".equals(lower)) {
+            this.smartInterfaceCustomTitleText = null;
+            return true;
+        }
+
+        String titlePrefix = "mmcege:si.title=";
+        if (lower.startsWith(titlePrefix)) {
+            String custom = body.substring(titlePrefix.length()).trim();
+            this.smartInterfaceCustomTitleText = custom.isEmpty() ? null : custom;
+            this.smartInterfaceHideTitleText = false;
+            return true;
+        }
+        return false;
     }
 
     private RoutedText parseRoutedText(@Nullable String raw, String defaultPanelId) {
@@ -1155,13 +2382,80 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         }
     }
 
+    private static class TextureLayerDef {
+        private String id;
+        private ResourceLocation texture;
+        private int offsetX;
+        private int offsetY;
+        private int priority = DEFAULT_RENDER_PRIORITY;
+        @Nullable
+        private Integer width;
+        @Nullable
+        private Integer height;
+        @Nullable
+        private Integer textureWidth;
+        @Nullable
+        private Integer textureHeight;
+        @Nullable
+        private Integer corner;
+        @Nullable
+        private Boolean useNineSlice;
+    }
+
+    private static class LayerRuntimeState {
+        @Nullable
+        private Integer offsetX;
+        @Nullable
+        private Integer offsetY;
+        @Nullable
+        private Float scale;
+        @Nullable
+        private Float scaleX;
+        @Nullable
+        private Float scaleY;
+        @Nullable
+        private Float rotation;
+        @Nullable
+        private Integer priority;
+        @Nullable
+        private Boolean visible;
+    }
+
+    private static class CustomSmartEditor {
+        private String id;
+        private int x;
+        private int y;
+        private int priority = DEFAULT_SMART_EDITOR_PRIORITY;
+        private int inputWidth;
+        private List<String> keys = new ArrayList<String>();
+        private int index = 0;
+        @Nullable
+        private GuiTextField input;
+        @Nullable
+        private GuiButton prev;
+        @Nullable
+        private GuiButton next;
+        @Nullable
+        private GuiButton apply;
+        @Nullable
+        private String activeKey;
+        @Nullable
+        private String title;
+        private boolean showTitle = true;
+        private boolean showInfo = true;
+        private boolean showControls = true;
+        private boolean inputBackground = true;
+    }
+
     private static class PanelDef {
         private final String id;
-        private final PanelRect rect;
+        private final Rectangle rect;
 
-        private PanelDef(String id, PanelRect rect) {
+        private PanelDef(String id, Rectangle rect) {
             this.id = id;
             this.rect = rect;
         }
     }
 }
+
+

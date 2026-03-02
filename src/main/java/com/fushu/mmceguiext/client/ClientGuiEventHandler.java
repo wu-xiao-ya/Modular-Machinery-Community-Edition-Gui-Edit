@@ -56,8 +56,8 @@ public class ClientGuiEventHandler {
         String texture = pickTexture(style.backgroundTexture, MMCEGuiExtConfig.machineController.backgroundTexture);
         boolean hasCustomTexture = hasCustomTexture(texture, DEFAULT_MACHINE_BG);
         boolean hideDefault = pickHideDefault(style.hideDefaultBackground, MMCEGuiExtConfig.machineController.hideDefaultBackground);
-        boolean hasGuiSizeOverride = hasGuiSizeOverride(style);
-        return hasCustomTexture || hideDefault || hasGuiSizeOverride;
+        boolean hasMachineStyleOverride = hasMachineStyleOverride(style);
+        return hasCustomTexture || hideDefault || hasMachineStyleOverride;
     }
 
     private boolean shouldReplaceFactoryController(ContainerFactoryController container) {
@@ -67,9 +67,9 @@ public class ClientGuiEventHandler {
         String texture = pickTexture(style.backgroundTexture, MMCEGuiExtConfig.factoryController.backgroundTexture);
         boolean hasCustomTexture = hasCustomTexture(texture, DEFAULT_FACTORY_BG);
         boolean hideDefault = pickHideDefault(style.hideDefaultBackground, MMCEGuiExtConfig.factoryController.hideDefaultBackground);
-        boolean hasGuiSizeOverride = hasGuiSizeOverride(style);
+        boolean hasMachineStyleOverride = hasMachineStyleOverride(style);
         boolean customSpecialThreadColor = hasCustomSpecialThreadColor(style);
-        return hasCustomTexture || hideDefault || hasGuiSizeOverride || customSpecialThreadColor;
+        return hasCustomTexture || hideDefault || hasMachineStyleOverride || customSpecialThreadColor;
     }
 
     private DynamicMachine resolveMachine(DynamicMachine found, DynamicMachine blueprint) {
@@ -105,7 +105,7 @@ public class ClientGuiEventHandler {
         return global != DEFAULT_SPECIAL_THREAD_BG_COLOR;
     }
 
-    private boolean hasGuiSizeOverride(MachineGuiStyleManager.ControllerStyle style) {
-        return style.guiWidth != null || style.guiHeight != null;
+    private boolean hasMachineStyleOverride(MachineGuiStyleManager.ControllerStyle style) {
+        return style != MachineGuiStyleManager.ControllerStyle.EMPTY;
     }
 }

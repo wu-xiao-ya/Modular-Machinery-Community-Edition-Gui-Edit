@@ -1,7 +1,13 @@
-# Modular Machinery: Community Edition Gui Edit (MMCEGE, 1.12.2)
+﻿# Modular Machinery: Community Edition Gui Edit (MMCEGE, 1.12.2)
 
 MMCEGE addon for MMCE controller GUIs.  
 MMCEGE 是一个用于 MMCE 控制器 GUI 的附属模组。
+
+## Docs | 文档
+
+- Full tutorial (Chinese): `docs/TUTORIAL.zh-CN.md`
+- Game-ready example pack: `examples/game-ready-1.0.1/`
+- Quick start in example folder: `examples/game-ready-1.0.1/README.zh-CN.md`
 
 ## Features | 功能
 
@@ -23,7 +29,7 @@ From `C:\mc_modding\MMCE-FUSHU`:
 
 Output / 产物：
 
-- `mmce-gui-ext/build/libs/MMCEGE-1.0.0.jar`
+- `mmce-gui-ext/build/libs/MMCEGE-1.0.1.jar`
 
 ## Global Config | 全局配置
 
@@ -34,16 +40,34 @@ File / 配置文件：
 Important keys / 重要键：
 
 - `machineController.backgroundTexture`
+- `machineController.backgroundTextureWidth`
+- `machineController.backgroundTextureHeight`
+- `machineController.useNineSlice`
+- `machineController.backgroundCorner`
 - `machineController.hideDefaultBackground`
 - `machineController.disableRightExtension` (force width to MMCE base width, no right-side expanded area / 强制宽度为 MMCE 基础宽度，不启用右侧扩展区)
 - `machineController.defaultPanelId`
 - `machineController.customPanels` (format / 格式: `id,x,y,width,height`)
+- `machineController.enableSmartInterfaceEditor`
+- `machineController.smartInterfaceEditorX` (`-1` = auto right-bottom)
+- `machineController.smartInterfaceEditorY` (`-1` = auto right-bottom)
+- `machineController.smartInterfaceEditorInputWidth`
+- `machineController.smartInterfaceEditorVirtualKey` (used when no bound DataPort, writes to controller `customData[key]`; supports multiple keys split by `,` or `;`)
 - `factoryController.backgroundTexture`
+- `factoryController.backgroundTextureWidth`
+- `factoryController.backgroundTextureHeight`
+- `factoryController.useNineSlice`
+- `factoryController.backgroundCorner`
 - `factoryController.hideDefaultBackground`
 - `factoryController.disableRightExtension` (force width to MMCE base width, no right-side expanded area / 强制宽度为 MMCE 基础宽度，不启用右侧扩展区)
 - `factoryController.specialThreadBackgroundColor` (hex `RRGGBB` or `AARRGGBB`, for core/special thread row tint / 十六进制颜色，用于核心/特殊线程行着色)
 - `factoryController.defaultPanelId`
 - `factoryController.customPanels` (format / 格式: `id,x,y,width,height`)
+- `factoryController.enableSmartInterfaceEditor`
+- `factoryController.smartInterfaceEditorX` (`-1` = auto right-bottom)
+- `factoryController.smartInterfaceEditorY` (`-1` = auto right-bottom)
+- `factoryController.smartInterfaceEditorInputWidth`
+- `factoryController.smartInterfaceEditorVirtualKey` (used when no bound DataPort, writes to controller `customData[key]`; supports multiple keys split by `,` or `;`)
 
 Rules / 规则：
 
@@ -132,3 +156,46 @@ Supported aliases / 支持的别名：
 
 Per-machine JSON values override global config values for that machine.  
 机器 JSON 中的值会覆盖该机器对应的全局配置值。
+
+Since `1.0.1+`, if a machine defines any `mmce_gui_ext` style node, unspecified GUI size falls back to MMCE base size first (`176x213` / `280x213`) to reduce global `client.cfg` coupling.  
+从 `1.0.1+` 开始，只要机器定义了 `mmce_gui_ext` 样式节点，未显式填写的 GUI 尺寸会优先回退到 MMCE 基础尺寸（`176x213` / `280x213`），从而降低对全局 `client.cfg` 的耦合。
+
+If a machine uses custom texture but does not set `backgroundTextureWidth/Height`, renderer auto-uses runtime target size to avoid accidental scaling from global texture size.  
+若机器使用了自定义贴图但未设置 `backgroundTextureWidth/Height`，渲染器会自动使用运行时目标尺寸，避免被全局贴图尺寸误触发缩放。
+
+
+
+## 1.0.1 Offset For Left/Top Decorations | 1.0.1 左上装饰偏移
+
+Use these keys to align custom textures that place the main frame at (offsetX, offsetY):
+使用以下键让“主框不在贴图 0,0”的贴图正确对齐：
+
+- `machineController.backgroundTextureOffsetX`
+- `machineController.backgroundTextureOffsetY`
+- `factoryController.backgroundTextureOffsetX`
+- `factoryController.backgroundTextureOffsetY`
+
+Per-machine JSON override keys:
+机器 JSON 覆盖键：
+
+- `backgroundTextureOffsetX` / `background_texture_offset_x` / `textureOffsetX` / `texture_offset_x` / `offsetX` / `offset_x` / `textureOriginX` / `texture_origin_x`
+- `backgroundTextureOffsetY` / `background_texture_offset_y` / `textureOffsetY` / `texture_offset_y` / `offsetY` / `offset_y` / `textureOriginY` / `texture_origin_y`
+- `backgroundTextureWidth` / `background_texture_width` / `textureWidth` / `texture_width`
+- `backgroundTextureHeight` / `background_texture_height` / `textureHeight` / `texture_height`
+- `useNineSlice` / `use_nine_slice` / `nineSlice` / `nine_slice`
+- `backgroundCorner` / `background_corner` / `corner` / `cornerSize` / `corner_size`
+- `enableSmartInterfaceEditor` / `enable_smart_interface_editor` / `enableDataPortEditor` / `enable_data_port_editor` / `enableDataPort`
+- `smartInterfaceEditorX` / `smart_interface_editor_x` / `dataPortEditorX` / `data_port_editor_x` / `dataPortX` / `data_port_x`
+- `smartInterfaceEditorY` / `smart_interface_editor_y` / `dataPortEditorY` / `data_port_editor_y` / `dataPortY` / `data_port_y`
+- `smartInterfaceEditorInputWidth` / `smart_interface_editor_input_width` / `dataPortEditorInputWidth` / `data_port_editor_input_width` / `dataPortWidth` / `data_port_width`
+- `smartInterfaceEditorVirtualKey` / `smart_interface_editor_virtual_key` / `dataPortEditorVirtualKey` / `data_port_editor_virtual_key` / `virtualDataPortKey` / `virtual_data_port_key`
+
+Smart Interface editor ZS directives (put in `ControllerGUIRenderEvent.extraInfo[]`):
+Smart Interface 编辑器 ZS 指令（写在 `ControllerGUIRenderEvent.extraInfo[]`）：
+
+- `[mmcege:si.hide_key]` / `[mmcege:si.hide_info]` hide the bottom info line (`Key: ...` or value info)
+- `[mmcege:si.show_key]` / `[mmcege:si.show_info]` show the bottom info line (default)
+- `[mmcege:si.hide_title]` hide top title line
+- `[mmcege:si.show_title]` show top title line (default)
+- `[mmcege:si.title=Your Title]` set custom top title; supports placeholders `{index}` `{count}` `{key}`
+- `[mmcege:si.clear_title]` clear custom title and restore default

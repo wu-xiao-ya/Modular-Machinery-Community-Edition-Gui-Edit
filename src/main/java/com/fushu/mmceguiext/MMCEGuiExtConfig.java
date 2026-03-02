@@ -53,6 +53,14 @@ public class MMCEGuiExtConfig {
 
         @Config.Comment("鑷畾涔夎儗鏅创鍥捐祫婧愯矾寰勶紝鐣欑┖琛ㄧず鏃?/ Custom background texture resource location, empty means none.")
         public String backgroundTexture = "";
+        
+        @Config.Comment("Custom texture origin offset X. Positive value lets texture extend to the left of GUI origin.")
+        @Config.RangeInt(min = 0, max = 1024)
+        public int backgroundTextureOffsetX = 0;
+
+        @Config.Comment("Custom texture origin offset Y. Positive value lets texture extend above GUI origin.")
+        @Config.RangeInt(min = 0, max = 1024)
+        public int backgroundTextureOffsetY = 0;
 
         @Config.Comment("鏈彁渚涜嚜瀹氫箟璐村浘鏃舵槸鍚﹂殣钘廙MCE榛樿鑳屾櫙 / Hide MMCE default background when no custom texture is provided.")
         public boolean hideDefaultBackground = false;
@@ -71,6 +79,24 @@ public class MMCEGuiExtConfig {
         @Config.Comment("9瀹牸鎷愯灏哄 / Corner size used by 9-slice rendering.")
         @Config.RangeInt(min = 2, max = 128)
         public int backgroundCorner = 8;
+
+        @Config.Comment("Enable Smart Interface editor in controller GUI.")
+        public boolean enableSmartInterfaceEditor = true;
+
+        @Config.Comment("Smart Interface editor X in GUI. -1 = auto place at right-bottom.")
+        @Config.RangeInt(min = -1, max = 2048)
+        public int smartInterfaceEditorX = -1;
+
+        @Config.Comment("Smart Interface editor Y in GUI. -1 = auto place at right-bottom.")
+        @Config.RangeInt(min = -1, max = 2048)
+        public int smartInterfaceEditorY = -1;
+
+        @Config.Comment("Smart Interface editor input width.")
+        @Config.RangeInt(min = 40, max = 512)
+        public int smartInterfaceEditorInputWidth = 68;
+
+        @Config.Comment("Virtual Smart Interface key when no DataPort is bound. Empty = disabled.")
+        public String smartInterfaceEditorVirtualKey = "mmcege_virtual_port";
     }
 
     public static class FactoryController {
@@ -109,6 +135,14 @@ public class MMCEGuiExtConfig {
 
         @Config.Comment("鑷畾涔夎儗鏅创鍥捐祫婧愯矾寰勶紝鐣欑┖琛ㄧず鏃?/ Custom background texture resource location, empty means none.")
         public String backgroundTexture = "";
+        
+        @Config.Comment("Custom texture origin offset X. Positive value lets texture extend to the left of GUI origin.")
+        @Config.RangeInt(min = 0, max = 1024)
+        public int backgroundTextureOffsetX = 0;
+
+        @Config.Comment("Custom texture origin offset Y. Positive value lets texture extend above GUI origin.")
+        @Config.RangeInt(min = 0, max = 1024)
+        public int backgroundTextureOffsetY = 0;
 
         @Config.Comment("鏈彁渚涜嚜瀹氫箟璐村浘鏃舵槸鍚﹂殣钘廙MCE榛樿鑳屾櫙 / Hide MMCE default background when no custom texture is provided.")
         public boolean hideDefaultBackground = false;
@@ -134,5 +168,24 @@ public class MMCEGuiExtConfig {
         @Config.Comment("Visible recipe queue rows on the left panel.")
         @Config.RangeInt(min = 1, max = 20)
         public int queueVisibleRows = 6;
+
+        @Config.Comment("Enable Smart Interface editor in factory GUI.")
+        public boolean enableSmartInterfaceEditor = true;
+
+        @Config.Comment("Smart Interface editor X in GUI. -1 = auto place at right-bottom.")
+        @Config.RangeInt(min = -1, max = 2048)
+        public int smartInterfaceEditorX = -1;
+
+        @Config.Comment("Smart Interface editor Y in GUI. -1 = auto place at right-bottom.")
+        @Config.RangeInt(min = -1, max = 2048)
+        public int smartInterfaceEditorY = -1;
+
+        @Config.Comment("Smart Interface editor input width.")
+        @Config.RangeInt(min = 40, max = 512)
+        public int smartInterfaceEditorInputWidth = 68;
+
+        @Config.Comment("Virtual Smart Interface key when no DataPort is bound. Empty = disabled.")
+        public String smartInterfaceEditorVirtualKey = "mmcege_virtual_port";
     }
 }
+

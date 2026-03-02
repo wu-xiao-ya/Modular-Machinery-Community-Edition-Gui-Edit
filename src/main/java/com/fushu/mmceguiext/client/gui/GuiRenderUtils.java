@@ -8,6 +8,7 @@ import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
 import javax.annotation.Nullable;
+import java.awt.Rectangle;
 
 public final class GuiRenderUtils {
     private GuiRenderUtils() {
@@ -54,11 +55,11 @@ public final class GuiRenderUtils {
         GL11.glDisable(GL11.GL_SCISSOR_TEST);
     }
 
-    public static boolean isMouseInPanel(int mouseX, int mouseY, PanelRect panel, int guiLeft, int guiTop) {
-        int left = guiLeft + panel.getX();
-        int top = guiTop + panel.getY();
-        int right = left + panel.getWidth();
-        int bottom = top + panel.getHeight();
+    public static boolean isMouseInPanel(int mouseX, int mouseY, Rectangle panel, int guiLeft, int guiTop) {
+        int left = guiLeft + panel.x;
+        int top = guiTop + panel.y;
+        int right = left + panel.width;
+        int bottom = top + panel.height;
         return mouseX >= left && mouseX < right && mouseY >= top && mouseY < bottom;
     }
 
