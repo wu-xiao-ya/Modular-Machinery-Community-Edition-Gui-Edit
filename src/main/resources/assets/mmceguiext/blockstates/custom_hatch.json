@@ -1,0 +1,9 @@
+{
+  "variants": {
+    "facing=north": { "model": "mmceguiext:custom_hatch" },
+    "facing=south": { "model": "mmceguiext:custom_hatch", "y": 180 },
+    "facing=west": { "model": "mmceguiext:custom_hatch", "y": 270 },
+    "facing=east": { "model": "mmceguiext:custom_hatch", "y": 90 },
+    "inventory": { "model": "mmceguiext:custom_hatch" }
+  }
+}

@@ -1,0 +1,252 @@
+﻿{
+    "registryname":  "assembly_line",
+    "localizedname":  "搂bAssembly Line",
+    "failure-action":  "decrease",
+    "requires-blueprint":  false,
+    "color":  "FFFFFF",
+    "dynamic-patterns":  [
+                             {
+                                 "name":  "line",
+                                 "faces":  [
+                                               "north"
+                                           ],
+                                 "minSize":  5,
+                                 "maxSize":  15,
+                                 "parts":  [
+                                               {
+                                                   "x":  0,
+                                                   "y":  -1,
+                                                   "z":  0,
+                                                   "selector-tag":  "input",
+                                                   "elements":  [
+                                                                    "modularmachinery:blockinputbus@0"
+                                                                ]
+                                               },
+                                               {
+                                                   "x":  1,
+                                                   "y":  -1,
+                                                   "z":  0,
+                                                   "selector-tag":  "input",
+                                                   "elements":  [
+                                                                    "modularmachinery:blockcasing@3",
+                                                                    "modularmachinery:blockfluidinputhatch"
+                                                                ]
+                                               },
+                                               {
+                                                   "x":  -1,
+                                                   "y":  0,
+                                                   "z":  0,
+                                                   "elements":  [
+                                                                    "minecraft:glass@0"
+                                                                ]
+                                               },
+                                               {
+                                                   "x":  1,
+                                                   "y":  0,
+                                                   "z":  0,
+                                                   "elements":  [
+                                                                    "minecraft:glass@0"
+                                                                ]
+                                               },
+                                               {
+                                                   "x":  -1,
+                                                   "y":  1,
+                                                   "z":  0,
+                                                   "elements":  [
+                                                                    "minecraft:quartz_stairs@0"
+                                                                ]
+                                               },
+                                               {
+                                                   "x":  1,
+                                                   "y":  1,
+                                                   "z":  0,
+                                                   "elements":  [
+                                                                    "minecraft:quartz_stairs@1"
+                                                                ]
+                                               },
+                                               {
+                                                   "x":  0,
+                                                   "y":  1,
+                                                   "z":  0,
+                                                   "elements":  [
+                                                                    "modularmachinery:blockenergyinputhatch",
+                                                                    "modularmachinery:blockcasing@5"
+                                                                ]
+                                               },
+                                               {
+                                                   "x":  -1,
+                                                   "y":  -1,
+                                                   "z":  0,
+                                                   "selector-tag":  "input",
+                                                   "elements":  [
+                                                                    "modularmachinery:blockcasing@3",
+                                                                    "modularmachinery:blockfluidinputhatch"
+                                                                ]
+                                               }
+                                           ],
+                                 "parts-end":  [
+                                                   {
+                                                       "x":  0,
+                                                       "y":  -1,
+                                                       "z":  0,
+                                                       "elements":  [
+                                                                        "modularmachinery:blockcasing@5"
+                                                                    ]
+                                                   },
+                                                   {
+                                                       "x":  1,
+                                                       "y":  -1,
+                                                       "z":  0,
+                                                       "elements":  [
+                                                                        "modularmachinery:blockcasing@4"
+                                                                    ]
+                                                   },
+                                                   {
+                                                       "x":  -1,
+                                                       "y":  0,
+                                                       "z":  0,
+                                                       "elements":  [
+                                                                        "modularmachinery:blockcasing@4"
+                                                                    ]
+                                                   },
+                                                   {
+                                                       "x":  0,
+                                                       "y":  0,
+                                                       "z":  0,
+                                                       "selector-tag":  "output",
+                                                       "elements":  [
+                                                                        "modularmachinery:blockoutputbus"
+                                                                    ]
+                                                   },
+                                                   {
+                                                       "x":  1,
+                                                       "y":  0,
+                                                       "z":  0,
+                                                       "elements":  [
+                                                                        "modularmachinery:blockcasing@4"
+                                                                    ]
+                                                   },
+                                                   {
+                                                       "x":  -1,
+                                                       "y":  1,
+                                                       "z":  0,
+                                                       "elements":  [
+                                                                        "modularmachinery:blockcasing@4"
+                                                                    ]
+                                                   },
+                                                   {
+                                                       "x":  1,
+                                                       "y":  1,
+                                                       "z":  0,
+                                                       "elements":  [
+                                                                        "modularmachinery:blockcasing@4"
+                                                                    ]
+                                                   },
+                                                   {
+                                                       "x":  0,
+                                                       "y":  1,
+                                                       "z":  0,
+                                                       "elements":  [
+                                                                        "modularmachinery:blockcasing@5"
+                                                                    ]
+                                                   },
+                                                   {
+                                                       "x":  -1,
+                                                       "y":  -1,
+                                                       "z":  0,
+                                                       "elements":  [
+                                                                        "modularmachinery:blockcasing@4"
+                                                                    ]
+                                                   }
+                                               ],
+                                 "structure-size-offset-start":  {
+                                                                     "x":  0,
+                                                                     "y":  0,
+                                                                     "z":  1
+                                                                 },
+                                 "structure-size-offset":  {
+                                                               "x":  0,
+                                                               "y":  0,
+                                                               "z":  1
+                                                           }
+                             }
+                         ],
+    "parts":  [
+                  {
+                      "x":  0,
+                      "y":  -1,
+                      "z":  0,
+                      "elements":  [
+                                       "modularmachinery:blockcasing@5",
+                                       "modularmachinery:blockparallelcontroller"
+                                   ]
+                  },
+                  {
+                      "x":  1,
+                      "y":  -1,
+                      "z":  0,
+                      "elements":  [
+                                       "modularmachinery:blockcasing@4"
+                                   ]
+                  },
+                  {
+                      "x":  -1,
+                      "y":  0,
+                      "z":  0,
+                      "elements":  [
+                                       "modularmachinery:blockcasing@4"
+                                   ]
+                  },
+                  {
+                      "x":  1,
+                      "y":  0,
+                      "z":  0,
+                      "elements":  [
+                                       "modularmachinery:blockcasing@4"
+                                   ]
+                  },
+                  {
+                      "x":  -1,
+                      "y":  1,
+                      "z":  0,
+                      "elements":  [
+                                       "modularmachinery:blockcasing@4"
+                                   ]
+                  },
+                  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  0,
+                      "elements":  [
+                                       "modularmachinery:blockcasing@4"
+                                   ]
+                  },
+                  {
+                      "x":  0,
+                      "y":  1,
+                      "z":  0,
+                      "elements":  [
+                                       "modularmachinery:blockcasing@5",
+                                       "modularmachinery:blockupgradebus"
+                                   ]
+                  },
+                  {
+                      "x":  -1,
+                      "y":  -1,
+                      "z":  0,
+                      "elements":  [
+                                       "modularmachinery:blockcasing@4"
+                                   ]
+                  }
+              ],
+    "mmce_gui_ext":  {
+                         "machineController":  {
+                                                   "backgroundTexture":  "modularmachinery:textures/gui/guicontroller_large.png",
+                                                   "hideDefaultBackground":  false
+                                               },
+                         "factoryController":  {
+                                                   "backgroundTexture":  "modularmachinery:textures/gui/guifactory.png",
+                                                   "hideDefaultBackground":  false
+                                               }
+                     }
+}

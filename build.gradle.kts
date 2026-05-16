@@ -1,11 +1,11 @@
-plugins {
+﻿plugins {
     id("java-library")
     id("maven-publish")
     id("com.gtnewhorizons.retrofuturagradle") version "1.4.0"
 }
 
 group = "com.fushu.mmce"
-version = "1.0.0"
+version = "1.0.1-beta"
 
 java {
     withSourcesJar()
@@ -18,6 +18,7 @@ minecraft {
 }
 
 repositories {
+    mavenCentral()
     maven {
         name = "GTNH Maven"
         url = uri("https://nexus.gtnewhorizons.com/repository/public/")
@@ -38,7 +39,16 @@ dependencies {
     patchedMinecraft("me.eigenraven.java8unsupported:java-8-unsupported-shim:1.0.0")
 
     implementation(rfg.deobf("curse.maven:modular-machinery-community-edition-817377:7372953"))
+    implementation("com.google.code.gson:gson:2.8.9")
+    compileOnly(rfg.deobf("curse.maven:the-one-probe-245211:2667280"))
+    compileOnly(rfg.deobf("curse.maven:ae2-extended-life-570458:6302098"))
+    compileOnly(rfg.deobf("curse.maven:ae2-fluid-crafting-rework-623955:5504001"))
+    compileOnly(rfg.deobf("curse.maven:Mekanism-268560:2835175"))
+    compileOnly(rfg.deobf("curse.maven:mekanism-energistics-1027681:5408319"))
+    compileOnly(rfg.deobf("curse.maven:had-enough-items-557549:4810661"))
     compileOnly("software.bernie.geckolib:geckolib-forge-1.12.2:3.0.31")
+
+    testImplementation("junit:junit:4.13.2")
 }
 
 tasks.processResources.configure {
@@ -68,3 +78,4 @@ publishing {
         }
     }
 }
+

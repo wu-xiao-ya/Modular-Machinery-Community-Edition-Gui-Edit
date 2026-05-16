@@ -1,0 +1,38 @@
+{
+  // 这个模板只演示背景替换。
+  // This template only demonstrates background replacement.
+  "registryname": "mmcege_background_only_demo",
+  "localizedname": "MMCEGE Background Only Demo / MMCEGE 仅背景示例",
+  "requires-blueprint": false,
+  "has-factory": true,
+  "mmce_gui_ext": {
+    "machineController": {
+      // 改这里：普通控制器背景图路径。
+      // Change this: normal controller background texture.
+      "backgroundTexture": "modularmachinery:textures/gui/guicontroller_large.png",
+      // false = 保留 MMCE 默认底图。
+      // false = keep MMCE default background.
+      "hideDefaultBackground": false
+    },
+    "factoryController": {
+      // 改这里：工厂控制器背景图路径。
+      // Change this: factory controller background texture.
+      "backgroundTexture": "modularmachinery:textures/gui/guifactory.png",
+      // false = 保留 MMCE 默认底图。
+      // false = keep MMCE default background.
+      "hideDefaultBackground": false
+    }
+  },
+  "parts": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "elements": [
+        // 这个部件决定它是工厂控制器样式。
+        // This block makes the machine behave like a factory controller.
+        "modularmachinery:blockfactorycontroller@0"
+      ]
+    }
+  ]
+}

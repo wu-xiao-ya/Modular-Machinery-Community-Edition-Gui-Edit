@@ -1,0 +1,42 @@
+{
+  // 这个模板只演示工厂控制器的队列区和右侧扩展。
+  // This template only demonstrates the factory queue and right expansion.
+  "registryname": "mmcege_factory_queue_demo",
+  "localizedname": "MMCEGE Factory Queue Demo / MMCEGE 工厂队列示例",
+  "requires-blueprint": false,
+  "has-factory": true,
+  "mmce_gui_ext": {
+    "factoryController": {
+      // 工厂 GUI 宽度，拉宽后右侧会有更多展示空间。
+      // Factory GUI width. Wider GUI gives more room on the right.
+      "guiWidth": 460,
+      // GUI 高度，决定整个界面高度。
+      // GUI height, controls the overall screen height.
+      "guiHeight": 230,
+      // 打开右侧扩展。
+      // Enable the right-side extension area.
+      "enableRightExtension": true,
+      // 线程背景色，工厂核心区域会用到。
+      // Background tint color used by the factory core/thread area.
+      "specialThreadBackgroundColor": "FF7DD3FC",
+      // 这两个分区会把右侧空间切成上、下两块。
+      // These two panels split the right side into upper and lower zones.
+      "customPanels": [
+        "main,286,10,168,96",
+        "log,286,110,168,84"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "elements": [
+        // 工厂控制器部件。
+        // Factory controller block.
+        "modularmachinery:blockfactorycontroller@0"
+      ]
+    }
+  ]
+}

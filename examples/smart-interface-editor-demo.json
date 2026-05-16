@@ -1,0 +1,128 @@
+{
+  "registryname": "mmcege_demo_multi_port",
+  "localizedname": "MMCEGE GUI DataPort Demo / MMCEGE GUI 数据端口示例",
+  "requires-blueprint": false,
+  "has-factory": true,
+  "color": "66CCFF",
+  "mmce_gui_ext": {
+    "factoryController": {
+      "backgroundTexture": "modularmachinery:textures/gui/guifactory.png",
+      "enableRightExtension": true,
+      "guiWidth": 420,
+      "guiHeight": 213,
+      "enableSmartInterfaceEditor": true,
+      "hideDefaultSmartInterfaceEditor": true,
+      "smartInterfaceEditors": [
+        {
+          "id": "port_a",
+          "x": 286,
+          "y": 170,
+          "inputWidth": 62,
+          "virtualKey": "demo_port_a",
+          "title": "Port A / 端口A",
+          "showInfo": false,
+          "showControls": false,
+          "inputBackground": false
+        },
+        {
+          "id": "port_b",
+          "x": 286,
+          "y": 186,
+          "inputWidth": 62,
+          "virtualKey": "demo_port_b",
+          "title": "Port B / 端口B",
+          "showInfo": false,
+          "showControls": false,
+          "inputBackground": false
+        },
+        {
+          "id": "port_c",
+          "x": 286,
+          "y": 202,
+          "inputWidth": 62,
+          "virtualKey": "demo_port_c",
+          "title": "Port C / 端口C",
+          "showInfo": false,
+          "showControls": false,
+          "inputBackground": false
+        }
+      ],
+      "textureLayers": [
+        {
+          "texture": "modularmachinery:textures/gui/guifactoryelements.png",
+          "offsetX": 0,
+          "offsetY": 0,
+          "width": 420,
+          "height": 213,
+          "textureWidth": 86,
+          "textureHeight": 32,
+          "foreground": true
+        }
+      ]
+    },
+    "machineController": {
+      "backgroundTexture": "modularmachinery:textures/gui/guicontroller_large.png",
+      "enableRightExtension": true,
+      "guiWidth": 320,
+      "guiHeight": 213,
+      "enableSmartInterfaceEditor": true,
+      "hideDefaultSmartInterfaceEditor": true,
+      "smartInterfaceEditors": [
+        {
+          "id": "port_a",
+          "x": 182,
+          "y": 170,
+          "inputWidth": 62,
+          "virtualKey": "demo_port_a",
+          "title": "Port A / 端口A",
+          "showInfo": false,
+          "showControls": false,
+          "inputBackground": false
+        },
+        {
+          "id": "port_b",
+          "x": 182,
+          "y": 186,
+          "inputWidth": 62,
+          "virtualKey": "demo_port_b",
+          "title": "Port B / 端口B",
+          "showInfo": false,
+          "showControls": false,
+          "inputBackground": false
+        },
+        {
+          "id": "port_c",
+          "x": 182,
+          "y": 202,
+          "inputWidth": 62,
+          "virtualKey": "demo_port_c",
+          "title": "Port C / 端口C",
+          "showInfo": false,
+          "showControls": false,
+          "inputBackground": false
+        }
+      ],
+      "backgroundLayers": [
+        {
+          "texture": "modularmachinery:textures/gui/guicontroller_large.png",
+          "offsetX": 0,
+          "offsetY": 0,
+          "width": 320,
+          "height": 213,
+          "textureWidth": 176,
+          "textureHeight": 213
+        }
+      ]
+    }
+  },
+  "parts": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "elements": [
+        "modularmachinery:blockfactorycontroller@0"
+      ]
+    }
+  ]
+}

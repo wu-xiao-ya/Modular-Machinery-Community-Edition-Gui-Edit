@@ -1,0 +1,8 @@
+.gradle/
+build/
+run/
+bin/
+.idea/
+.vscode/
+*.log
+cmd_exit.txt

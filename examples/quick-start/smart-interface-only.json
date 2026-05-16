@@ -1,0 +1,86 @@
+{
+  // 这个模板只演示 Smart Interface 编辑器。
+  // This template only demonstrates Smart Interface editors.
+  "registryname": "mmcege_smart_interface_only_demo",
+  "localizedname": "MMCEGE Smart Interface Only Demo / MMCEGE 仅 Smart Interface 示例",
+  "requires-blueprint": false,
+  "has-factory": true,
+  "mmce_gui_ext": {
+    "machineController": {
+      // 打开 Smart Interface 编辑器。
+      // Enable the Smart Interface editor.
+      "enableSmartInterfaceEditor": true,
+      // 隐藏默认编辑器，只显示下面自定义的条目。
+      // Hide the default editor and show only custom entries below.
+      "hideDefaultSmartInterfaceEditor": true,
+      "smartInterfaceEditors": [
+        {
+          // 条目 ID，方便你在多个条目里区分。
+          // Entry ID for identifying this slot.
+          "id": "input_a",
+          // 在 GUI 里的位置。
+          // Position inside the GUI.
+          "x": 182,
+          "y": 170,
+          // 输入框宽度。
+          // Input box width.
+          "inputWidth": 68,
+          // 绑定的虚拟 key。空格分隔多个 key 也可以。
+          // Bound virtual key. Multiple keys can be comma-separated.
+          "virtualKey": "demo_input_a",
+          // 显示给作者看的标题。
+          // Title shown to the author.
+          "title": "Input A / 输入A",
+          // 是否显示标题。
+          // Whether to show the title.
+          "showTitle": true,
+          // 是否显示说明信息。
+          // Whether to show info text.
+          "showInfo": false,
+          // 是否显示左右按钮等控件。
+          // Whether to show control buttons.
+          "showControls": true,
+          // 是否显示输入框背景。
+          // Whether to show the input background.
+          "inputBackground": true,
+          // 渲染优先级，数值越大越靠后画。
+          // Render priority; higher values draw later.
+          "priority": 20
+        }
+      ]
+    },
+    "factoryController": {
+      // 工厂控制器也可以单独开一份同样的条目。
+      // Factory controller can define its own matching entry.
+      "enableSmartInterfaceEditor": true,
+      "hideDefaultSmartInterfaceEditor": true,
+      "smartInterfaceEditors": [
+        {
+          "id": "input_a",
+          "x": 286,
+          "y": 170,
+          "inputWidth": 68,
+          "virtualKey": "demo_input_a",
+          "title": "Input A / 输入A",
+          "showTitle": true,
+          "showInfo": false,
+          "showControls": true,
+          "inputBackground": true,
+          "priority": 20
+        }
+      ]
+    }
+  },
+  "parts": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "elements": [
+        // 工厂控制器部件。
+        // Factory controller block.
+        "modularmachinery:blockfactorycontroller@0"
+      ]
+    }
+  ]
+}

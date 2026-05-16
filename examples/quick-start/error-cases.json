@@ -1,0 +1,40 @@
+{
+  // 这个模板故意带错误字段，用来测试日志报错是否清楚。
+  // This template intentionally contains invalid fields to test error logging.
+  "registryname": "mmcege_error_case_demo",
+  "localizedname": "MMCEGE Error Case Demo / MMCEGE 错误示例",
+  "requires-blueprint": false,
+  "has-factory": true,
+  "mmce_gui_ext": {
+    "machineController": {
+      // 缺少 virtualKey，应该触发“字段不全”报错。
+      // Missing virtualKey; should trigger a "missing fields" warning.
+      "smartInterfaceEditors": [
+        {
+          "x": 12,
+          "y": 8
+        }
+      ],
+      // 第一个元素是数字，第二个元素缺 texture，都会报错。
+      // First item is a number, second item lacks texture; both should log errors.
+      "foregroundLayers": [
+        123,
+        {
+          "id": "missing_texture"
+        }
+      ]
+    }
+  },
+  "parts": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "elements": [
+        // 工厂控制器部件。
+        // Factory controller block.
+        "modularmachinery:blockfactorycontroller@0"
+      ]
+    }
+  ]
+}

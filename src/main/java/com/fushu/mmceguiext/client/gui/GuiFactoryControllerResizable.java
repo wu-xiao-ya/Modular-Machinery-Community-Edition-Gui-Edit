@@ -23,6 +23,7 @@ import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.resources.I18n;
+import net.minecraft.inventory.Slot;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.MathHelper;
 import org.lwjgl.input.Mouse;
@@ -46,7 +47,13 @@ import java.util.TreeSet;
 public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFactoryController> {
     private static final int BASE_WIDTH = 280;
     private static final int BASE_HEIGHT = 213;
+    private static final int PLAYER_INVENTORY_LEFT = 112;
     private static final int PLAYER_INVENTORY_TOP = 131;
+    private static final int PLAYER_HOTBAR_TOP = 189;
+    private static final int PLAYER_INVENTORY_WIDTH = 162;
+    private static final int PLAYER_INVENTORY_HEIGHT = 76;
+    private static final int HIDDEN_PLAYER_INVENTORY_TOP = 9999;
+    private static final int PLAYER_INVENTORY_MASK_COLOR = 0xFF555555;
 
     private static final ResourceLocation DEFAULT_BACKGROUND = new ResourceLocation(
         ModularMachinery.MODID,
@@ -131,6 +138,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         this.customBackgroundTexture = resolveCustomTexture();
         this.specialThreadBgColor = resolveSpecialThreadBgColor();
         super.initGui();
+        applyPlayerInventoryVisibility(MMCEGuiExtConfig.factoryController);
         initTextureLayers(MMCEGuiExtConfig.factoryController);
         this.panelScroll.clear();
         this.panelMaxScroll.clear();
@@ -175,6 +183,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                     drawStatusPanels();
                 }
             }
+            drawConfiguredTexts(Integer.valueOf(priority));
             drawConfiguredTextureLayers(true, cfg, Integer.valueOf(priority));
             if (this.smartInterfaceEditorPriority == priority) {
                 GlStateManager.pushMatrix();
@@ -189,6 +198,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             GlStateManager.popMatrix();
             drawCustomSmartInterfaceEditorsForeground(Integer.valueOf(priority));
         }
+        resetForegroundRenderState();
     }
 
     @Override
@@ -198,6 +208,9 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         if (isUsingDefaultBackground(cfg)) {
             this.mc.getTextureManager().bindTexture(DEFAULT_BACKGROUND);
             Gui.drawModalRectWithCustomSizedTexture(guiLeft, guiTop, 0, 0, BASE_WIDTH, BASE_HEIGHT, BASE_WIDTH, BASE_HEIGHT);
+            if (getHidePlayerInventory(cfg)) {
+                maskPlayerInventoryArea();
+            }
             drawConfiguredTextureLayers(false, cfg);
             updateRecipeScrollbar(this.guiLeft, this.guiTop);
             recipeScrollbar.draw(this, mc);
@@ -231,6 +244,10 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             if (this.renderWidth > BASE_WIDTH || this.renderHeight > BASE_HEIGHT) {
                 drawExtensionFallback();
             }
+        }
+
+        if (getHidePlayerInventory(cfg) && this.customBackgroundTexture == null) {
+            maskPlayerInventoryArea();
         }
 
         // Custom panel backgrounds are intentionally not rendered.
@@ -461,6 +478,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     }
 
     private void drawDefaultFactoryStatus() {
+        MMCEGuiExtConfig.FactoryController cfg = MMCEGuiExtConfig.factoryController;
         GlStateManager.pushMatrix();
         GlStateManager.scale(FONT_SCALE, FONT_SCALE, FONT_SCALE);
 
@@ -484,10 +502,20 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         }
 
         DynamicMachine machine = factory.getBlueprintMachine();
-        offsetY = drawDefaultBlueprintInfo(offsetX, offsetY, machine, factory.isStructureFormed());
+        if (getShowBlueprintInfo(cfg)) {
+            offsetY = drawDefaultBlueprintInfo(offsetX, offsetY, machine, factory.isStructureFormed());
+        }
 
         DynamicMachine found = factory.getFoundMachine();
-        offsetY = drawDefaultStructureInfo(offsetX, offsetY, found);
+        if (getShowStructureInfo(cfg)) {
+            offsetY = drawDefaultStructureInfo(offsetX, offsetY, found);
+        } else if (found != null) {
+            ControllerGUIRenderEvent event = new ControllerGUIRenderEvent(factory);
+            event.postEvent();
+            for (String extra : event.getExtraInfo()) {
+                consumeGuiDirective(extra);
+            }
+        }
 
         if (!factory.isStructureFormed()) {
             GlStateManager.popMatrix();
@@ -495,29 +523,35 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         }
         offsetY += 15;
 
-        offsetY = drawDefaultFactoryRecipeSearchStatusInfo(offsetX, offsetY);
+        if (getShowStatusInfo(cfg)) {
+            offsetY = drawDefaultFactoryRecipeSearchStatusInfo(offsetX, offsetY);
+        }
 
         int tmp = offsetY;
-        offsetY = drawDefaultFactoryThreadsInfo(offsetX, offsetY);
-        offsetY = drawDefaultParallelismInfo(offsetX, offsetY);
+        if (getShowParallelismInfo(cfg)) {
+            offsetY = drawDefaultFactoryThreadsInfo(offsetX, offsetY);
+            offsetY = drawDefaultParallelismInfo(offsetX, offsetY);
+        }
         if (tmp != offsetY) {
             offsetY += 5;
         }
 
-        int usedTimeCache = TileMultiblockMachineController.usedTimeCache;
-        float searchUsedTimeCache = TileMultiblockMachineController.searchUsedTimeCache;
-        String workMode = TileMultiblockMachineController.workModeCache.getDisplayName();
-        this.fontRenderer.drawStringWithShadow(
-            String.format(
-                "Avg: %dus/t (Search: %sms), WorkMode: %s",
-                usedTimeCache,
-                MiscUtils.formatFloat(searchUsedTimeCache / 1000F, 2),
-                workMode
-            ),
-            offsetX,
-            offsetY,
-            0xFFFFFF
-        );
+        if (getShowPerformanceInfo(cfg)) {
+            int usedTimeCache = TileMultiblockMachineController.usedTimeCache;
+            float searchUsedTimeCache = TileMultiblockMachineController.searchUsedTimeCache;
+            String workMode = TileMultiblockMachineController.workModeCache.getDisplayName();
+            this.fontRenderer.drawStringWithShadow(
+                String.format(
+                    "Avg: %dus/t (Search: %sms), WorkMode: %s",
+                    usedTimeCache,
+                    MiscUtils.formatFloat(searchUsedTimeCache / 1000F, 2),
+                    workMode
+                ),
+                offsetX,
+                offsetY,
+                0xFFFFFF
+            );
+        }
 
         GlStateManager.popMatrix();
     }
@@ -676,7 +710,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         cleanupPanelState(panels);
 
         Map<String, List<String>> linesByPanel = buildPanelInfoLines(panels, cfg);
-        int lineHeight = this.fontRenderer.FONT_HEIGHT + 2;
+        int lineHeight = Math.max(1, MathHelper.ceil((float) ((this.fontRenderer.FONT_HEIGHT + 2) * FONT_SCALE)));
 
         for (PanelDef panel : panels) {
             List<String> lines = linesByPanel.get(panel.id);
@@ -692,18 +726,21 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             int scroll = MathHelper.clamp(getPanelScroll(panel.id), 0, maxScroll);
             panelScroll.put(panel.id, scroll);
 
-            int textX = panel.rect.x + 3;
-            int textY = panel.rect.y + 2 - scroll;
+            int textX = MathHelper.floor((float) ((panel.rect.x + 3) / FONT_SCALE));
+            int textY = MathHelper.floor((float) ((panel.rect.y + 2 - scroll) / FONT_SCALE));
             int clipX = this.guiLeft + panel.rect.x + 1;
             int clipY = this.guiTop + panel.rect.y + 1;
             int clipWidth = panel.rect.width - 2;
             int clipHeight = panel.rect.height - 2;
 
             GuiRenderUtils.enableScissor(this.mc, clipX, clipY, clipWidth, clipHeight);
+            GlStateManager.pushMatrix();
+            GlStateManager.scale((float) FONT_SCALE, (float) FONT_SCALE, 1.0F);
             for (String line : lines) {
                 this.fontRenderer.drawStringWithShadow(line, textX, textY, 0xFFFFFF);
-                textY += lineHeight;
+                textY += this.fontRenderer.FONT_HEIGHT + 2;
             }
+            GlStateManager.popMatrix();
             GuiRenderUtils.disableScissor();
 
             drawPanelScrollBar(panel);
@@ -833,6 +870,42 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         return runtime != null && runtime.priority != null ? runtime.priority.intValue() : layer.priority;
     }
 
+    private void applyPlayerInventoryVisibility(MMCEGuiExtConfig.FactoryController cfg) {
+        boolean hidePlayerInventory = getHidePlayerInventory(cfg);
+        if (this.inventorySlots == null || this.inventorySlots.inventorySlots == null) {
+            return;
+        }
+
+        int visibleSlots = Math.min(36, this.inventorySlots.inventorySlots.size());
+        for (int i = 0; i < visibleSlots; i++) {
+            Slot slot = this.inventorySlots.inventorySlots.get(i);
+            if (slot == null) {
+                continue;
+            }
+
+            if (hidePlayerInventory) {
+                slot.xPos = -1000;
+                slot.yPos = -1000;
+            } else if (i < 27) {
+                slot.xPos = PLAYER_INVENTORY_LEFT + (i % 9) * 18;
+                slot.yPos = PLAYER_INVENTORY_TOP + (i / 9) * 18;
+            } else {
+                slot.xPos = PLAYER_INVENTORY_LEFT + (i - 27) * 18;
+                slot.yPos = PLAYER_HOTBAR_TOP;
+            }
+        }
+    }
+
+    private void maskPlayerInventoryArea() {
+        drawRect(
+            PLAYER_INVENTORY_LEFT - 1,
+            PLAYER_INVENTORY_TOP - 1,
+            PLAYER_INVENTORY_LEFT + PLAYER_INVENTORY_WIDTH + 1,
+            PLAYER_INVENTORY_TOP + PLAYER_INVENTORY_HEIGHT + 1,
+            PLAYER_INVENTORY_MASK_COLOR
+        );
+    }
+
     private boolean isLayerVisible(TextureLayerDef layer) {
         LayerRuntimeState runtime = this.layerRuntimeStates.get(layer.id);
         return runtime == null || runtime.visible == null || runtime.visible.booleanValue();
@@ -854,11 +927,11 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     private List<PanelDef> getActivePanels(MMCEGuiExtConfig.FactoryController cfg) {
         List<PanelDef> panels = new ArrayList<PanelDef>();
         if (isUsingDefaultBackground(cfg)) {
-            panels.add(new PanelDef(normalizePanelId(cfg.defaultPanelId), getDefaultPanelRect(cfg)));
+            panels.add(new PanelDef(resolveConfiguredDefaultPanelId(cfg), getDefaultPanelRect(cfg)));
             return panels;
         }
 
-        String[] configuredPanels = cfg.customPanels;
+        String[] configuredPanels = getConfiguredPanels(cfg);
         if (configuredPanels != null) {
             LinkedHashMap<String, PanelDef> map = new LinkedHashMap<String, PanelDef>();
             for (String entry : configuredPanels) {
@@ -885,13 +958,13 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         panelX = Math.max(0, Math.min(panelX, Math.max(0, BASE_WIDTH - 32)));
 
         int panelY = Math.max(4, cfg.panelY);
-        panelY = Math.min(panelY, PLAYER_INVENTORY_TOP - 24);
+        panelY = Math.min(panelY, getPlayerInventoryTop(cfg) - 24);
 
         int panelWidth = cfg.panelWidth > 0 ? cfg.panelWidth : 159;
         panelWidth = Math.max(48, Math.min(panelWidth, Math.max(48, BASE_WIDTH - panelX - 4)));
         panelWidth = Math.min(panelWidth, 159);
 
-        int maxHeight = Math.max(24, PLAYER_INVENTORY_TOP - panelY - 4);
+        int maxHeight = Math.max(24, getPlayerInventoryTop(cfg) - panelY - 4);
         int panelHeight = cfg.panelHeight > 0 ? cfg.panelHeight : 112;
         panelHeight = Math.max(24, Math.min(panelHeight, maxHeight));
 
@@ -950,34 +1023,41 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             linesByPanel.put(panel.id, new ArrayList<String>());
         }
 
-        String defaultPanelId = resolveDefaultPanelId(panels, cfg.defaultPanelId);
+        String defaultPanelId = resolveDefaultPanelId(panels, resolveConfiguredDefaultPanelId(cfg));
+        String blueprintPanel = resolveInfoSectionPanel(defaultPanelId, "blueprint", "blueprint_info");
+        String structurePanel = resolveInfoSectionPanel(defaultPanelId, "structure", "structure_info");
+        String statusPanel = resolveInfoSectionPanel(defaultPanelId, "status", "status_info");
+        String parallelismPanel = resolveInfoSectionPanel(defaultPanelId, "parallelism", "parallelism_info", "threads", "thread_info");
+        String performancePanel = resolveInfoSectionPanel(defaultPanelId, "performance", "performance_info", "perf");
 
         int redstone = factory.getWorld().getStrongPower(factory.getPos());
         if (redstone > 0) {
-            addWrapped(linesByPanel, panelMap, defaultPanelId, I18n.format("gui.controller.status.redstone_stopped"), defaultPanelId);
+            if (getShowStatusInfo(cfg)) {
+                addWrapped(linesByPanel, panelMap, statusPanel, I18n.format("gui.controller.status.redstone_stopped"), defaultPanelId);
+            }
             return linesByPanel;
         }
 
         DynamicMachine machine = factory.getBlueprintMachine();
-        if (machine != null) {
-            addWrapped(linesByPanel, panelMap, defaultPanelId, I18n.format("gui.controller.blueprint", ""), defaultPanelId);
-            addWrapped(linesByPanel, panelMap, defaultPanelId, machine.getLocalizedName(), defaultPanelId);
-            addBlank(linesByPanel, defaultPanelId);
-        } else if (!factory.isStructureFormed()) {
+        if (getShowBlueprintInfo(cfg) && machine != null) {
+            addWrapped(linesByPanel, panelMap, blueprintPanel, I18n.format("gui.controller.blueprint", ""), defaultPanelId);
+            addWrapped(linesByPanel, panelMap, blueprintPanel, machine.getLocalizedName(), defaultPanelId);
+            addBlank(linesByPanel, blueprintPanel);
+        } else if (getShowBlueprintInfo(cfg) && !factory.isStructureFormed()) {
             addWrapped(
                 linesByPanel,
                 panelMap,
-                defaultPanelId,
+                blueprintPanel,
                 I18n.format("gui.controller.blueprint", I18n.format("gui.controller.blueprint.none")),
                 defaultPanelId
             );
-            addBlank(linesByPanel, defaultPanelId);
+            addBlank(linesByPanel, blueprintPanel);
         }
 
         DynamicMachine found = factory.getFoundMachine();
-        if (found != null) {
-            addWrapped(linesByPanel, panelMap, defaultPanelId, I18n.format("gui.controller.structure", ""), defaultPanelId);
-            addWrapped(linesByPanel, panelMap, defaultPanelId, found.getLocalizedName(), defaultPanelId);
+        if (getShowStructureInfo(cfg) && found != null) {
+            addWrapped(linesByPanel, panelMap, structurePanel, I18n.format("gui.controller.structure", ""), defaultPanelId);
+            addWrapped(linesByPanel, panelMap, structurePanel, found.getLocalizedName(), defaultPanelId);
 
             ControllerGUIRenderEvent event = new ControllerGUIRenderEvent(factory);
             event.postEvent();
@@ -986,36 +1066,42 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                     continue;
                 }
                 RoutedText routed = parseRoutedText(extra, defaultPanelId);
-                String targetPanel = panelMap.containsKey(routed.panelId) ? routed.panelId : defaultPanelId;
+                String targetPanel = panelMap.containsKey(routed.panelId) ? routed.panelId : structurePanel;
                 addWrapped(linesByPanel, panelMap, targetPanel, routed.text, defaultPanelId);
             }
-        } else {
+        } else if (getShowStructureInfo(cfg)) {
             addWrapped(
                 linesByPanel,
                 panelMap,
-                defaultPanelId,
+                structurePanel,
                 I18n.format("gui.controller.structure", I18n.format("gui.controller.structure.none")),
                 defaultPanelId
             );
-            addBlank(linesByPanel, defaultPanelId);
+            addBlank(linesByPanel, structurePanel);
+        } else if (found != null) {
+            ControllerGUIRenderEvent event = new ControllerGUIRenderEvent(factory);
+            event.postEvent();
+            for (String extra : event.getExtraInfo()) {
+                consumeGuiDirective(extra);
+            }
         }
 
         if (!factory.isStructureFormed()) {
             return linesByPanel;
         }
 
-        addBlank(linesByPanel, defaultPanelId);
-        if (factory.hasIdleThread()) {
-            addWrapped(linesByPanel, panelMap, defaultPanelId, I18n.format("gui.controller.status"), defaultPanelId);
-            addWrapped(linesByPanel, panelMap, defaultPanelId, I18n.format(factory.getControllerStatus().getUnlocMessage()), defaultPanelId);
-            addBlank(linesByPanel, defaultPanelId);
+        addBlank(linesByPanel, statusPanel);
+        if (getShowStatusInfo(cfg) && factory.hasIdleThread()) {
+            addWrapped(linesByPanel, panelMap, statusPanel, I18n.format("gui.controller.status"), defaultPanelId);
+            addWrapped(linesByPanel, panelMap, statusPanel, I18n.format(factory.getControllerStatus().getUnlocMessage()), defaultPanelId);
+            addBlank(linesByPanel, statusPanel);
         }
 
-        if (factory.getMaxThreads() > 0) {
+        if (getShowParallelismInfo(cfg) && factory.getMaxThreads() > 0) {
             addWrapped(
                 linesByPanel,
                 panelMap,
-                defaultPanelId,
+                parallelismPanel,
                 I18n.format("gui.factory.threads", factory.getFactoryRecipeThreadList().size(), factory.getMaxThreads()),
                 defaultPanelId
             );
@@ -1023,7 +1109,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
 
         int parallelism = 1;
         int maxParallelism = factory.getTotalParallelism();
-        if (maxParallelism > 1) {
+        if (getShowParallelismInfo(cfg) && maxParallelism > 1) {
             for (FactoryRecipeThread thread : factory.getFactoryRecipeThreadList()) {
                 ActiveMachineRecipe activeRecipe = thread.getActiveRecipe();
                 if (activeRecipe != null) {
@@ -1037,33 +1123,35 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 }
             }
             if (parallelism > 1) {
-                addWrapped(linesByPanel, panelMap, defaultPanelId, I18n.format("gui.controller.parallelism", parallelism), defaultPanelId);
+                addWrapped(linesByPanel, panelMap, parallelismPanel, I18n.format("gui.controller.parallelism", parallelism), defaultPanelId);
                 addWrapped(
                     linesByPanel,
                     panelMap,
-                    defaultPanelId,
+                    parallelismPanel,
                     I18n.format("gui.controller.max_parallelism", maxParallelism),
                     defaultPanelId
                 );
             }
         }
-        addBlank(linesByPanel, defaultPanelId);
+        addBlank(linesByPanel, parallelismPanel);
 
-        int usedTimeCache = TileMultiblockMachineController.usedTimeCache;
-        float searchUsedTimeCache = TileMultiblockMachineController.searchUsedTimeCache;
-        String workMode = TileMultiblockMachineController.workModeCache.getDisplayName();
-        addWrapped(
-            linesByPanel,
-            panelMap,
-            defaultPanelId,
-            String.format(
-                "Avg: %dus/t (Search: %sms), WorkMode: %s",
-                usedTimeCache,
-                MiscUtils.formatFloat(searchUsedTimeCache / 1000F, 2),
-                workMode
-            ),
-            defaultPanelId
-        );
+        if (getShowPerformanceInfo(cfg)) {
+            int usedTimeCache = TileMultiblockMachineController.usedTimeCache;
+            float searchUsedTimeCache = TileMultiblockMachineController.searchUsedTimeCache;
+            String workMode = TileMultiblockMachineController.workModeCache.getDisplayName();
+            addWrapped(
+                linesByPanel,
+                panelMap,
+                performancePanel,
+                String.format(
+                    "Avg: %dus/t (Search: %sms), WorkMode: %s",
+                    usedTimeCache,
+                    MiscUtils.formatFloat(searchUsedTimeCache / 1000F, 2),
+                    workMode
+                ),
+                defaultPanelId
+            );
+        }
 
         return linesByPanel;
     }
@@ -1092,7 +1180,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         if (panel == null) {
             return;
         }
-        int wrapWidth = Math.max(24, panel.rect.width - 8);
+        int wrapWidth = Math.max(24, MathHelper.floor((float) ((panel.rect.width - 8) / FONT_SCALE)));
         target.addAll(this.fontRenderer.listFormattedStringToWidth(text, wrapWidth));
     }
 
@@ -1406,6 +1494,267 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         return styleOverride.guiWidth != null || styleOverride.guiHeight != null;
     }
 
+    private boolean getHidePlayerInventory(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.hidePlayerInventory != null) {
+            return styleOverride.hidePlayerInventory.booleanValue();
+        }
+        return cfg.hidePlayerInventory;
+    }
+
+    private boolean getShowBlueprintInfo(MMCEGuiExtConfig.FactoryController cfg) {
+        Boolean visible = resolveInfoSectionVisible("blueprint", "blueprint_info");
+        if (visible != null) {
+            return visible.booleanValue();
+        }
+        if (styleOverride.showBlueprintInfo != null) {
+            return styleOverride.showBlueprintInfo.booleanValue();
+        }
+        return cfg.showBlueprintInfo;
+    }
+
+    private boolean getShowStructureInfo(MMCEGuiExtConfig.FactoryController cfg) {
+        Boolean visible = resolveInfoSectionVisible("structure", "structure_info");
+        if (visible != null) {
+            return visible.booleanValue();
+        }
+        if (styleOverride.showStructureInfo != null) {
+            return styleOverride.showStructureInfo.booleanValue();
+        }
+        return cfg.showStructureInfo;
+    }
+
+    private boolean getShowStatusInfo(MMCEGuiExtConfig.FactoryController cfg) {
+        Boolean visible = resolveInfoSectionVisible("status", "status_info");
+        if (visible != null) {
+            return visible.booleanValue();
+        }
+        if (styleOverride.showStatusInfo != null) {
+            return styleOverride.showStatusInfo.booleanValue();
+        }
+        return cfg.showStatusInfo;
+    }
+
+    private boolean getShowParallelismInfo(MMCEGuiExtConfig.FactoryController cfg) {
+        Boolean visible = resolveInfoSectionVisible("parallelism", "parallelism_info", "threads", "thread_info");
+        if (visible != null) {
+            return visible.booleanValue();
+        }
+        if (styleOverride.showParallelismInfo != null) {
+            return styleOverride.showParallelismInfo.booleanValue();
+        }
+        return cfg.showParallelismInfo;
+    }
+
+    private boolean getShowPerformanceInfo(MMCEGuiExtConfig.FactoryController cfg) {
+        Boolean visible = resolveInfoSectionVisible("performance", "performance_info", "perf");
+        if (visible != null) {
+            return visible.booleanValue();
+        }
+        if (styleOverride.showPerformanceInfo != null) {
+            return styleOverride.showPerformanceInfo.booleanValue();
+        }
+        return cfg.showPerformanceInfo;
+    }
+
+    private void drawConfiguredTexts(@Nullable Integer priorityFilter) {
+        if (styleOverride.texts == null || styleOverride.texts.isEmpty()) {
+            return;
+        }
+        for (MachineGuiStyleManager.TextStyle text : styleOverride.texts) {
+            if (text == null || text.value == null || text.value.trim().isEmpty()) {
+                continue;
+            }
+            if (text.visible != null && !text.visible.booleanValue()) {
+                continue;
+            }
+            int priority = text.priority == null ? resolveForegroundContentPriority() : text.priority.intValue();
+            if (priorityFilter != null && priority != priorityFilter.intValue()) {
+                continue;
+            }
+            String value = resolveConfiguredTextValue(text.value);
+            if (value == null || value.isEmpty()) {
+                continue;
+            }
+            int color = text.color == null ? 0xFFFFFF : text.color.intValue();
+            float scale = text.scale == null ? 1.0F : Math.max(0.05F, text.scale.floatValue());
+            boolean shadow = text.shadow == null || text.shadow.booleanValue();
+            GlStateManager.pushMatrix();
+            GlStateManager.scale(scale, scale, 1.0F);
+            int drawX = MathHelper.floor((float) (text.x / scale));
+            int drawY = MathHelper.floor((float) (text.y / scale));
+            if (shadow) {
+                this.fontRenderer.drawStringWithShadow(value, drawX, drawY, color);
+            } else {
+                this.fontRenderer.drawString(value, drawX, drawY, color);
+            }
+            GlStateManager.popMatrix();
+        }
+    }
+
+    private String resolveConfiguredTextValue(@Nullable String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String text = raw.trim();
+        if (text.isEmpty()) {
+            return "";
+        }
+        if (text.indexOf('{') >= 0 && text.indexOf('}') > text.indexOf('{')) {
+            StringBuilder out = new StringBuilder();
+            int index = 0;
+            while (index < text.length()) {
+                int start = text.indexOf('{', index);
+                if (start < 0) {
+                    out.append(text.substring(index));
+                    break;
+                }
+                int end = text.indexOf('}', start + 1);
+                if (end < 0) {
+                    out.append(text.substring(index));
+                    break;
+                }
+                out.append(text, index, start);
+                out.append(resolveControllerInfoKey(text.substring(start + 1, end)));
+                index = end + 1;
+            }
+            return out.toString();
+        }
+        return resolveControllerInfoKey(text);
+    }
+
+    private String resolveControllerInfoKey(@Nullable String rawKey) {
+        String key = rawKey == null ? "" : rawKey.trim().toLowerCase(Locale.ROOT);
+        if (key.isEmpty()) {
+            return "";
+        }
+
+        DynamicMachine blueprint = factory.getBlueprintMachine();
+        DynamicMachine found = factory.getFoundMachine();
+
+        if ("blueprint.name".equals(key) || "blueprint".equals(key)) {
+            return blueprint == null ? I18n.format("gui.controller.blueprint.none") : blueprint.getLocalizedName();
+        }
+        if ("structure.name".equals(key) || "structure".equals(key) || "machine.name".equals(key)) {
+            return found == null ? I18n.format("gui.controller.structure.none") : found.getLocalizedName();
+        }
+        if ("structure.formed".equals(key)) {
+            return String.valueOf(factory.isStructureFormed());
+        }
+        if ("status.text".equals(key) || "status".equals(key)) {
+            int redstone = factory.getWorld().getStrongPower(factory.getPos());
+            if (redstone > 0) {
+                return I18n.format("gui.controller.status.redstone_stopped");
+            }
+            return I18n.format(factory.getControllerStatus().getUnlocMessage());
+        }
+        if ("factory.threads.current".equals(key) || "threads.current".equals(key)) {
+            return String.valueOf(factory.getFactoryRecipeThreadList().size());
+        }
+        if ("factory.threads.max".equals(key) || "threads.max".equals(key)) {
+            return String.valueOf(factory.getMaxThreads());
+        }
+        if ("factory.threads.line".equals(key) || "threads.line".equals(key)) {
+            return I18n.format("gui.factory.threads", factory.getFactoryRecipeThreadList().size(), factory.getMaxThreads());
+        }
+        int parallelism = getCurrentParallelism();
+        int maxParallelism = factory.getTotalParallelism();
+        if ("parallelism.current".equals(key) || "parallelism".equals(key)) {
+            return String.valueOf(parallelism);
+        }
+        if ("parallelism.max".equals(key)) {
+            return String.valueOf(maxParallelism);
+        }
+        if ("parallelism.line".equals(key)) {
+            return I18n.format("gui.controller.parallelism", parallelism);
+        }
+        if ("parallelism.max_line".equals(key)) {
+            return I18n.format("gui.controller.max_parallelism", maxParallelism);
+        }
+        if ("performance.avg_us".equals(key) || "perf.avg_us".equals(key) || "latency.avg_us".equals(key)) {
+            return String.valueOf(TileMultiblockMachineController.usedTimeCache);
+        }
+        if ("performance.search_ms".equals(key) || "perf.search_ms".equals(key) || "latency.search_ms".equals(key)) {
+            return MiscUtils.formatFloat(TileMultiblockMachineController.searchUsedTimeCache / 1000F, 2);
+        }
+        if ("performance.work_mode".equals(key) || "perf.work_mode".equals(key) || "work_mode".equals(key)) {
+            return TileMultiblockMachineController.workModeCache.getDisplayName();
+        }
+        if ("performance.line".equals(key) || "perf.line".equals(key) || "latency.line".equals(key)) {
+            return String.format(
+                "Avg: %dus/t (Search: %sms), WorkMode: %s",
+                TileMultiblockMachineController.usedTimeCache,
+                MiscUtils.formatFloat(TileMultiblockMachineController.searchUsedTimeCache / 1000F, 2),
+                TileMultiblockMachineController.workModeCache.getDisplayName()
+            );
+        }
+        return rawKey == null ? "" : rawKey;
+    }
+
+    private int getCurrentParallelism() {
+        int parallelism = 1;
+        for (FactoryRecipeThread thread : factory.getFactoryRecipeThreadList()) {
+            ActiveMachineRecipe activeRecipe = thread.getActiveRecipe();
+            if (activeRecipe != null) {
+                parallelism += activeRecipe.getParallelism() - 1;
+            }
+        }
+        for (FactoryRecipeThread thread : factory.getCoreRecipeThreads().values()) {
+            ActiveMachineRecipe activeRecipe = thread.getActiveRecipe();
+            if (activeRecipe != null) {
+                parallelism += activeRecipe.getParallelism() - 1;
+            }
+        }
+        return parallelism;
+    }
+
+    private String resolveInfoSectionPanel(String fallback, String... ids) {
+        if (styleOverride.infoSections == null || styleOverride.infoSections.isEmpty()) {
+            return fallback;
+        }
+        for (MachineGuiStyleManager.InfoSectionStyle section : styleOverride.infoSections) {
+            if (section == null || section.panel == null || section.panel.trim().isEmpty()) {
+                continue;
+            }
+            if (matchesInfoSection(section.id, ids)) {
+                return section.panel.trim();
+            }
+        }
+        return fallback;
+    }
+
+    @Nullable
+    private Boolean resolveInfoSectionVisible(String... ids) {
+        if (styleOverride.infoSections == null || styleOverride.infoSections.isEmpty()) {
+            return null;
+        }
+        for (MachineGuiStyleManager.InfoSectionStyle section : styleOverride.infoSections) {
+            if (section == null || section.visible == null) {
+                continue;
+            }
+            if (matchesInfoSection(section.id, ids)) {
+                return section.visible;
+            }
+        }
+        return null;
+    }
+
+    private boolean matchesInfoSection(@Nullable String id, String... expected) {
+        if (id == null) {
+            return false;
+        }
+        String normalized = id.trim().toLowerCase(java.util.Locale.ROOT);
+        for (String item : expected) {
+            if (normalized.equals(item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int getPlayerInventoryTop(MMCEGuiExtConfig.FactoryController cfg) {
+        return getHidePlayerInventory(cfg) ? HIDDEN_PLAYER_INVENTORY_TOP : PLAYER_INVENTORY_TOP;
+    }
+
     private boolean hasMachineStyleOverride() {
         return styleOverride != MachineGuiStyleManager.ControllerStyle.EMPTY;
     }
@@ -1497,8 +1846,17 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             float scaleX = resolveLayerScaleX(layer);
             float scaleY = resolveLayerScaleY(layer);
             float rotation = resolveLayerRotation(layer);
+            GlStateManager.pushMatrix();
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
             drawLayerWithTransform(drawX, drawY, width, height, useNineSlice, texW, texH, corner, scaleX, scaleY, rotation);
+            GlStateManager.popMatrix();
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         }
+    }
+
+    private void resetForegroundRenderState() {
+        GuiRenderUtils.disableScissor();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private void initCustomSmartInterfaceEditors(MMCEGuiExtConfig.FactoryController cfg) {
@@ -1526,7 +1884,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             editor.title = style.title;
             editor.priority = style.priority == null ? DEFAULT_SMART_EDITOR_PRIORITY : style.priority.intValue();
 
-            int inputWidth = style.inputWidth == null ? getSmartInterfaceEditorInputWidth(cfg) : Math.max(40, style.inputWidth.intValue());
+            int inputWidth = style.inputWidth == null ? getSmartInterfaceEditorInputWidth(cfg) : Math.max(4, style.inputWidth.intValue());
             int editorX = MathHelper.clamp(style.x, 2, Math.max(2, this.renderWidth - 2));
             int editorY = MathHelper.clamp(style.y, 12, Math.max(12, this.renderHeight - SMART_EDITOR_INPUT_H - 2));
             int absX = this.guiLeft + editorX;
@@ -2045,6 +2403,13 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         for (CustomSmartEditor editor : this.customSmartEditors) {
             priorities.add(Integer.valueOf(editor.priority));
         }
+        if (styleOverride.texts != null) {
+            for (MachineGuiStyleManager.TextStyle text : styleOverride.texts) {
+                if (text != null && text.priority != null) {
+                    priorities.add(text.priority);
+                }
+            }
+        }
         return priorities;
     }
 
@@ -2063,6 +2428,21 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         return cfg.enableSmartInterfaceEditor;
     }
 
+    private String resolveConfiguredDefaultPanelId(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.defaultPanelId != null && !styleOverride.defaultPanelId.trim().isEmpty()) {
+            return styleOverride.defaultPanelId;
+        }
+        return cfg.defaultPanelId;
+    }
+
+    @Nullable
+    private String[] getConfiguredPanels(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.customPanels != null && !styleOverride.customPanels.isEmpty()) {
+            return styleOverride.customPanels.toArray(new String[0]);
+        }
+        return cfg.customPanels;
+    }
+
     private int getSmartInterfaceEditorX(MMCEGuiExtConfig.FactoryController cfg) {
         if (styleOverride.smartInterfaceEditorX != null) {
             return styleOverride.smartInterfaceEditorX.intValue();
@@ -2079,9 +2459,9 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
 
     private int getSmartInterfaceEditorInputWidth(MMCEGuiExtConfig.FactoryController cfg) {
         if (styleOverride.smartInterfaceEditorInputWidth != null) {
-            return Math.max(40, styleOverride.smartInterfaceEditorInputWidth.intValue());
+            return Math.max(4, styleOverride.smartInterfaceEditorInputWidth.intValue());
         }
-        return Math.max(40, cfg.smartInterfaceEditorInputWidth);
+        return Math.max(4, cfg.smartInterfaceEditorInputWidth);
     }
 
     private List<String> getSmartInterfaceEditorVirtualKeys(MMCEGuiExtConfig.FactoryController cfg) {

@@ -1,0 +1,256 @@
+{
+  "registryname": "mmcege_full_feature_demo_101",
+  "localizedname": "MMCEGE Full Feature Demo 1.0.1",
+  "requires-blueprint": false,
+  "has-factory": true,
+  "color": "66CCFF",
+  "mmce_gui_ext": {
+    "machineController": {
+      "backgroundTexture": "modularmachinery:textures/gui/guicontroller_large.png",
+      "backgroundTextureOffsetX": 0,
+      "backgroundTextureOffsetY": 0,
+      "hideDefaultBackground": false,
+      "enableRightExtension": true,
+      "guiWidth": 336,
+      "guiHeight": 230,
+      "useNineSlice": true,
+      "backgroundTextureWidth": 176,
+      "backgroundTextureHeight": 213,
+      "backgroundCorner": 8,
+      "defaultPanelId": "main",
+      "customPanels": [
+        "main,182,10,148,96",
+        "log,182,110,148,84"
+      ],
+      "foregroundContentPriority": 10,
+      "enableSmartInterfaceEditor": true,
+      "smartInterfaceEditorX": -1,
+      "smartInterfaceEditorY": -1,
+      "smartInterfaceEditorInputWidth": 70,
+      "smartInterfaceEditorVirtualKey": "demo_default_port_a,demo_default_port_b",
+      "smartInterfaceEditorPriority": 10,
+      "hideDefaultSmartInterfaceEditor": true,
+      "smartInterfaceEditors": [
+        {
+          "id": "port_main",
+          "x": 186,
+          "y": 188,
+          "inputWidth": 68,
+          "virtualKey": "demo_port_main",
+          "title": "Main Port ({key})",
+          "showTitle": true,
+          "showInfo": true,
+          "showControls": true,
+          "inputBackground": true,
+          "priority": 20
+        },
+        {
+          "id": "port_hidden",
+          "x": 186,
+          "y": 206,
+          "inputWidth": 68,
+          "virtualKey": "demo_port_hidden_a,demo_port_hidden_b",
+          "title": "Hidden Label",
+          "showTitle": false,
+          "showInfo": false,
+          "showControls": true,
+          "inputBackground": false,
+          "priority": 20
+        },
+        {
+          "id": "port_quick",
+          "x": 260,
+          "y": 206,
+          "inputWidth": 66,
+          "virtualKey": "demo_port_quick",
+          "title": "Quick Port",
+          "showTitle": true,
+          "showInfo": false,
+          "showControls": false,
+          "inputBackground": true,
+          "priority": 21
+        }
+      ],
+      "backgroundLayers": [
+        {
+          "id": "base_bg",
+          "texture": "modularmachinery:textures/gui/guicontroller_large.png",
+          "offsetX": 0,
+          "offsetY": 0,
+          "width": 336,
+          "height": 230,
+          "textureWidth": 176,
+          "textureHeight": 213,
+          "useNineSlice": true,
+          "corner": 8,
+          "priority": 0
+        },
+        {
+          "id": "side_grid",
+          "texture": "minecraft:textures/gui/options_background.png",
+          "offsetX": 176,
+          "offsetY": 0,
+          "width": 160,
+          "height": 130,
+          "textureWidth": 32,
+          "textureHeight": 32,
+          "useNineSlice": false,
+          "priority": 1
+        }
+      ],
+      "foregroundLayers": [
+        {
+          "id": "badge_shadow",
+          "texture": "minecraft:textures/gui/widgets.png",
+          "offsetX": 294,
+          "offsetY": 180,
+          "width": 24,
+          "height": 24,
+          "textureWidth": 256,
+          "textureHeight": 256,
+          "priority": 18
+        },
+        {
+          "id": "badge_anim",
+          "texture": "minecraft:textures/gui/widgets.png",
+          "offsetX": 300,
+          "offsetY": 186,
+          "width": 20,
+          "height": 20,
+          "textureWidth": 256,
+          "textureHeight": 256,
+          "priority": 22
+        }
+      ]
+    },
+    "factoryController": {
+      "backgroundTexture": "modularmachinery:textures/gui/guifactory.png",
+      "backgroundTextureOffsetX": 0,
+      "backgroundTextureOffsetY": 0,
+      "hideDefaultBackground": false,
+      "enableRightExtension": true,
+      "guiWidth": 460,
+      "guiHeight": 230,
+      "useNineSlice": true,
+      "backgroundTextureWidth": 280,
+      "backgroundTextureHeight": 213,
+      "backgroundCorner": 8,
+      "specialThreadBackgroundColor": "FF7DD3FC",
+      "defaultPanelId": "main",
+      "customPanels": [
+        "main,286,10,168,96",
+        "log,286,110,168,84"
+      ],
+      "foregroundContentPriority": 10,
+      "enableSmartInterfaceEditor": true,
+      "smartInterfaceEditorX": -1,
+      "smartInterfaceEditorY": -1,
+      "smartInterfaceEditorInputWidth": 70,
+      "smartInterfaceEditorVirtualKey": "demo_default_port_a,demo_default_port_b",
+      "smartInterfaceEditorPriority": 10,
+      "hideDefaultSmartInterfaceEditor": true,
+      "smartInterfaceEditors": [
+        {
+          "id": "port_main",
+          "x": 290,
+          "y": 188,
+          "inputWidth": 68,
+          "virtualKey": "demo_port_main",
+          "title": "Main Port ({key})",
+          "showTitle": true,
+          "showInfo": true,
+          "showControls": true,
+          "inputBackground": true,
+          "priority": 20
+        },
+        {
+          "id": "port_hidden",
+          "x": 290,
+          "y": 206,
+          "inputWidth": 68,
+          "virtualKey": "demo_port_hidden_a,demo_port_hidden_b",
+          "title": "Hidden Label",
+          "showTitle": false,
+          "showInfo": false,
+          "showControls": true,
+          "inputBackground": false,
+          "priority": 20
+        },
+        {
+          "id": "port_quick",
+          "x": 364,
+          "y": 206,
+          "inputWidth": 66,
+          "virtualKey": "demo_port_quick",
+          "title": "Quick Port",
+          "showTitle": true,
+          "showInfo": false,
+          "showControls": false,
+          "inputBackground": true,
+          "priority": 21
+        }
+      ],
+      "backgroundLayers": [
+        {
+          "id": "base_bg",
+          "texture": "modularmachinery:textures/gui/guifactory.png",
+          "offsetX": 0,
+          "offsetY": 0,
+          "width": 460,
+          "height": 230,
+          "textureWidth": 280,
+          "textureHeight": 213,
+          "useNineSlice": true,
+          "corner": 8,
+          "priority": 0
+        },
+        {
+          "id": "side_grid",
+          "texture": "minecraft:textures/gui/options_background.png",
+          "offsetX": 280,
+          "offsetY": 0,
+          "width": 180,
+          "height": 130,
+          "textureWidth": 32,
+          "textureHeight": 32,
+          "useNineSlice": false,
+          "priority": 1
+        }
+      ],
+      "foregroundLayers": [
+        {
+          "id": "badge_shadow",
+          "texture": "minecraft:textures/gui/widgets.png",
+          "offsetX": 418,
+          "offsetY": 180,
+          "width": 24,
+          "height": 24,
+          "textureWidth": 256,
+          "textureHeight": 256,
+          "priority": 18
+        },
+        {
+          "id": "badge_anim",
+          "texture": "minecraft:textures/gui/widgets.png",
+          "offsetX": 424,
+          "offsetY": 186,
+          "width": 20,
+          "height": 20,
+          "textureWidth": 256,
+          "textureHeight": 256,
+          "priority": 22
+        }
+      ]
+    }
+  },
+  "parts": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "elements": [
+        "modularmachinery:blockfactorycontroller@0"
+      ]
+    }
+  ]
+}

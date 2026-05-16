@@ -1,0 +1,64 @@
+# Configuration file
+
+general {
+    B:enabled=true
+    I:wheelStep=10
+
+    machinecontroller {
+        I:backgroundCorner=8
+        S:backgroundTexture=
+        I:backgroundTextureHeight=213
+        I:backgroundTextureOffsetX=0
+        I:backgroundTextureOffsetY=0
+        I:backgroundTextureWidth=176
+        S:customPanels <
+            main,182,10,148,96
+            log,182,110,148,84
+         >
+        S:defaultPanelId=main
+        B:enableSmartInterfaceEditor=true
+        I:guiHeight=230
+        I:guiWidth=336
+        B:hideDefaultBackground=false
+        I:panelHeight=112
+        I:panelWidth=0
+        I:panelX=0
+        I:panelY=10
+        B:replaceGui=true
+        I:smartInterfaceEditorInputWidth=70
+        S:smartInterfaceEditorVirtualKey=demo_default_port_a,demo_default_port_b
+        I:smartInterfaceEditorX=-1
+        I:smartInterfaceEditorY=-1
+        B:useNineSlice=true
+    }
+
+    factorycontroller {
+        I:backgroundCorner=8
+        S:backgroundTexture=
+        I:backgroundTextureHeight=213
+        I:backgroundTextureOffsetX=0
+        I:backgroundTextureOffsetY=0
+        I:backgroundTextureWidth=280
+        S:customPanels <
+            main,286,10,168,96
+            log,286,110,168,84
+         >
+        S:defaultPanelId=main
+        B:enableSmartInterfaceEditor=true
+        I:guiHeight=230
+        I:guiWidth=460
+        B:hideDefaultBackground=false
+        I:panelHeight=112
+        I:panelWidth=0
+        I:panelX=0
+        I:panelY=10
+        I:queueVisibleRows=6
+        B:replaceGui=true
+        I:smartInterfaceEditorInputWidth=70
+        S:smartInterfaceEditorVirtualKey=demo_default_port_a,demo_default_port_b
+        I:smartInterfaceEditorX=-1
+        I:smartInterfaceEditorY=-1
+        S:specialThreadBackgroundColor=FF7DD3FC
+        B:useNineSlice=true
+    }
+}

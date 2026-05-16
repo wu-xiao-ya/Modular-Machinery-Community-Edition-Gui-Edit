@@ -4,13 +4,25 @@ import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import com.fushu.mmceguiext.client.config.MachineGuiStyleManager;
 import com.fushu.mmceguiext.client.gui.GuiRenderUtils;
 import com.fushu.mmceguiext.client.gui.GuiFactoryControllerResizable;
+import com.fushu.mmceguiext.client.gui.GuiFluidHatchCustom;
+import com.fushu.mmceguiext.client.gui.GuiFluidProcessorHatchCustom;
+import com.fushu.mmceguiext.client.gui.GuiItemBusCustom;
 import com.fushu.mmceguiext.client.gui.GuiMachineControllerResizable;
+import com.fushu.mmceguiext.client.gui.GuiUpgradeBusCustom;
+import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
 import hellfirepvp.modularmachinery.common.machine.DynamicMachine;
+import hellfirepvp.modularmachinery.client.gui.GuiContainerFluidHatch;
+import hellfirepvp.modularmachinery.client.gui.GuiContainerItemBus;
+import hellfirepvp.modularmachinery.client.gui.GuiContainerUpgradeBus;
 import hellfirepvp.modularmachinery.client.gui.GuiFactoryController;
 import hellfirepvp.modularmachinery.client.gui.GuiMachineController;
 import hellfirepvp.modularmachinery.common.container.ContainerController;
 import hellfirepvp.modularmachinery.common.container.ContainerFactoryController;
+import hellfirepvp.modularmachinery.common.tiles.base.TileFluidTank;
+import hellfirepvp.modularmachinery.common.tiles.TileUpgradeBus;
+import hellfirepvp.modularmachinery.common.tiles.base.TileItemBus;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.Side;
@@ -27,9 +39,17 @@ public class ClientGuiEventHandler {
         if (!MMCEGuiExtConfig.enabled || event.getGui() == null) {
             return;
         }
+        if (!MMCEGuiExtConfig.novaEngCoreCompatibilityMode) {
+            MachineGuiStyleManager.clearPinnedCache();
+        }
 
         GuiScreen gui = event.getGui();
-        if (gui instanceof GuiMachineControllerResizable || gui instanceof GuiFactoryControllerResizable) {
+        if (gui instanceof GuiMachineControllerResizable
+            || gui instanceof GuiFactoryControllerResizable
+            || gui instanceof GuiFluidHatchCustom
+            || gui instanceof GuiFluidProcessorHatchCustom
+            || gui instanceof GuiItemBusCustom
+            || gui instanceof GuiUpgradeBusCustom) {
             return;
         }
 
@@ -45,6 +65,36 @@ public class ClientGuiEventHandler {
             ContainerFactoryController container = ((GuiFactoryController) gui).getContainer();
             if (shouldReplaceFactoryController(container)) {
                 event.setGui(new GuiFactoryControllerResizable(container));
+            }
+            return;
+        }
+
+        if (MMCEGuiExtConfig.itemBus.replaceGui && gui instanceof GuiContainerItemBus) {
+            TileItemBus itemBus = ((GuiContainerItemBus) gui).getContainer().getOwner();
+            if (itemBus != null) {
+                event.setGui(new GuiItemBusCustom(itemBus, net.minecraft.client.Minecraft.getMinecraft().player));
+            }
+            return;
+        }
+
+        if (MMCEGuiExtConfig.fluidHatch.replaceGui && gui instanceof GuiContainerFluidHatch) {
+            TileEntity owner = ((GuiContainerFluidHatch) gui).getContainer().getOwner();
+            CustomHatchRegistry.CustomHatchDef customHatch = resolveCustomHatch(owner);
+            if (customHatch != null && isFluidProcessorHatch(owner)) {
+                event.setGui(new GuiFluidProcessorHatchCustom(owner, net.minecraft.client.Minecraft.getMinecraft().player, customHatch));
+                return;
+            }
+            if (owner instanceof TileFluidTank) {
+                TileFluidTank fluidTank = (TileFluidTank) owner;
+                event.setGui(new GuiFluidHatchCustom(fluidTank, net.minecraft.client.Minecraft.getMinecraft().player));
+            }
+            return;
+        }
+
+        if (MMCEGuiExtConfig.upgradeBus.replaceGui && gui instanceof GuiContainerUpgradeBus) {
+            TileUpgradeBus upgradeBus = ((GuiContainerUpgradeBus) gui).getContainer().getOwner();
+            if (upgradeBus != null) {
+                event.setGui(new GuiUpgradeBusCustom(upgradeBus, net.minecraft.client.Minecraft.getMinecraft().player));
             }
         }
     }
@@ -107,5 +157,21 @@ public class ClientGuiEventHandler {
 
     private boolean hasMachineStyleOverride(MachineGuiStyleManager.ControllerStyle style) {
         return style != MachineGuiStyleManager.ControllerStyle.EMPTY;
+    }
+
+    private boolean isFluidProcessorHatch(TileEntity owner) {
+        return owner != null && "hellfirepvp.modularmachinery.common.tiles.TileFluidProcessorHatch".equals(owner.getClass().getName());
+    }
+
+    private CustomHatchRegistry.CustomHatchDef resolveCustomHatch(TileEntity owner) {
+        if (owner == null || owner.getBlockType() == null || owner.getBlockType().getRegistryName() == null) {
+            return null;
+        }
+        String full = owner.getBlockType().getRegistryName().toString();
+        CustomHatchRegistry.CustomHatchDef def = CustomHatchRegistry.findById(full);
+        if (def != null) {
+            return def;
+        }
+        return CustomHatchRegistry.findById(owner.getBlockType().getRegistryName().getPath());
     }
 }

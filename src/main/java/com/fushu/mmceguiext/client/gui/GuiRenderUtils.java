@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
@@ -15,25 +16,96 @@ public final class GuiRenderUtils {
     }
 
     public static ResourceLocation parseTexture(String value, ResourceLocation fallback) {
-        if (value == null || value.trim().isEmpty()) {
-            return fallback;
-        }
-        try {
-            return new ResourceLocation(value.trim());
-        } catch (Exception ignored) {
-            return fallback;
-        }
+        ResourceLocation texture = parseOptionalTexture(value);
+        return texture == null ? fallback : texture;
     }
 
     @Nullable
     public static ResourceLocation parseOptionalTexture(String value) {
-        if (value == null || value.trim().isEmpty()) {
+        String raw = normalizeRawTexturePath(value);
+        if (raw == null) {
             return null;
         }
         try {
-            return new ResourceLocation(value.trim());
+            ResourceLocation original = new ResourceLocation(raw);
+            if (resourceExists(original)) {
+                return original;
+            }
+
+            String normalized = normalizeGuiTexturePath(raw);
+            if (normalized != null && !normalized.equals(raw)) {
+                ResourceLocation guiTexture = new ResourceLocation(normalized);
+                if (resourceExists(guiTexture)) {
+                    return guiTexture;
+                }
+            }
+
+            return original;
         } catch (Exception ignored) {
             return null;
+        }
+    }
+
+    public static ResourceLocation parseLooseTexture(String value) {
+        return parseOptionalTexture(value);
+    }
+
+    public static ResourceLocation parseTexture(String value) {
+        return parseOptionalTexture(value);
+    }
+
+    public static boolean hasTexture(String value) {
+        return parseOptionalTexture(value) != null;
+    }
+
+    @Nullable
+    private static String normalizeRawTexturePath(String value) {
+        if (value == null) {
+            return null;
+        }
+        String text = value.trim().replace('\\', '/');
+        if (text.isEmpty()) {
+            return null;
+        }
+        return text;
+    }
+
+    @Nullable
+    private static String normalizeGuiTexturePath(String value) {
+        String text = normalizeRawTexturePath(value);
+        if (text == null) {
+            return null;
+        }
+        int separator = text.indexOf(':');
+        if (separator < 0) {
+            return text;
+        }
+
+        String domain = text.substring(0, separator).trim();
+        String path = text.substring(separator + 1).trim();
+        if (domain.isEmpty() || path.isEmpty()) {
+            return null;
+        }
+        if (!path.startsWith("textures/")) {
+            path = path.startsWith("gui/") ? "textures/" + path : "textures/gui/" + path;
+        }
+        return domain + ":" + path;
+    }
+
+    private static boolean resourceExists(ResourceLocation texture) {
+        try {
+            Minecraft minecraft = Minecraft.getMinecraft();
+            if (minecraft == null) {
+                return false;
+            }
+            IResourceManager manager = minecraft.getResourceManager();
+            if (manager == null) {
+                return false;
+            }
+            manager.getResource(texture);
+            return true;
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
