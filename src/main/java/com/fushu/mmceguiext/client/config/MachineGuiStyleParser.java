@@ -398,6 +398,7 @@ final class MachineGuiStyleParser {
             text.shadow = getBoolean(obj, result, itemScope, "shadow", "withShadow", "with_shadow");
             text.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
             text.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab");
+            text.align = normalizeTextAlign(getTrimmedString(obj, result, itemScope, "align", "alignment", "textAlign", "text_align"));
             texts.add(text);
         }
 
@@ -893,6 +894,24 @@ final class MachineGuiStyleParser {
 
     private static String safeTrim(@Nullable String text) {
         return text == null ? "" : text.trim();
+    }
+
+    @Nullable
+    private static String normalizeTextAlign(@Nullable String raw) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("left".equals(text) || "start".equals(text)) {
+            return "left";
+        }
+        if ("center".equals(text) || "centre".equals(text) || "middle".equals(text)) {
+            return "center";
+        }
+        if ("right".equals(text) || "end".equals(text)) {
+            return "right";
+        }
+        return null;
     }
 
     private static String summarizeException(Exception ex) {

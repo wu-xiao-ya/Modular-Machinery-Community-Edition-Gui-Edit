@@ -576,9 +576,10 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             int color = text.color == null ? 0xFFFFFF : text.color.intValue();
             float scale = text.scale == null ? 1.0F : Math.max(0.05F, text.scale.floatValue());
             boolean shadow = text.shadow == null || text.shadow.booleanValue();
+            int alignedX = GuiRenderUtils.resolveAlignedTextX(text.x, Math.round(this.fontRenderer.getStringWidth(value) * scale), text.align);
             GlStateManager.pushMatrix();
             GlStateManager.scale(scale, scale, 1.0F);
-            int drawX = MathHelper.floor((float) (text.x / scale));
+            int drawX = MathHelper.floor((float) (alignedX / scale));
             int drawY = MathHelper.floor((float) (text.y / scale));
             if (shadow) {
                 this.fontRenderer.drawStringWithShadow(value, drawX, drawY, color);

@@ -179,6 +179,7 @@ public final class CustomHatchRegistry {
             text.x = getInt(obj, "x", 0);
             text.y = getInt(obj, "y", 0);
             text.value = getString(obj, "value");
+            text.align = normalizeTextAlign(getString(obj, "align"), getString(obj, "alignment"), getString(obj, "textAlign"), getString(obj, "text_align"));
             out.add(text);
         }
         return out;
@@ -235,6 +236,10 @@ public final class CustomHatchRegistry {
             def.scrollbarTextureHeight = getInt(obj, "scrollbarTextureHeight", getInt(obj, "scrollbar_texture_height", 256));
             def.scrollbarU = getInt(obj, "scrollbarU", getInt(obj, "scrollbar_u", 232));
             def.scrollbarV = getInt(obj, "scrollbarV", getInt(obj, "scrollbar_v", 0));
+            def.scrollbarHoverU = getInt(obj, "scrollbarHoverU", getInt(obj, "scrollbar_hover_u", def.scrollbarU));
+            def.scrollbarHoverV = getInt(obj, "scrollbarHoverV", getInt(obj, "scrollbar_hover_v", def.scrollbarV));
+            def.scrollbarPressedU = getInt(obj, "scrollbarPressedU", getInt(obj, "scrollbar_pressed_u", def.scrollbarU));
+            def.scrollbarPressedV = getInt(obj, "scrollbarPressedV", getInt(obj, "scrollbar_pressed_v", def.scrollbarV));
             def.scrollbarDisabledU = getInt(obj, "scrollbarDisabledU", getInt(obj, "scrollbar_disabled_u", 244));
             def.scrollbarDisabledV = getInt(obj, "scrollbarDisabledV", getInt(obj, "scrollbar_disabled_v", 0));
             def.value = getString(obj, "value");
@@ -242,6 +247,7 @@ public final class CustomHatchRegistry {
             def.content = lower(getString(obj, "content"));
             def.color = getString(obj, "color");
             def.scale = getFloat(obj, "scale");
+            def.align = normalizeTextAlign(getString(obj, "align"), getString(obj, "alignment"), getString(obj, "textAlign"), getString(obj, "text_align"));
             def.overlay = getBoolean(obj, "overlay");
             if (def.type != null && !def.type.trim().isEmpty()) {
                 if ("slot_grid".equals(def.type) || "slots".equals(def.type)) {
@@ -271,6 +277,10 @@ public final class CustomHatchRegistry {
         int scrollbarTextureHeight = getFirstInt(obj, 256, "scrollbarTextureHeight", "scrollbar_texture_height");
         int scrollbarU = getFirstInt(obj, 232, "scrollbarU", "scrollbar_u");
         int scrollbarV = getFirstInt(obj, 0, "scrollbarV", "scrollbar_v");
+        int scrollbarHoverU = getFirstInt(obj, scrollbarU, "scrollbarHoverU", "scrollbar_hover_u");
+        int scrollbarHoverV = getFirstInt(obj, scrollbarV, "scrollbarHoverV", "scrollbar_hover_v");
+        int scrollbarPressedU = getFirstInt(obj, scrollbarU, "scrollbarPressedU", "scrollbar_pressed_u");
+        int scrollbarPressedV = getFirstInt(obj, scrollbarV, "scrollbarPressedV", "scrollbar_pressed_v");
         int scrollbarDisabledU = getFirstInt(obj, 244, "scrollbarDisabledU", "scrollbar_disabled_u");
         int scrollbarDisabledV = getFirstInt(obj, 0, "scrollbarDisabledV", "scrollbar_disabled_v");
         String scrollbarTexture = getString(obj, "scrollbarTexture");
@@ -308,6 +318,10 @@ public final class CustomHatchRegistry {
                 slot.scrollbarTextureHeight = scrollbarTextureHeight;
                 slot.scrollbarU = scrollbarU;
                 slot.scrollbarV = scrollbarV;
+                slot.scrollbarHoverU = scrollbarHoverU;
+                slot.scrollbarHoverV = scrollbarHoverV;
+                slot.scrollbarPressedU = scrollbarPressedU;
+                slot.scrollbarPressedV = scrollbarPressedV;
                 slot.scrollbarDisabledU = scrollbarDisabledU;
                 slot.scrollbarDisabledV = scrollbarDisabledV;
                 out.add(slot);
@@ -361,6 +375,7 @@ public final class CustomHatchRegistry {
                 text.x = component.x;
                 text.y = component.y;
                 text.value = component.value;
+                text.align = component.align;
                 texts.add(text);
             }
         }
@@ -381,6 +396,32 @@ public final class CustomHatchRegistry {
             e = fallbackObj.get(key);
         }
         return e == null || e.isJsonNull() ? fallback : e.getAsString();
+    }
+
+    @Nullable
+    private static String normalizeTextAlign(@Nullable String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (@Nullable String value : values) {
+            if (value == null) {
+                continue;
+            }
+            String text = value.trim().toLowerCase(Locale.ROOT);
+            if (text.isEmpty()) {
+                continue;
+            }
+            if ("left".equals(text) || "start".equals(text)) {
+                return "left";
+            }
+            if ("center".equals(text) || "centre".equals(text) || "middle".equals(text)) {
+                return "center";
+            }
+            if ("right".equals(text) || "end".equals(text)) {
+                return "right";
+            }
+        }
+        return null;
     }
 
     private static int getInt(JsonObject obj, String key, int fallback) {
@@ -520,6 +561,10 @@ public final class CustomHatchRegistry {
         public int scrollbarTextureHeight = 256;
         public int scrollbarU = 232;
         public int scrollbarV = 0;
+        public int scrollbarHoverU = 232;
+        public int scrollbarHoverV = 0;
+        public int scrollbarPressedU = 232;
+        public int scrollbarPressedV = 0;
         public int scrollbarDisabledU = 244;
         public int scrollbarDisabledV = 0;
         public String value;
@@ -527,6 +572,8 @@ public final class CustomHatchRegistry {
         public String content;
         public String color;
         public Float scale;
+        @Nullable
+        public String align;
         public Boolean overlay;
     }
 
@@ -552,6 +599,8 @@ public final class CustomHatchRegistry {
         public int x;
         public int y;
         public String value;
+        @Nullable
+        public String align;
     }
 
     @Nullable

@@ -226,4 +226,17 @@ public final class GuiRenderUtils {
         float b = (color & 0xFF) / 255.0F;
         GlStateManager.color(r, g, b, a);
     }
+
+    public static int resolveAlignedTextX(int anchorX, int textWidth, @Nullable String align) {
+        if (textWidth <= 0 || align == null) {
+            return anchorX;
+        }
+        if ("center".equalsIgnoreCase(align)) {
+            return anchorX - textWidth / 2;
+        }
+        if ("right".equalsIgnoreCase(align)) {
+            return anchorX - textWidth;
+        }
+        return anchorX;
+    }
 }

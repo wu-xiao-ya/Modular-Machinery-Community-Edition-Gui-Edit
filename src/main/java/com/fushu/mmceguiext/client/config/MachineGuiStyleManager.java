@@ -303,6 +303,8 @@ public final class MachineGuiStyleManager {
         public Boolean visible;
         @Nullable
         public String page;
+        @Nullable
+        public String align;
     }
 
     public static class SmartInterfaceEditorStyle {

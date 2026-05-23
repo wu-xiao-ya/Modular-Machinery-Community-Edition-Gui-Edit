@@ -97,6 +97,7 @@ public final class GlobalGuiStyleManager {
             def.value = getString(obj, "value");
             def.color = getString(obj, "color");
             def.scale = getFloat(obj, "scale");
+            def.align = normalizeTextAlign(getString(obj, "align"), getString(obj, "alignment"), getString(obj, "textAlign"), getString(obj, "text_align"));
             if (def.value != null && !def.value.trim().isEmpty()) {
                 out.add(def);
             }
@@ -164,6 +165,32 @@ public final class GlobalGuiStyleManager {
         return e == null || e.isJsonNull() ? null : Float.valueOf(e.getAsFloat());
     }
 
+    @Nullable
+    private static String normalizeTextAlign(@Nullable String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (@Nullable String value : values) {
+            if (value == null) {
+                continue;
+            }
+            String text = value.trim().toLowerCase(java.util.Locale.ROOT);
+            if (text.isEmpty()) {
+                continue;
+            }
+            if ("left".equals(text) || "start".equals(text)) {
+                return "left";
+            }
+            if ("center".equals(text) || "centre".equals(text) || "middle".equals(text)) {
+                return "center";
+            }
+            if ("right".equals(text) || "end".equals(text)) {
+                return "right";
+            }
+        }
+        return null;
+    }
+
     private static Path resolveStyleDir() {
         Object mcHome = Launch.blackboard.get("mcLocation");
         Path base = mcHome instanceof java.io.File ? ((java.io.File) mcHome).toPath() : Paths.get(".");
@@ -221,5 +248,7 @@ public final class GlobalGuiStyleManager {
         public String color;
         @Nullable
         public Float scale;
+        @Nullable
+        public String align;
     }
 }

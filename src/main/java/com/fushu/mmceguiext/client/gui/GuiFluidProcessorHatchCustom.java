@@ -132,6 +132,12 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
     }
 
     @Override
+    protected void mouseReleased(int mouseX, int mouseY, int state) {
+        releaseSlotGridScrollbars();
+        super.mouseReleased(mouseX, mouseY, state);
+    }
+
+    @Override
     protected void renderHoveredToolTip(int mouseX, int mouseY) {
         super.renderHoveredToolTip(mouseX, mouseY);
         CustomHatchRegistry.ComponentDef tankComponent = findHoveredTankComponent(mouseX, mouseY);
@@ -167,13 +173,18 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             }
             int color = GuiRenderUtils.parseColorARGBOrDefault(component.color, 0xFFFFFF);
             float scale = component.scale == null ? 1.0F : component.scale.floatValue();
+            int alignedX = GuiRenderUtils.resolveAlignedTextX(
+                componentGuiX(component),
+                Math.round(this.fontRenderer.getStringWidth(value) * scale),
+                component.align
+            );
             if (scale != 1.0F) {
                 GlStateManager.pushMatrix();
                 GlStateManager.scale(scale, scale, 1.0F);
-                this.fontRenderer.drawStringWithShadow(value, Math.round(componentGuiX(component) / scale), Math.round(componentGuiY(component) / scale), color);
+                this.fontRenderer.drawStringWithShadow(value, Math.round(alignedX / scale), Math.round(componentGuiY(component) / scale), color);
                 GlStateManager.popMatrix();
             } else {
-                this.fontRenderer.drawStringWithShadow(value, componentGuiX(component), componentGuiY(component), color);
+                this.fontRenderer.drawStringWithShadow(value, alignedX, componentGuiY(component), color);
             }
         }
     }
@@ -563,6 +574,10 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             state.scrollbar.textureHeight = Math.max(1, component.scrollbarTextureHeight);
             state.scrollbar.u = component.scrollbarU;
             state.scrollbar.v = component.scrollbarV;
+            state.scrollbar.hoverU = component.scrollbarHoverU;
+            state.scrollbar.hoverV = component.scrollbarHoverV;
+            state.scrollbar.pressedU = component.scrollbarPressedU;
+            state.scrollbar.pressedV = component.scrollbarPressedV;
             state.scrollbar.disabledU = component.scrollbarDisabledU;
             state.scrollbar.disabledV = component.scrollbarDisabledV;
             state.scrollbar.setRange(0, state.maxScroll, state.scrollMode == ScrollMode.PAGE ? state.visibleRows : 1);
@@ -594,6 +609,14 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             state.scrollOffset = state.scrollbar.currentScroll;
             applyConfiguredSlotPositions();
             return;
+        }
+    }
+
+    private void releaseSlotGridScrollbars() {
+        for (SlotGridState state : this.slotGridStates.values()) {
+            if (state.scrollbar != null) {
+                state.scrollbar.release();
+            }
         }
     }
 
@@ -718,8 +741,13 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         private int textureHeight = 256;
         private int u = 232;
         private int v = 0;
+        private int hoverU = 232;
+        private int hoverV = 0;
+        private int pressedU = 232;
+        private int pressedV = 0;
         private int disabledU = 244;
         private int disabledV = 0;
+        private boolean pressed;
 
         private void setRange(int min, int max, int pageSize) {
             this.minScroll = min;
@@ -745,11 +773,16 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
                 return;
             }
             if (isMouseOver(x, y)) {
+                this.pressed = true;
                 this.currentScroll = (y - this.top);
                 this.currentScroll = this.minScroll + ((this.currentScroll * 2 * this.getRange() / this.height));
                 this.currentScroll = (this.currentScroll + 1) >> 1;
                 this.applyRange();
             }
+        }
+
+        private void release() {
+            this.pressed = false;
         }
 
         private void wheel(int delta) {
@@ -768,9 +801,20 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
                 return;
             }
 
+            int mouseX = org.lwjgl.input.Mouse.getX() * mc.currentScreen.width / mc.displayWidth;
+            int mouseY = mc.currentScreen.height - org.lwjgl.input.Mouse.getY() * mc.currentScreen.height / mc.displayHeight - 1;
             int available = Math.max(1, this.height - this.thumbHeight);
             int offset = (this.currentScroll - this.minScroll) * available / this.getRange();
-            Gui.drawModalRectWithCustomSizedTexture(this.left, this.top + offset, this.u, this.v, this.width, this.thumbHeight, this.textureWidth, this.textureHeight);
+            int drawU = this.u;
+            int drawV = this.v;
+            if (this.pressed) {
+                drawU = this.pressedU;
+                drawV = this.pressedV;
+            } else if (isMouseOver(mouseX, mouseY)) {
+                drawU = this.hoverU;
+                drawV = this.hoverV;
+            }
+            Gui.drawModalRectWithCustomSizedTexture(this.left, this.top + offset, drawU, drawV, this.width, this.thumbHeight, this.textureWidth, this.textureHeight);
         }
     }
 }

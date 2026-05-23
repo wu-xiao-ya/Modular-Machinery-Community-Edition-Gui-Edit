@@ -180,18 +180,20 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
                 continue;
             }
             int color = GuiRenderUtils.parseColorARGBOrDefault(text.color, 0xFFFFFF);
-            if (text.scale != null && text.scale.floatValue() > 0F && text.scale.floatValue() != 1F) {
+            float scale = text.scale == null ? 1.0F : text.scale.floatValue();
+            int alignedX = GuiRenderUtils.resolveAlignedTextX(text.x, Math.round(this.fontRenderer.getStringWidth(value) * scale), text.align);
+            if (scale > 0F && scale != 1F) {
                 GlStateManager.pushMatrix();
-                GlStateManager.scale(text.scale.floatValue(), text.scale.floatValue(), 1.0F);
+                GlStateManager.scale(scale, scale, 1.0F);
                 this.fontRenderer.drawStringWithShadow(
                     value,
-                    Math.round(text.x / text.scale.floatValue()),
-                    Math.round(text.y / text.scale.floatValue()),
+                    Math.round(alignedX / scale),
+                    Math.round(text.y / scale),
                     color
                 );
                 GlStateManager.popMatrix();
             } else {
-                this.fontRenderer.drawStringWithShadow(value, text.x, text.y, color);
+                this.fontRenderer.drawStringWithShadow(value, alignedX, text.y, color);
             }
         }
     }
