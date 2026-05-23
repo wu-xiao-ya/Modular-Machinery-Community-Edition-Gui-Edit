@@ -7,9 +7,13 @@ import com.fushu.mmceguiext.client.gui.GuiFactoryControllerResizable;
 import com.fushu.mmceguiext.client.gui.GuiFluidHatchCustom;
 import com.fushu.mmceguiext.client.gui.GuiFluidProcessorHatchCustom;
 import com.fushu.mmceguiext.client.gui.GuiItemBusCustom;
+import com.fushu.mmceguiext.client.gui.GuiMEItemInputBusCustom;
 import com.fushu.mmceguiext.client.gui.GuiMachineControllerResizable;
 import com.fushu.mmceguiext.client.gui.GuiUpgradeBusCustom;
+import com.fushu.mmceguiext.common.tile.TileCustomMEItemInputBus;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
+import github.kasuminova.mmce.client.gui.GuiMEItemInputBus;
+import github.kasuminova.mmce.common.tile.MEItemInputBus;
 import hellfirepvp.modularmachinery.common.machine.DynamicMachine;
 import hellfirepvp.modularmachinery.client.gui.GuiContainerFluidHatch;
 import hellfirepvp.modularmachinery.client.gui.GuiContainerItemBus;
@@ -49,6 +53,7 @@ public class ClientGuiEventHandler {
             || gui instanceof GuiFluidHatchCustom
             || gui instanceof GuiFluidProcessorHatchCustom
             || gui instanceof GuiItemBusCustom
+            || gui instanceof GuiMEItemInputBusCustom
             || gui instanceof GuiUpgradeBusCustom) {
             return;
         }
@@ -73,6 +78,17 @@ public class ClientGuiEventHandler {
             TileItemBus itemBus = ((GuiContainerItemBus) gui).getContainer().getOwner();
             if (itemBus != null) {
                 event.setGui(new GuiItemBusCustom(itemBus, net.minecraft.client.Minecraft.getMinecraft().player));
+            }
+            return;
+        }
+
+        if (MMCEGuiExtConfig.aeBus.enabled && gui instanceof GuiMEItemInputBus) {
+            net.minecraft.inventory.Container container = ((GuiMEItemInputBus) gui).inventorySlots;
+            if (container instanceof github.kasuminova.mmce.common.container.ContainerMEItemInputBus) {
+                MEItemInputBus bus = ((github.kasuminova.mmce.common.container.ContainerMEItemInputBus) container).getOwner();
+                if (bus instanceof TileCustomMEItemInputBus) {
+                    event.setGui(new GuiMEItemInputBusCustom(bus, net.minecraft.client.Minecraft.getMinecraft().player));
+                }
             }
             return;
         }

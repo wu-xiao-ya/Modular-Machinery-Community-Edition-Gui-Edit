@@ -5,7 +5,7 @@
 }
 
 group = "com.fushu.mmce"
-version = "1.0.1-beta"
+version = "1.1.0-beta"
 
 java {
     withSourcesJar()

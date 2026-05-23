@@ -1,6 +1,8 @@
 package com.fushu.mmceguiext.common.integration.theoneprobe;
 
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
+import com.fushu.mmceguiext.common.tile.TileCustomAEMixedInputBus;
+import com.fushu.mmceguiext.common.tile.TileCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.tile.TileCustomHatch;
 import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import mcjty.theoneprobe.api.IProbeHitData;
@@ -30,6 +32,12 @@ public class CustomHatchInfoProvider implements IProbeInfoProvider {
     @Override
     public void addProbeInfo(ProbeMode mode, IProbeInfo probeInfo, EntityPlayer player, World world, IBlockState blockState, IProbeHitData data) {
         TileEntity tile = world.getTileEntity(data.getPos());
+        if (tile instanceof TileCustomAEMixedInputBus) {
+            return;
+        }
+        if (tile instanceof TileCustomAEMixedOutputBus) {
+            return;
+        }
         if (!(tile instanceof TileCustomHatch)) {
             return;
         }

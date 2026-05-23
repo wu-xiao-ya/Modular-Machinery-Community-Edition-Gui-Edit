@@ -222,6 +222,8 @@ public final class MachineGuiStyleManager {
         @Nullable
         public Boolean showPerformanceInfo;
         @Nullable
+        public String defaultPageId;
+        @Nullable
         public String defaultPanelId;
         @Nullable
         public List<String> customPanels;
@@ -231,6 +233,8 @@ public final class MachineGuiStyleManager {
         public List<TextStyle> texts;
         @Nullable
         public List<SmartInterfaceEditorStyle> smartInterfaceEditors;
+        @Nullable
+        public List<ButtonStyle> buttons;
         @Nullable
         public List<TextureLayerStyle> textureLayers;
 
@@ -261,11 +265,13 @@ public final class MachineGuiStyleManager {
                    && showStatusInfo == null
                    && showParallelismInfo == null
                    && showPerformanceInfo == null
+                   && (defaultPageId == null || defaultPageId.trim().isEmpty())
                    && (defaultPanelId == null || defaultPanelId.trim().isEmpty())
                    && (customPanels == null || customPanels.isEmpty())
                    && (infoSections == null || infoSections.isEmpty())
                    && (texts == null || texts.isEmpty())
                    && (smartInterfaceEditors == null || smartInterfaceEditors.isEmpty())
+                   && (buttons == null || buttons.isEmpty())
                    && (textureLayers == null || textureLayers.isEmpty());
         }
     }
@@ -295,6 +301,8 @@ public final class MachineGuiStyleManager {
         public Boolean shadow;
         @Nullable
         public Boolean visible;
+        @Nullable
+        public String page;
     }
 
     public static class SmartInterfaceEditorStyle {
@@ -317,6 +325,39 @@ public final class MachineGuiStyleManager {
         public Boolean inputBackground;
         @Nullable
         public Integer priority;
+        @Nullable
+        public String page;
+    }
+
+    public static class ButtonStyle {
+        @Nullable
+        public String id;
+        public int x;
+        public int y;
+        @Nullable
+        public Integer width;
+        @Nullable
+        public Integer height;
+        @Nullable
+        public String label;
+        @Nullable
+        public String action;
+        @Nullable
+        public String key;
+        @Nullable
+        public Float value;
+        @Nullable
+        public Float min;
+        @Nullable
+        public Float max;
+        @Nullable
+        public String targetPage;
+        @Nullable
+        public Integer priority;
+        @Nullable
+        public Boolean visible;
+        @Nullable
+        public String page;
     }
 
     public static class TextureLayerStyle {
@@ -343,5 +384,7 @@ public final class MachineGuiStyleManager {
         public Boolean foreground;
         @Nullable
         public Integer priority;
+        @Nullable
+        public String page;
     }
 }

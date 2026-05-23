@@ -293,11 +293,13 @@ final class MachineGuiStyleParser {
             "showPerformance",
             "show_performance"
         );
+        style.defaultPageId = getTrimmedString(node, result, scope, "defaultPageId", "default_page_id", "pageId", "page_id");
         style.defaultPanelId = getTrimmedString(node, result, scope, "defaultPanelId", "default_panel_id", "panelId", "panel_id");
         style.customPanels = parseStringArray(node, result, scope, "customPanels", "custom_panels", "panels");
         style.infoSections = parseInfoSections(node, result, scope);
         style.texts = parseTexts(node, result, scope);
         style.smartInterfaceEditors = parseSmartInterfaceEditors(node, result, scope);
+        style.buttons = parseButtons(node, result, scope);
         style.textureLayers = parseTextureLayers(node, result, scope);
 
         Boolean useDefaultBackground = getBoolean(node, result, scope, "useDefaultBackground");
@@ -395,6 +397,7 @@ final class MachineGuiStyleParser {
             text.priority = getInt(obj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
             text.shadow = getBoolean(obj, result, itemScope, "shadow", "withShadow", "with_shadow");
             text.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
+            text.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab");
             texts.add(text);
         }
 
@@ -447,10 +450,97 @@ final class MachineGuiStyleParser {
             editor.showControls = getBoolean(editorObj, result, itemScope, "showControls", "show_controls");
             editor.inputBackground = getBoolean(editorObj, result, itemScope, "inputBackground", "input_background");
             editor.priority = getInt(editorObj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
+            editor.page = getTrimmedString(editorObj, result, itemScope, "page", "pageId", "page_id", "tab");
             editors.add(editor);
         }
 
         return editors.isEmpty() ? null : editors;
+    }
+
+    @Nullable
+    private static List<MachineGuiStyleManager.ButtonStyle> parseButtons(
+        JsonObject node,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        MatchedElement match = findElement(node, "buttons", "buttonList", "button_list", "guiButtons", "gui_buttons");
+        if (match == null) {
+            return null;
+        }
+        if (!match.element.isJsonArray()) {
+            result.warnForMachine(scope, field(scope, match.key) + " must be an array.");
+            return null;
+        }
+
+        List<MachineGuiStyleManager.ButtonStyle> buttons = new ArrayList<MachineGuiStyleManager.ButtonStyle>();
+        JsonArray array = match.element.getAsJsonArray();
+        for (int i = 0; i < array.size(); i++) {
+            JsonElement child = array.get(i);
+            String itemScope = field(scope, match.key + "[" + i + "]");
+            if (child == null || !child.isJsonObject()) {
+                result.warnForMachine(scope, itemScope + " must be an object.");
+                continue;
+            }
+
+            JsonObject obj = child.getAsJsonObject();
+            Integer x = validateMinInt(getInt(obj, result, itemScope, "x"), 0, result, itemScope, "x");
+            Integer y = validateMinInt(getInt(obj, result, itemScope, "y"), 0, result, itemScope, "y");
+            String label = getTrimmedString(obj, result, itemScope, "label", "text", "title");
+            String action = getTrimmedString(obj, result, itemScope, "action", "mode", "type");
+            String targetPage = getTrimmedString(obj, result, itemScope, "targetPage", "target_page", "pageTarget", "page_target");
+            String key = getTrimmedString(obj, result, itemScope, "key", "virtualKey", "virtual_key", "interfaceType", "interface_type");
+            Float value = getFloat(obj, result, itemScope, "value", "delta", "amount");
+            if (x == null || y == null || label == null || label.isEmpty()) {
+                result.warnForMachine(scope, itemScope + " is missing required fields x, y or label.");
+                continue;
+            }
+            if ((action == null || action.isEmpty()) && targetPage != null && !targetPage.isEmpty()) {
+                action = "page";
+            }
+            if (action == null || action.isEmpty()) {
+                result.warnForMachine(scope, itemScope + " is missing required field action.");
+                continue;
+            }
+
+            String normalizedAction = normalizeButtonAction(action);
+            if (normalizedAction == null) {
+                result.warnForMachine(scope, itemScope + ".action is invalid: " + action);
+                continue;
+            }
+            if ("page".equals(normalizedAction) && (targetPage == null || targetPage.isEmpty())) {
+                result.warnForMachine(scope, itemScope + " page action requires targetPage.");
+                continue;
+            }
+            if (("smart_set".equals(normalizedAction) || "smart_add".equals(normalizedAction))
+                && (key == null || key.isEmpty())) {
+                result.warnForMachine(scope, itemScope + " smart action requires key.");
+                continue;
+            }
+            if ("smart_set".equals(normalizedAction) && value == null) {
+                result.warnForMachine(scope, itemScope + " smart_set action requires value.");
+                continue;
+            }
+
+            MachineGuiStyleManager.ButtonStyle button = new MachineGuiStyleManager.ButtonStyle();
+            button.id = getTrimmedString(obj, result, itemScope, "id", "name");
+            button.x = x.intValue();
+            button.y = y.intValue();
+            button.width = validateMinInt(getInt(obj, result, itemScope, "width", "w"), 1, result, itemScope, "width");
+            button.height = validateMinInt(getInt(obj, result, itemScope, "height", "h"), 1, result, itemScope, "height");
+            button.label = label;
+            button.action = normalizedAction;
+            button.key = key;
+            button.value = value;
+            button.min = getFloat(obj, result, itemScope, "min", "minimum");
+            button.max = getFloat(obj, result, itemScope, "max", "maximum");
+            button.targetPage = targetPage;
+            button.priority = getInt(obj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
+            button.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
+            button.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab");
+            buttons.add(button);
+        }
+
+        return buttons.isEmpty() ? null : buttons;
     }
 
     @Nullable
@@ -586,7 +676,28 @@ final class MachineGuiStyleParser {
         layer.foreground = forceForeground
             ? Boolean.TRUE
             : getBoolean(obj, result, scope, "foreground", "front", "drawForeground");
+        layer.page = getTrimmedString(obj, result, scope, "page", "pageId", "page_id", "tab");
         return layer;
+    }
+
+    @Nullable
+    private static String normalizeButtonAction(@Nullable String raw) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("page".equals(text) || "switchpage".equals(text) || "switch_page".equals(text)
+            || "page_switch".equals(text) || "setpage".equals(text) || "set_page".equals(text)) {
+            return "page";
+        }
+        if ("smart_set".equals(text) || "smartset".equals(text) || "set".equals(text)) {
+            return "smart_set";
+        }
+        if ("smart_add".equals(text) || "smartadd".equals(text) || "add".equals(text)
+            || "increment".equals(text) || "inc".equals(text)) {
+            return "smart_add";
+        }
+        return null;
     }
 
     @Nullable

@@ -3,6 +3,7 @@ package com.fushu.mmceguiext.client.gui;
 import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import com.fushu.mmceguiext.client.config.MachineGuiStyleManager;
+import com.fushu.mmceguiext.common.network.PktControllerButtonAction;
 import com.fushu.mmceguiext.common.network.PktControllerSmartInterfaceUpdate;
 import github.kasuminova.mmce.common.event.client.ControllerGUIRenderEvent;
 import hellfirepvp.modularmachinery.ModularMachinery;
@@ -62,8 +63,11 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     private static final int SMART_EDITOR_APPLY_W = 20;
     private static final int SMART_EDITOR_INPUT_H = 12;
     private static final int CUSTOM_EDITOR_BUTTON_ID_BASE = 4000;
+    private static final int CUSTOM_BUTTON_ID_BASE = 5000;
     private static final int DEFAULT_RENDER_PRIORITY = 0;
     private static final int DEFAULT_SMART_EDITOR_PRIORITY = 10;
+    private static final int DEFAULT_BUTTON_WIDTH = 20;
+    private static final int DEFAULT_BUTTON_HEIGHT = 20;
 
     private final TileMachineController controller;
     private MachineGuiStyleManager.ControllerStyle styleOverride = MachineGuiStyleManager.ControllerStyle.EMPTY;
@@ -99,10 +103,12 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     private String smartInterfaceCustomTitleText = null;
     private boolean hideDefaultSmartInterfaceEditor = false;
     private final List<CustomSmartEditor> customSmartEditors = new ArrayList<CustomSmartEditor>();
+    private final List<CustomButton> customButtons = new ArrayList<CustomButton>();
     private final List<TextureLayerDef> backgroundTextureLayers = new ArrayList<TextureLayerDef>();
     private final List<TextureLayerDef> foregroundTextureLayers = new ArrayList<TextureLayerDef>();
     private final Map<String, LayerRuntimeState> layerRuntimeStates = new HashMap<String, LayerRuntimeState>();
     private final Set<String> textureLayerIds = new HashSet<String>();
+    private String activePageId = "main";
 
     public GuiMachineControllerResizable(ContainerController container) {
         super(container);
@@ -122,6 +128,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         this.infoScrollbarDragOffset = 0;
         initSmartInterfaceEditor();
         initCustomSmartInterfaceEditors(MMCEGuiExtConfig.machineController);
+        initCustomButtons(MMCEGuiExtConfig.machineController);
     }
 
     @Override
@@ -259,6 +266,10 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             }
             GlStateManager.pushMatrix();
             GlStateManager.translate(-this.guiLeft, -this.guiTop, 0.0F);
+            drawCustomButtons(mouseScreenX, mouseScreenY, Integer.valueOf(priority));
+            GlStateManager.popMatrix();
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(-this.guiLeft, -this.guiTop, 0.0F);
             drawCustomSmartInterfaceEditorsBackground(mouseScreenX, mouseScreenY, Integer.valueOf(priority));
             GlStateManager.popMatrix();
             drawCustomSmartInterfaceEditorsForeground(Integer.valueOf(priority));
@@ -308,6 +319,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (handleCustomButtonKeyTyped(typedChar, keyCode)) {
+            return;
+        }
         if (handleCustomSmartInterfaceKeyTyped(typedChar, keyCode)) {
             return;
         }
@@ -319,6 +333,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleCustomButtonMouseClicked(mouseX, mouseY, mouseButton)) {
+            return;
+        }
         if (handleCustomSmartInterfaceMouseClicked(mouseX, mouseY, mouseButton)) {
             return;
         }
@@ -545,6 +562,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             if (text.visible != null && !text.visible.booleanValue()) {
                 continue;
             }
+            if (!isPageVisible(text.page)) {
+                continue;
+            }
             int priority = text.priority == null ? resolveForegroundContentPriority() : text.priority.intValue();
             if (priorityFilter != null && priority != priorityFilter.intValue()) {
                 continue;
@@ -749,7 +769,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     private List<PanelDef> getActivePanels(MMCEGuiExtConfig.MachineController cfg) {
         List<PanelDef> panels = new ArrayList<PanelDef>();
         if (isUsingDefaultBackground(cfg)) {
-            panels.add(new PanelDef(resolveConfiguredDefaultPanelId(cfg), getDefaultPanelRect(cfg)));
+            panels.add(new PanelDef(resolveConfiguredDefaultPanelId(cfg), getDefaultPanelRect(cfg), null));
             return panels;
         }
 
@@ -770,9 +790,10 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             int y = Math.max(4, cfg.panelY);
             int width = Math.max(48, this.renderWidth - x - 8);
             int height = Math.max(24, this.renderHeight - y - 4);
-            panels.add(new PanelDef("main", new Rectangle(x, y, width, height)));
+            panels.add(new PanelDef("main", new Rectangle(x, y, width, height), null));
         }
 
+        panels.removeIf(panel -> !isPageVisible(panel.page));
         return panels;
     }
 
@@ -805,7 +826,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         }
 
         String[] split = trimmed.split(",");
-        if (split.length != 5) {
+        if (split.length != 5 && split.length != 6) {
             return null;
         }
 
@@ -833,7 +854,8 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             width = Math.max(24, Math.min(width, this.renderWidth - x - 2));
             height = Math.max(24, Math.min(height, this.renderHeight - y - 2));
 
-            return new PanelDef(id, new Rectangle(x, y, width, height));
+            String page = split.length >= 6 ? normalizePageIdOrNull(split[5]) : null;
+            return new PanelDef(id, new Rectangle(x, y, width, height), page);
         } catch (NumberFormatException ignored) {
             return null;
         }
@@ -1083,6 +1105,26 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         }
         String normalized = id.trim().toLowerCase(Locale.ROOT);
         return normalized.isEmpty() ? "main" : normalized;
+    }
+
+    private String normalizePageId(@Nullable String id) {
+        if (id == null) {
+            return "main";
+        }
+        String normalized = id.trim().toLowerCase(Locale.ROOT);
+        return normalized.isEmpty() ? "main" : normalized;
+    }
+
+    @Nullable
+    private String normalizePageIdOrNull(@Nullable String id) {
+        if (id == null || id.trim().isEmpty()) {
+            return null;
+        }
+        return normalizePageId(id);
+    }
+
+    private boolean isPageVisible(@Nullable String page) {
+        return page == null || page.isEmpty() || normalizePageId(page).equals(this.activePageId);
     }
 
     private boolean isOnPanelThumb(int localX, int localY, PanelDef panel) {
@@ -1526,6 +1568,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             def.corner = layer.corner;
             def.useNineSlice = layer.useNineSlice;
             def.priority = layer.priority == null ? DEFAULT_RENDER_PRIORITY : layer.priority.intValue();
+            def.page = normalizePageIdOrNull(layer.page);
             boolean foreground = layer.foreground != null && layer.foreground.booleanValue();
             String defaultId = foreground ? "fg_" + fgIndex++ : "bg_" + bgIndex++;
             String requestedId = layer.id == null ? defaultId : layer.id.trim();
@@ -1559,6 +1602,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 continue;
             }
             if (!isLayerVisible(layer)) {
+                continue;
+            }
+            if (!isPageVisible(layer.page)) {
                 continue;
             }
             this.mc.getTextureManager().bindTexture(layer.texture);
@@ -1612,6 +1658,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             editor.inputBackground = style.inputBackground == null || style.inputBackground.booleanValue();
             editor.title = style.title;
             editor.priority = style.priority == null ? DEFAULT_SMART_EDITOR_PRIORITY : style.priority.intValue();
+            editor.page = normalizePageIdOrNull(style.page);
 
             int inputWidth = style.inputWidth == null ? getSmartInterfaceEditorInputWidth(cfg) : Math.max(4, style.inputWidth.intValue());
             int editorX = MathHelper.clamp(style.x, 2, Math.max(2, this.renderWidth - 2));
@@ -1973,6 +2020,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             if (priorityFilter != null && editor.priority != priorityFilter.intValue()) {
                 continue;
             }
+            if (!isPageVisible(editor.page)) {
+                continue;
+            }
             if (editor.input == null) {
                 continue;
             }
@@ -1996,6 +2046,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     private void drawCustomSmartInterfaceEditorsForeground(@Nullable Integer priorityFilter) {
         for (CustomSmartEditor editor : this.customSmartEditors) {
             if (priorityFilter != null && editor.priority != priorityFilter.intValue()) {
+                continue;
+            }
+            if (!isPageVisible(editor.page)) {
                 continue;
             }
             if (editor.input == null) {
@@ -2024,6 +2077,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             return false;
         }
         for (CustomSmartEditor editor : this.customSmartEditors) {
+            if (!isPageVisible(editor.page)) {
+                continue;
+            }
             if (editor.input == null) {
                 continue;
             }
@@ -2050,6 +2106,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
     private boolean handleCustomSmartInterfaceKeyTyped(char typedChar, int keyCode) {
         for (CustomSmartEditor editor : this.customSmartEditors) {
+            if (!isPageVisible(editor.page)) {
+                continue;
+            }
             if (editor.input == null || !editor.input.isFocused()) {
                 continue;
             }
@@ -2120,6 +2179,94 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         return editor.keys.get(editor.index);
     }
 
+    private void initCustomButtons(MMCEGuiExtConfig.MachineController cfg) {
+        this.customButtons.clear();
+        if (styleOverride.buttons != null) {
+            int buttonId = CUSTOM_BUTTON_ID_BASE;
+            for (MachineGuiStyleManager.ButtonStyle style : styleOverride.buttons) {
+                if (style == null || style.label == null || style.label.trim().isEmpty() || style.action == null || style.action.trim().isEmpty()) {
+                    continue;
+                }
+                int width = style.width == null ? DEFAULT_BUTTON_WIDTH : Math.max(8, style.width.intValue());
+                int height = style.height == null ? DEFAULT_BUTTON_HEIGHT : Math.max(8, style.height.intValue());
+                int x = MathHelper.clamp(style.x, 0, Math.max(0, this.renderWidth - width));
+                int y = MathHelper.clamp(style.y, 0, Math.max(0, this.renderHeight - height));
+
+                CustomButton button = new CustomButton();
+                button.id = style.id == null || style.id.trim().isEmpty() ? "button_" + this.customButtons.size() : style.id.trim();
+                button.action = style.action;
+                button.key = style.key;
+                button.value = style.value == null ? ("smart_add".equals(style.action) ? 1.0F : 0.0F) : style.value.floatValue();
+                button.min = style.min;
+                button.max = style.max;
+                button.targetPage = normalizePageId(style.targetPage);
+                button.priority = style.priority == null ? DEFAULT_SMART_EDITOR_PRIORITY : style.priority.intValue();
+                button.page = normalizePageIdOrNull(style.page);
+                button.visible = style.visible == null || style.visible.booleanValue();
+                button.button = new GuiButton(buttonId++, this.guiLeft + x, this.guiTop + y, width, height, style.label);
+                this.customButtons.add(button);
+            }
+        }
+        this.activePageId = resolveInitialPageId(cfg, this.activePageId);
+    }
+
+    private void drawCustomButtons(int mouseX, int mouseY, @Nullable Integer priorityFilter) {
+        for (CustomButton button : this.customButtons) {
+            if (!button.visible) {
+                continue;
+            }
+            if (priorityFilter != null && button.priority != priorityFilter.intValue()) {
+                continue;
+            }
+            if (!isPageVisible(button.page) || button.button == null) {
+                continue;
+            }
+            button.button.enabled = !"page".equals(button.action) || !button.targetPage.equals(this.activePageId);
+            button.button.drawButton(this.mc, mouseX, mouseY, 0F);
+        }
+    }
+
+    private boolean handleCustomButtonMouseClicked(int mouseX, int mouseY, int mouseButton) {
+        if (mouseButton != 0) {
+            return false;
+        }
+        for (CustomButton button : this.customButtons) {
+            if (!button.visible || !isPageVisible(button.page) || button.button == null) {
+                continue;
+            }
+            if (button.button.mousePressed(this.mc, mouseX, mouseY)) {
+                activateCustomButton(button);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean handleCustomButtonKeyTyped(char typedChar, int keyCode) {
+        return false;
+    }
+
+    private void activateCustomButton(CustomButton button) {
+        if ("page".equals(button.action)) {
+            this.activePageId = button.targetPage;
+            return;
+        }
+        if (!"smart_set".equals(button.action) && !"smart_add".equals(button.action)) {
+            return;
+        }
+        if (button.key == null || button.key.trim().isEmpty() || !Float.isFinite(button.value)) {
+            return;
+        }
+        MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerButtonAction(
+            this.controller.getPos(),
+            button.key,
+            "smart_add".equals(button.action),
+            button.value,
+            button.min,
+            button.max
+        ));
+    }
+
     private TreeSet<Integer> collectForegroundRenderPriorities() {
         TreeSet<Integer> priorities = new TreeSet<Integer>();
         priorities.add(Integer.valueOf(resolveForegroundContentPriority()));
@@ -2128,6 +2275,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         }
         if (this.smartInterfaceEditorInput != null) {
             priorities.add(Integer.valueOf(this.smartInterfaceEditorPriority));
+        }
+        for (CustomButton button : this.customButtons) {
+            priorities.add(Integer.valueOf(button.priority));
         }
         for (CustomSmartEditor editor : this.customSmartEditors) {
             priorities.add(Integer.valueOf(editor.priority));
@@ -2162,6 +2312,72 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             return styleOverride.defaultPanelId;
         }
         return cfg.defaultPanelId;
+    }
+
+    private String resolveConfiguredDefaultPageId() {
+        if (styleOverride.defaultPageId != null && !styleOverride.defaultPageId.trim().isEmpty()) {
+            return normalizePageId(styleOverride.defaultPageId);
+        }
+        return "main";
+    }
+
+    private String resolveInitialPageId(MMCEGuiExtConfig.MachineController cfg, @Nullable String current) {
+        LinkedHashMap<String, Boolean> pages = new LinkedHashMap<String, Boolean>();
+        pages.put(resolveConfiguredDefaultPageId(), Boolean.TRUE);
+        String[] configuredPanels = getConfiguredPanels(cfg);
+        if (configuredPanels != null) {
+            for (String entry : configuredPanels) {
+                PanelDef panel = parsePanelEntry(entry);
+                if (panel != null && panel.page != null) {
+                    pages.put(panel.page, Boolean.TRUE);
+                }
+            }
+        }
+        if (styleOverride.texts != null) {
+            for (MachineGuiStyleManager.TextStyle text : styleOverride.texts) {
+                if (text != null && text.page != null && !text.page.trim().isEmpty()) {
+                    pages.put(normalizePageId(text.page), Boolean.TRUE);
+                }
+            }
+        }
+        if (styleOverride.smartInterfaceEditors != null) {
+            for (MachineGuiStyleManager.SmartInterfaceEditorStyle editor : styleOverride.smartInterfaceEditors) {
+                if (editor != null && editor.page != null && !editor.page.trim().isEmpty()) {
+                    pages.put(normalizePageId(editor.page), Boolean.TRUE);
+                }
+            }
+        }
+        if (styleOverride.textureLayers != null) {
+            for (MachineGuiStyleManager.TextureLayerStyle layer : styleOverride.textureLayers) {
+                if (layer != null && layer.page != null && !layer.page.trim().isEmpty()) {
+                    pages.put(normalizePageId(layer.page), Boolean.TRUE);
+                }
+            }
+        }
+        if (styleOverride.buttons != null) {
+            for (MachineGuiStyleManager.ButtonStyle button : styleOverride.buttons) {
+                if (button == null) {
+                    continue;
+                }
+                if (button.page != null && !button.page.trim().isEmpty()) {
+                    pages.put(normalizePageId(button.page), Boolean.TRUE);
+                }
+                if (button.targetPage != null && !button.targetPage.trim().isEmpty()) {
+                    pages.put(normalizePageId(button.targetPage), Boolean.TRUE);
+                }
+            }
+        }
+        if (current != null) {
+            String normalizedCurrent = normalizePageId(current);
+            if (pages.containsKey(normalizedCurrent)) {
+                return normalizedCurrent;
+            }
+        }
+        String configured = resolveConfiguredDefaultPageId();
+        if (pages.containsKey(configured)) {
+            return configured;
+        }
+        return pages.isEmpty() ? "main" : pages.keySet().iterator().next();
     }
 
     @Nullable
@@ -2498,6 +2714,8 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         private int offsetY;
         private int priority = DEFAULT_RENDER_PRIORITY;
         @Nullable
+        private String page;
+        @Nullable
         private Integer width;
         @Nullable
         private Integer height;
@@ -2535,6 +2753,8 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         private int x;
         private int y;
         private int priority = DEFAULT_SMART_EDITOR_PRIORITY;
+        @Nullable
+        private String page;
         private int inputWidth;
         private List<String> keys = new ArrayList<String>();
         private int index = 0;
@@ -2556,13 +2776,35 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         private boolean inputBackground = true;
     }
 
+    private static class CustomButton {
+        private String id;
+        private String action;
+        @Nullable
+        private String key;
+        private float value;
+        @Nullable
+        private Float min;
+        @Nullable
+        private Float max;
+        private String targetPage = "main";
+        private int priority = DEFAULT_SMART_EDITOR_PRIORITY;
+        @Nullable
+        private String page;
+        private boolean visible = true;
+        @Nullable
+        private GuiButton button;
+    }
+
     private static class PanelDef {
         private final String id;
         private final Rectangle rect;
+        @Nullable
+        private final String page;
 
-        private PanelDef(String id, Rectangle rect) {
+        private PanelDef(String id, Rectangle rect, @Nullable String page) {
             this.id = id;
             this.rect = rect;
+            this.page = page;
         }
     }
 }

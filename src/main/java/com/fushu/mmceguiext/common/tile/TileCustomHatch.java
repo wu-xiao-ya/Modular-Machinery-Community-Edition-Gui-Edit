@@ -14,6 +14,7 @@ import hellfirepvp.modularmachinery.common.tiles.base.SelectiveUpdateTileEntity;
 import hellfirepvp.modularmachinery.common.tiles.base.TileEntityRestrictedTick;
 import hellfirepvp.modularmachinery.common.util.IOInventory;
 import mekanism.api.gas.Gas;
+import mekanism.api.gas.IGasItem;
 import mekanism.api.gas.GasStack;
 import mekanism.api.gas.GasTankInfo;
 import mekanism.api.gas.IGasHandler;
@@ -27,6 +28,8 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTank;
+import net.minecraftforge.fluids.FluidActionResult;
+import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidUtil;
 import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidHandler;
@@ -206,6 +209,17 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         tryProcess();
     }
 
+    public boolean tryHeldItemInteraction(EntityPlayer player, EnumHand hand) {
+        ItemStack held = player.getHeldItem(hand);
+        if (held.isEmpty()) {
+            return false;
+        }
+        if (tryProcessHeldFluidItem(player, hand, held)) {
+            return true;
+        }
+        return tryProcessHeldGasItem(player, hand, held);
+    }
+
     private void onInventoryChanged(int slot) {
         if (world != null && !world.isRemote) {
             tryProcess();
@@ -222,6 +236,19 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     }
 
     private boolean tryProcessInputSlot(int inputSlot, int[] outputSlots) {
+        if (tryProcessFluidInputSlot(inputSlot, outputSlots)) {
+            return true;
+        }
+        if (tryProcessFluidOutputSlot(inputSlot, outputSlots)) {
+            return true;
+        }
+        if (tryProcessGasInputSlot(inputSlot, outputSlots)) {
+            return true;
+        }
+        return tryProcessGasOutputSlot(inputSlot, outputSlots);
+    }
+
+    private boolean tryProcessFluidInputSlot(int inputSlot, int[] outputSlots) {
         ItemStack input = this.inventory.getStackInSlot(inputSlot);
         if (input.isEmpty()) {
             return false;
@@ -250,16 +277,142 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return false;
         }
 
-        this.tank.fill(drained.copy(), true);
+        this.tank.fill(actuallyDrained.copy(), true);
+        return moveProcessedContainer(inputSlot, outputSlot, emptiedContainer);
+    }
+
+    private boolean tryProcessFluidOutputSlot(int inputSlot, int[] outputSlots) {
+        ItemStack input = this.inventory.getStackInSlot(inputSlot);
+        if (input.isEmpty()) {
+            return false;
+        }
+        FluidActionResult result = FluidUtil.tryFillContainer(input.copy(), this.tank, Fluid.BUCKET_VOLUME, null, true);
+        if (!result.isSuccess()) {
+            return false;
+        }
+        ItemStack filledContainer = result.getResult();
+        int outputSlot = findOutputSlotFor(filledContainer, outputSlots);
+        if (outputSlot < 0) {
+            return false;
+        }
+        return moveProcessedContainer(inputSlot, outputSlot, filledContainer);
+    }
+
+    @Optional.Method(modid = "mekanism")
+    private boolean tryProcessGasInputSlot(int inputSlot, int[] outputSlots) {
+        ItemStack input = this.inventory.getStackInSlot(inputSlot);
+        if (input.isEmpty() || !(input.getItem() instanceof IGasItem)) {
+            return false;
+        }
+        ItemStack container = input.copy();
+        GasStack gas = getGasFromItem(container);
+        if (gas == null || gas.amount <= 0) {
+            return false;
+        }
+        int accepted = this.gasTank.receiveGas(null, gas.copy(), false);
+        if (accepted <= 0) {
+            return false;
+        }
+        GasStack removed = removeGasFromItem(container, accepted, true);
+        if (removed == null || removed.amount <= 0) {
+            return false;
+        }
+        int outputSlot = findOutputSlotFor(container, outputSlots);
+        if (outputSlot < 0) {
+            return false;
+        }
+        this.gasTank.receiveGas(null, removed.copy(), true);
+        return moveProcessedContainer(inputSlot, outputSlot, container);
+    }
+
+    @Optional.Method(modid = "mekanism")
+    private boolean tryProcessGasOutputSlot(int inputSlot, int[] outputSlots) {
+        ItemStack input = this.inventory.getStackInSlot(inputSlot);
+        if (input.isEmpty() || !(input.getItem() instanceof IGasItem)) {
+            return false;
+        }
+        GasStack available = getGasStack();
+        if (available == null || available.amount <= 0) {
+            return false;
+        }
+        ItemStack container = input.copy();
+        int accepted = addGasToItem(container, available.copy(), true);
+        if (accepted <= 0) {
+            return false;
+        }
+        int outputSlot = findOutputSlotFor(container, outputSlots);
+        if (outputSlot < 0) {
+            return false;
+        }
+        GasStack drained = this.gasTank.drawGas(null, accepted, true);
+        if (drained == null || drained.amount <= 0) {
+            return false;
+        }
+        return moveProcessedContainer(inputSlot, outputSlot, container);
+    }
+
+    private boolean moveProcessedContainer(int inputSlot, int outputSlot, ItemStack producedContainer) {
         this.inventory.setStackInSlot(inputSlot, ItemStack.EMPTY);
         ItemStack output = this.inventory.getStackInSlot(outputSlot);
         if (output.isEmpty()) {
-            this.inventory.setStackInSlot(outputSlot, emptiedContainer.copy());
+            this.inventory.setStackInSlot(outputSlot, producedContainer.copy());
         } else {
             ItemStack grown = output.copy();
-            grown.grow(emptiedContainer.getCount());
+            grown.grow(producedContainer.getCount());
             this.inventory.setStackInSlot(outputSlot, grown);
         }
+        markNoUpdateSync();
+        return true;
+    }
+
+    private boolean tryProcessHeldFluidItem(EntityPlayer player, EnumHand hand, ItemStack held) {
+        FluidActionResult emptyResult = FluidUtil.tryEmptyContainer(held, this.tank, Fluid.BUCKET_VOLUME, player, true);
+        if (emptyResult.isSuccess()) {
+            player.setHeldItem(hand, emptyResult.getResult());
+            markNoUpdateSync();
+            return true;
+        }
+        FluidActionResult fillResult = FluidUtil.tryFillContainer(held, this.tank, Fluid.BUCKET_VOLUME, player, true);
+        if (fillResult.isSuccess()) {
+            player.setHeldItem(hand, fillResult.getResult());
+            markNoUpdateSync();
+            return true;
+        }
+        return false;
+    }
+
+    @Optional.Method(modid = "mekanism")
+    private boolean tryProcessHeldGasItem(EntityPlayer player, EnumHand hand, ItemStack held) {
+        if (!(held.getItem() instanceof IGasItem)) {
+            return false;
+        }
+        GasStack heldGas = getGasFromItem(held);
+        if (heldGas != null && heldGas.amount > 0) {
+            int accepted = this.gasTank.receiveGas(null, heldGas.copy(), false);
+            if (accepted > 0) {
+                GasStack removed = removeGasFromItem(held, accepted, true);
+                if (removed != null && removed.amount > 0) {
+                    this.gasTank.receiveGas(null, removed.copy(), true);
+                    player.setHeldItem(hand, held);
+                    markNoUpdateSync();
+                    return true;
+                }
+            }
+        }
+
+        GasStack storedGas = getGasStack();
+        if (storedGas == null || storedGas.amount <= 0) {
+            return false;
+        }
+        int added = addGasToItem(held, storedGas.copy(), true);
+        if (added <= 0) {
+            return false;
+        }
+        GasStack drained = this.gasTank.drawGas(null, added, true);
+        if (drained == null || drained.amount <= 0) {
+            return false;
+        }
+        player.setHeldItem(hand, held);
         markNoUpdateSync();
         return true;
     }
@@ -280,6 +433,62 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             }
         }
         return -1;
+    }
+
+    @Nullable
+    @Optional.Method(modid = "mekanism")
+    private GasStack getGasFromItem(ItemStack stack) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof IGasItem)) {
+            return null;
+        }
+        GasStack gas = ((IGasItem) stack.getItem()).getGas(stack);
+        return gas == null ? null : gas.copy();
+    }
+
+    @Nullable
+    @Optional.Method(modid = "mekanism")
+    private GasStack removeGasFromItem(ItemStack stack, int amount, boolean doTransfer) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof IGasItem) || amount <= 0) {
+            return null;
+        }
+        IGasItem item = (IGasItem) stack.getItem();
+        GasStack current = item.getGas(stack);
+        if (current == null || current.amount <= 0 || !item.canProvideGas(stack, current.getGas())) {
+            return null;
+        }
+        int removed = Math.min(amount, current.amount);
+        GasStack result = current.copy();
+        result.amount = removed;
+        if (doTransfer) {
+            int remaining = current.amount - removed;
+            item.setGas(stack, remaining <= 0 ? null : current.copy().withAmount(remaining));
+        }
+        return result;
+    }
+
+    @Optional.Method(modid = "mekanism")
+    private int addGasToItem(ItemStack stack, GasStack gas, boolean doTransfer) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof IGasItem) || gas == null || gas.amount <= 0) {
+            return 0;
+        }
+        IGasItem item = (IGasItem) stack.getItem();
+        if (!item.canReceiveGas(stack, gas.getGas())) {
+            return 0;
+        }
+        GasStack current = item.getGas(stack);
+        int currentAmount = current == null ? 0 : current.amount;
+        if (current != null && current.amount > 0 && current.getGas() != gas.getGas()) {
+            return 0;
+        }
+        int space = Math.max(0, item.getMaxGas(stack) - currentAmount);
+        int added = Math.min(space, gas.amount);
+        if (added <= 0) {
+            return 0;
+        }
+        if (doTransfer) {
+            item.setGas(stack, gas.copy().withAmount(currentAmount + added));
+        }
+        return added;
     }
 
     private void syncDefinition() {
@@ -354,23 +563,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     }
 
     private MachineComponent<?> createCombinedMachineComponent(IOType ioType, long groupId) {
-        return new MachineComponent<InfItemFluidHandler>(ioType) {
-            @Override
-            public ComponentType getComponentType() {
-                return ComponentTypesMM.COMPONENT_ITEM_FLUID_GAS;
-            }
-
-            @Override
-            public InfItemFluidHandler getContainerProvider() {
-                int[] slots = ioType == IOType.OUTPUT ? TileCustomHatch.this.recipeOutputSlots : TileCustomHatch.this.recipeInputSlots;
-                return new CombinedHatchHandler(new FilteredItemHandlerView(TileCustomHatch.this.inventory, slots), TileCustomHatch.this.tank, TileCustomHatch.this.gasTank);
-            }
-
-            @Override
-            public long getGroupID() {
-                return groupId;
-            }
-        };
+        return new CombinedMachineComponent(ioType, groupId);
     }
 
     @Nullable
@@ -382,48 +575,13 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return createCombinedMachineComponent(ioType, groupId);
         }
         if ("item".equalsIgnoreCase(componentType)) {
-            return new MachineComponent.ItemBus(ioType) {
-                @Override
-                public net.minecraftforge.items.IItemHandlerModifiable getContainerProvider() {
-                    return new FilteredItemHandlerView(TileCustomHatch.this.inventory, ioType == IOType.OUTPUT ? TileCustomHatch.this.recipeOutputSlots : TileCustomHatch.this.recipeInputSlots);
-                }
-
-                @Override
-                public long getGroupID() {
-                    return groupId;
-                }
-            };
+            return new ItemMachineComponent(ioType, groupId);
         }
         if ("fluid".equalsIgnoreCase(componentType)) {
-            return new MachineComponent.FluidHatch(ioType) {
-                @Override
-                public FluidTank getContainerProvider() {
-                    return TileCustomHatch.this.tank;
-                }
-
-                @Override
-                public long getGroupID() {
-                    return groupId;
-                }
-            };
+            return new FluidMachineComponent(ioType, groupId);
         }
         if ("gas".equalsIgnoreCase(componentType)) {
-            return new MachineComponent<IExtendedGasHandler>(ioType) {
-                @Override
-                public ComponentType getComponentType() {
-                    return ComponentTypesMM.COMPONENT_GAS;
-                }
-
-                @Override
-                public IExtendedGasHandler getContainerProvider() {
-                    return TileCustomHatch.this.gasTank;
-                }
-
-                @Override
-                public long getGroupID() {
-                    return groupId;
-                }
-            };
+            return new GasMachineComponent(ioType, groupId);
         }
         return null;
     }
@@ -557,6 +715,93 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         public ProcessorGasTank(int capacity, int tankCount) {
             super(capacity, tankCount);
             setOnSlotChanged(slot -> markForUpdateSync());
+        }
+    }
+
+    private class CombinedMachineComponent extends MachineComponent<InfItemFluidHandler> {
+        private final long groupId;
+
+        private CombinedMachineComponent(IOType ioType, long groupId) {
+            super(ioType);
+            this.groupId = groupId;
+        }
+
+        @Override
+        public ComponentType getComponentType() {
+            return ComponentTypesMM.COMPONENT_ITEM_FLUID_GAS;
+        }
+
+        @Override
+        public InfItemFluidHandler getContainerProvider() {
+            int[] slots = this.ioType == IOType.OUTPUT ? TileCustomHatch.this.recipeOutputSlots : TileCustomHatch.this.recipeInputSlots;
+            return new CombinedHatchHandler(new FilteredItemHandlerView(TileCustomHatch.this.inventory, slots), TileCustomHatch.this.tank, TileCustomHatch.this.gasTank);
+        }
+
+        @Override
+        public long getGroupID() {
+            return this.groupId;
+        }
+    }
+
+    private class ItemMachineComponent extends MachineComponent.ItemBus {
+        private final long groupId;
+
+        private ItemMachineComponent(IOType ioType, long groupId) {
+            super(ioType);
+            this.groupId = groupId;
+        }
+
+        @Override
+        public net.minecraftforge.items.IItemHandlerModifiable getContainerProvider() {
+            return new FilteredItemHandlerView(TileCustomHatch.this.inventory, this.ioType == IOType.OUTPUT ? TileCustomHatch.this.recipeOutputSlots : TileCustomHatch.this.recipeInputSlots);
+        }
+
+        @Override
+        public long getGroupID() {
+            return this.groupId;
+        }
+    }
+
+    private class FluidMachineComponent extends MachineComponent.FluidHatch {
+        private final long groupId;
+
+        private FluidMachineComponent(IOType ioType, long groupId) {
+            super(ioType);
+            this.groupId = groupId;
+        }
+
+        @Override
+        public FluidTank getContainerProvider() {
+            return TileCustomHatch.this.tank;
+        }
+
+        @Override
+        public long getGroupID() {
+            return this.groupId;
+        }
+    }
+
+    private class GasMachineComponent extends MachineComponent<IExtendedGasHandler> {
+        private final long groupId;
+
+        private GasMachineComponent(IOType ioType, long groupId) {
+            super(ioType);
+            this.groupId = groupId;
+        }
+
+        @Override
+        public ComponentType getComponentType() {
+            return ComponentTypesMM.COMPONENT_GAS;
+        }
+
+        @Override
+        public IExtendedGasHandler getContainerProvider() {
+            return TileCustomHatch.this.gasTank;
+        }
+
+        @Override
+        public long getGroupID() {
+            return this.groupId;
         }
     }
 

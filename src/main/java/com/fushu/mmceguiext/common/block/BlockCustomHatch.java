@@ -21,9 +21,6 @@ import net.minecraft.util.Rotation;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import net.minecraftforge.fluids.Fluid;
-import net.minecraftforge.fluids.FluidActionResult;
-import net.minecraftforge.fluids.FluidUtil;
 
 import javax.annotation.Nullable;
 
@@ -53,15 +50,9 @@ public class BlockCustomHatch extends BlockMachineComponent {
         if (!worldIn.isRemote) {
             TileEntity te = worldIn.getTileEntity(pos);
             if (te instanceof TileCustomHatch) {
-                ItemStack held = playerIn.getHeldItem(hand);
-                if (!held.isEmpty() && FluidUtil.getFluidHandler(held) != null) {
-                    TileCustomHatch hatch = (TileCustomHatch) te;
-                    FluidActionResult result = FluidUtil.tryEmptyContainer(held, hatch.getCapability(net.minecraftforge.fluids.capability.CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, null), Fluid.BUCKET_VOLUME, playerIn, true);
-                    if (result.isSuccess()) {
-                        playerIn.setHeldItem(hand, result.getResult());
-                        hatch.onPlayerInteract(playerIn, hand);
-                        return true;
-                    }
+                TileCustomHatch hatch = (TileCustomHatch) te;
+                if (hatch.tryHeldItemInteraction(playerIn, hand)) {
+                    return true;
                 }
             }
             playerIn.openGui(MMCEGuiExt.MODID, MMCEGuiExt.GUI_CUSTOM_HATCH, worldIn, pos.getX(), pos.getY(), pos.getZ());

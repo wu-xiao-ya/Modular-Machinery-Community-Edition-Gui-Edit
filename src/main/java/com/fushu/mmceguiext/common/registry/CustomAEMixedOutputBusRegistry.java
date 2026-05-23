@@ -1,0 +1,233 @@
+package com.fushu.mmceguiext.common.registry;
+
+import com.fushu.mmceguiext.MMCEGuiExt;
+import com.fushu.mmceguiext.client.gui.GlobalTextureLayerConfig;
+import com.fushu.mmceguiext.client.gui.GuiRenderUtils;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import net.minecraft.util.ResourceLocation;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import javax.annotation.Nullable;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+public final class CustomAEMixedOutputBusRegistry {
+    private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
+    private static final Path BUS_DIR = resolveBusDir();
+    private static final List<Def> CACHE = new ArrayList<Def>();
+    private static final Map<String, Def> REGISTERED = new LinkedHashMap<String, Def>();
+
+    private CustomAEMixedOutputBusRegistry() {
+    }
+
+    public static List<Def> loadAll() {
+        CACHE.clear();
+        REGISTERED.clear();
+        if (!Files.isDirectory(BUS_DIR)) {
+            return Collections.emptyList();
+        }
+        try {
+            Files.list(BUS_DIR).filter(p -> p.toString().endsWith(".json")).forEach(path -> {
+                Def def = load(path);
+                if (def != null) {
+                    CACHE.add(def);
+                    REGISTERED.put(normalizeId(def.id), def);
+                }
+            });
+        } catch (IOException ex) {
+            LOGGER.warn("Failed to scan custom AE mixed output bus dir {}: {}", BUS_DIR, ex.getMessage());
+        }
+        return new ArrayList<Def>(CACHE);
+    }
+
+    public static List<Def> getCached() {
+        return new ArrayList<Def>(CACHE);
+    }
+
+    @Nullable
+    public static Def findById(@Nullable String id) {
+        if (id == null || id.trim().isEmpty()) {
+            return null;
+        }
+        String normalized = normalizeId(id);
+        Def direct = REGISTERED.get(normalized);
+        if (direct != null) {
+            return direct;
+        }
+        String pathId = normalized.contains(":") ? normalized.substring(normalized.indexOf(':') + 1) : normalized;
+        direct = REGISTERED.get(pathId);
+        if (direct != null) {
+            return direct;
+        }
+        for (Def def : CACHE) {
+            if (def != null && def.id != null) {
+                String defId = normalizeId(def.id);
+                if (defId.equals(normalized) || defId.equals(pathId) || defId.endsWith(":" + pathId)) {
+                    return def;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    public static Def load(Path path) {
+        try {
+            String text = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+            JsonObject root = new JsonParser().parse(text).getAsJsonObject();
+            Def def = new Def();
+            def.id = getString(root, "id");
+            def.displayName = getString(root, "displayName");
+            def.guiBackgroundTexture = getString(root, "guiBackgroundTexture");
+            def.guiWidth = getInt(root, "guiWidth", 176);
+            def.guiHeight = getInt(root, "guiHeight", 235);
+            def.backgroundTextureWidth = getInt(root, "backgroundTextureWidth", def.guiWidth);
+            def.backgroundTextureHeight = getInt(root, "backgroundTextureHeight", def.guiHeight);
+            def.textureLayers = parseTextureLayers(root.getAsJsonArray("textureLayers"));
+            def.gui = parseGui(root.getAsJsonObject("gui"));
+            return def.id == null || def.id.trim().isEmpty() ? null : def;
+        } catch (Exception ex) {
+            LOGGER.warn("[MMCEGE-NEW] Failed to parse custom AE mixed output bus {}", path, ex);
+            return null;
+        }
+    }
+
+    private static GuiDef parseGui(@Nullable JsonObject obj) {
+        GuiDef gui = new GuiDef();
+        if (obj == null) {
+            return gui;
+        }
+        gui.width = getInt(obj, "width", 176);
+        gui.height = getInt(obj, "height", 235);
+        gui.components = parseComponents(obj.getAsJsonArray("components"));
+        return gui;
+    }
+
+    private static List<ComponentDef> parseComponents(@Nullable com.google.gson.JsonArray array) {
+        if (array == null || array.size() == 0) {
+            return Collections.emptyList();
+        }
+        List<ComponentDef> out = new ArrayList<ComponentDef>();
+        for (int i = 0; i < array.size(); i++) {
+            if (!array.get(i).isJsonObject()) {
+                continue;
+            }
+            JsonObject obj = array.get(i).getAsJsonObject();
+            ComponentDef def = new ComponentDef();
+            def.type = lower(getString(obj, "type"));
+            def.role = lower(getString(obj, "role"));
+            def.x = getInt(obj, "x", 0);
+            def.y = getInt(obj, "y", 0);
+            def.width = getInt(obj, "width", 16);
+            def.height = getInt(obj, "height", 16);
+            def.index = getInt(obj, "index", -1);
+            if (def.type != null && !def.type.trim().isEmpty()) {
+                out.add(def);
+            }
+        }
+        return out;
+    }
+
+    private static List<GlobalTextureLayerConfig.LayerDef> parseTextureLayers(@Nullable com.google.gson.JsonArray array) {
+        if (array == null || array.size() == 0) {
+            return Collections.emptyList();
+        }
+        List<GlobalTextureLayerConfig.LayerDef> out = new ArrayList<GlobalTextureLayerConfig.LayerDef>();
+        for (int i = 0; i < array.size(); i++) {
+            if (!array.get(i).isJsonObject()) {
+                continue;
+            }
+            JsonObject obj = array.get(i).getAsJsonObject();
+            ResourceLocation texture = GuiRenderUtils.parseOptionalTexture(getString(obj, "texture"));
+            if (texture == null) {
+                continue;
+            }
+            GlobalTextureLayerConfig.LayerDef def = new GlobalTextureLayerConfig.LayerDef();
+            def.foreground = obj.has("foreground") && !obj.get("foreground").isJsonNull() && obj.get("foreground").getAsBoolean();
+            def.texture = texture;
+            def.x = getInt(obj, "x", 0);
+            def.y = getInt(obj, "y", 0);
+            def.width = getInt(obj, "width", 16);
+            def.height = getInt(obj, "height", 16);
+            def.textureWidth = getInt(obj, "textureWidth", def.width);
+            def.textureHeight = getInt(obj, "textureHeight", def.height);
+            def.corner = getInt(obj, "corner", 0);
+            def.useNineSlice = obj.has("useNineSlice") && !obj.get("useNineSlice").isJsonNull() && obj.get("useNineSlice").getAsBoolean();
+            def.priority = getInt(obj, "priority", 0);
+            out.add(def);
+        }
+        return out;
+    }
+
+    @Nullable
+    private static String getString(@Nullable JsonObject obj, String key) {
+        if (obj == null) {
+            return null;
+        }
+        return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsString() : null;
+    }
+
+    private static int getInt(@Nullable JsonObject obj, String key, int fallback) {
+        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
+            return fallback;
+        }
+        return obj.get(key).getAsInt();
+    }
+
+    @Nullable
+    private static String lower(@Nullable String value) {
+        return value == null ? null : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static Path resolveBusDir() {
+        Path dir = Paths.get("config").resolve("mmceguiext").resolve("custom_ae_mixed_output_buses");
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException ignored) {
+        }
+        return dir;
+    }
+
+    private static String normalizeId(String id) {
+        return id.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public static class Def {
+        public String id;
+        public String displayName;
+        public String guiBackgroundTexture;
+        public int guiWidth = 176;
+        public int guiHeight = 235;
+        public int backgroundTextureWidth = 176;
+        public int backgroundTextureHeight = 235;
+        public List<GlobalTextureLayerConfig.LayerDef> textureLayers = Collections.emptyList();
+        public GuiDef gui = new GuiDef();
+    }
+
+    public static class GuiDef {
+        public int width = 176;
+        public int height = 235;
+        public List<ComponentDef> components = Collections.emptyList();
+    }
+
+    public static class ComponentDef {
+        public String type;
+        public String role;
+        public int x;
+        public int y;
+        public int width = 16;
+        public int height = 16;
+        public int index = -1;
+    }
+}

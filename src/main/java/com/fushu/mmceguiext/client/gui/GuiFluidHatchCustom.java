@@ -3,10 +3,15 @@ package com.fushu.mmceguiext.client.gui;
 import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import com.fushu.mmceguiext.client.config.GlobalGuiStyleManager;
 import hellfirepvp.modularmachinery.client.gui.GuiContainerFluidHatch;
+import mekanism.api.gas.GasStack;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.fluids.FluidStack;
 
 import javax.annotation.Nullable;
@@ -72,7 +77,7 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
 
     @Override
     protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
-        super.drawGuiContainerForegroundLayer(mouseX, mouseY);
+        drawTankContents();
         drawConfiguredTexts();
         GlobalTextureLayerConfig.drawLayers(
             this.textureLayers,
@@ -82,6 +87,77 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
             MMCEGuiExtConfig.fluidHatch.backgroundTextureOffsetX,
             MMCEGuiExtConfig.fluidHatch.backgroundTextureOffsetY
         );
+    }
+
+    private void drawTankContents() {
+        int tankX = getTankX();
+        int tankY = getTankY();
+        int tankWidth = getTankWidth();
+        int tankHeight = getTankHeight();
+        if (tankWidth <= 0 || tankHeight <= 0) {
+            return;
+        }
+
+        FluidStack fluid = getFluid();
+        if (fluid != null && fluid.amount > 0) {
+            int fluidColor = fluid.getFluid().getColor(fluid);
+            float red = (fluidColor >> 16 & 0xFF) / 255F;
+            float green = (fluidColor >> 8 & 0xFF) / 255F;
+            float blue = (fluidColor & 0xFF) / 255F;
+            float fillPercent = MathHelper.clamp(fluid.amount / (float) Math.max(1, getCapacity()), 0F, 1F);
+            int filled = MathHelper.ceil(fillPercent * tankHeight);
+            ResourceLocation still = fluid.getFluid().getStill(fluid);
+            TextureAtlasSprite sprite = Minecraft.getMinecraft().getTextureMapBlocks().getTextureExtry(still.toString());
+            if (sprite == null) {
+                sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
+            }
+            GlStateManager.color(red, green, blue, 1.0F);
+            this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
+            drawTiledSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        } else {
+            GasStack gas = getGas();
+            if (gas != null && gas.amount > 0) {
+                int gasColor = gas.getGas().getTint();
+                float red = (gasColor >> 16 & 0xFF) / 255F;
+                float green = (gasColor >> 8 & 0xFF) / 255F;
+                float blue = (gasColor & 0xFF) / 255F;
+                float fillPercent = MathHelper.clamp(gas.amount / (float) Math.max(1, getCapacity()), 0F, 1F);
+                int filled = MathHelper.ceil(fillPercent * tankHeight);
+                TextureAtlasSprite sprite = gas.getGas().getSprite();
+                if (sprite == null) {
+                    sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
+                }
+                GlStateManager.color(red, green, blue, 1.0F);
+                this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
+                drawTiledSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
+                GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            }
+        }
+
+        this.mc.getTextureManager().bindTexture(DEFAULT_TEXTURE);
+        this.drawTexturedModalRect(tankX, tankY, 176, 0, tankWidth, tankHeight);
+    }
+
+    private void drawTiledSprite(int x, int y, int width, int height, TextureAtlasSprite sprite) {
+        if (sprite == null || width <= 0 || height <= 0) {
+            return;
+        }
+        int remainingHeight = height;
+        int drawY = y;
+        while (remainingHeight > 0) {
+            int tileHeight = Math.min(16, remainingHeight);
+            int remainingWidth = width;
+            int drawX = x;
+            while (remainingWidth > 0) {
+                int tileWidth = Math.min(16, remainingWidth);
+                drawTexturedModalRect(drawX, drawY, sprite, tileWidth, tileHeight);
+                drawX += tileWidth;
+                remainingWidth -= tileWidth;
+            }
+            drawY += tileHeight;
+            remainingHeight -= tileHeight;
+        }
     }
 
     private ResourceLocation resolveBackgroundTexture() {
@@ -168,6 +244,38 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
         } catch (Exception ignored) {
             return 0;
         }
+    }
+
+    @Nullable
+    private GasStack getGas() {
+        try {
+            Object tank = getTankObject();
+            if (tank == null) {
+                return null;
+            }
+            Method m = tank.getClass().getMethod("getGas");
+            return (GasStack) m.invoke(tank);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private int getTankX() {
+        return this.styleFile.tank != null && this.styleFile.tank.x != null ? this.styleFile.tank.x.intValue() : 15;
+    }
+
+    private int getTankY() {
+        return this.styleFile.tank != null && this.styleFile.tank.y != null ? this.styleFile.tank.y.intValue() : 10;
+    }
+
+    private int getTankWidth() {
+        int width = this.styleFile.tank != null && this.styleFile.tank.width != null ? this.styleFile.tank.width.intValue() : 20;
+        return Math.max(1, width);
+    }
+
+    private int getTankHeight() {
+        int height = this.styleFile.tank != null && this.styleFile.tank.height != null ? this.styleFile.tank.height.intValue() : 61;
+        return Math.max(1, height);
     }
 
     @Nullable

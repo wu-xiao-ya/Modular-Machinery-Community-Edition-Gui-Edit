@@ -1,0 +1,102 @@
+{
+  "registryname": "demo:paged_controller",
+  "localizedname": "Paged Controller Demo",
+  "parts": [],
+  "mmce_gui_ext": {
+    "machineController": {
+      "backgroundTexture": "demo:textures/gui/paged_controller.png",
+      "guiWidth": 300,
+      "guiHeight": 213,
+      "defaultPageId": "main",
+      "customPanels": [
+        "main,180,8,112,116,main",
+        "settings,180,8,112,116,settings"
+      ],
+      "texts": [
+        {
+          "x": 186,
+          "y": 14,
+          "value": "Main Page",
+          "page": "main"
+        },
+        {
+          "x": 186,
+          "y": 28,
+          "value": "Pulse count is driven by smart-interface key pulse_counter.",
+          "scale": 0.7,
+          "page": "main"
+        },
+        {
+          "x": 186,
+          "y": 14,
+          "value": "Settings",
+          "page": "settings"
+        },
+        {
+          "x": 186,
+          "y": 28,
+          "value": "Use +/- buttons to change virtual key speed.",
+          "scale": 0.7,
+          "page": "settings"
+        }
+      ],
+      "buttons": [
+        {
+          "x": 186,
+          "y": 96,
+          "width": 48,
+          "height": 20,
+          "label": "Settings",
+          "action": "page",
+          "targetPage": "settings",
+          "page": "main"
+        },
+        {
+          "x": 238,
+          "y": 96,
+          "width": 48,
+          "height": 20,
+          "label": "Pulse",
+          "action": "smart_add",
+          "key": "pulse_counter",
+          "value": 1.0,
+          "page": "main"
+        },
+        {
+          "x": 186,
+          "y": 96,
+          "width": 32,
+          "height": 20,
+          "label": "-1",
+          "action": "smart_add",
+          "key": "speed",
+          "value": -1.0,
+          "min": 0.0,
+          "page": "settings"
+        },
+        {
+          "x": 222,
+          "y": 96,
+          "width": 32,
+          "height": 20,
+          "label": "+1",
+          "action": "smart_add",
+          "key": "speed",
+          "value": 1.0,
+          "min": 0.0,
+          "page": "settings"
+        },
+        {
+          "x": 258,
+          "y": 96,
+          "width": 28,
+          "height": 20,
+          "label": "<",
+          "action": "page",
+          "targetPage": "main",
+          "page": "settings"
+        }
+      ]
+    }
+  }
+}

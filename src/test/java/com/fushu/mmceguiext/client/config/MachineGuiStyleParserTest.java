@@ -141,6 +141,43 @@ public class MachineGuiStyleParserTest {
         assertTrue(result.warnings.isEmpty());
     }
 
+    @Test
+    public void parseMachineJsonParsesButtonsAndPages() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "button-pages.json",
+            "{\n" +
+                "  \"registryname\": \"demo:paged_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"defaultPageId\": \"main\",\n" +
+                "      \"texts\": [\n" +
+                "        {\"x\": 8, \"y\": 8, \"value\": \"A\", \"page\": \"main\"},\n" +
+                "        {\"x\": 8, \"y\": 18, \"value\": \"B\", \"page\": \"settings\"}\n" +
+                "      ],\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 140, \"y\": 8, \"label\": \">\", \"action\": \"page\", \"targetPage\": \"settings\"},\n" +
+                "        {\"x\": 140, \"y\": 24, \"label\": \"+\", \"action\": \"add\", \"key\": \"pulse\", \"value\": 1.0, \"page\": \"settings\"}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertEquals("demo:paged_machine", result.namespacedKey);
+        assertNotNull(result.machineStyle);
+        assertEquals("main", result.machineStyle.defaultPageId);
+        assertNotNull(result.machineStyle.texts);
+        assertEquals("settings", result.machineStyle.texts.get(1).page);
+        assertNotNull(result.machineStyle.buttons);
+        assertEquals(2, result.machineStyle.buttons.size());
+        assertEquals("page", result.machineStyle.buttons.get(0).action);
+        assertEquals("settings", result.machineStyle.buttons.get(0).targetPage);
+        assertEquals("smart_add", result.machineStyle.buttons.get(1).action);
+        assertEquals("pulse", result.machineStyle.buttons.get(1).key);
+        assertEquals("settings", result.machineStyle.buttons.get(1).page);
+        assertTrue(result.warnings.isEmpty());
+    }
+
     private static boolean containsWarning(MachineGuiStyleParser.MachineFileParseResult result, String fragment) {
         for (String warning : result.warnings) {
             if (warning.contains(fragment)) {
