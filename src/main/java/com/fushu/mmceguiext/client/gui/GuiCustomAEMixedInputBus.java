@@ -53,11 +53,16 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
 
     @Override
     public void drawFG(final int offsetX, final int offsetY, final int mouseX, final int mouseY) {
-        String title = this.definition.displayName == null || this.definition.displayName.trim().isEmpty()
-            ? I18n.format("gui.meiteminputbus.title")
-            : this.definition.displayName;
-        this.fontRenderer.drawString(title, 28, 6, 0x404040);
-        GlobalTextureLayerConfig.drawLayers(this.definition.textureLayers, true, this.guiLeft, this.guiTop, 0, 0);
+        java.util.SortedSet<Integer> priorities = GlobalTextureLayerConfig.collectPriorities(this.definition.textureLayers, true, 0);
+        for (Integer priority : priorities) {
+            if (priority.intValue() == 0) {
+                String title = this.definition.displayName == null || this.definition.displayName.trim().isEmpty()
+                    ? I18n.format("gui.meiteminputbus.title")
+                    : this.definition.displayName;
+                this.fontRenderer.drawString(title, 28, 6, 0x404040);
+            }
+            GlobalTextureLayerConfig.drawLayers(this.definition.textureLayers, true, this.guiLeft, this.guiTop, 0, 0, priority);
+        }
     }
 
     @Override

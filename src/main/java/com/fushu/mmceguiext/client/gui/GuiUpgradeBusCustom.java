@@ -75,6 +75,30 @@ public class GuiUpgradeBusCustom extends GuiContainerBase<ContainerUpgradeBus> {
 
     @Override
     protected void drawGuiContainerForegroundLayer(final int mouseX, final int mouseY) {
+        int layerOffsetX = this.styleFile.background != null && this.styleFile.background.offsetX != null
+            ? this.styleFile.background.offsetX.intValue()
+            : MMCEGuiExtConfig.upgradeBus.backgroundTextureOffsetX;
+        int layerOffsetY = this.styleFile.background != null && this.styleFile.background.offsetY != null
+            ? this.styleFile.background.offsetY.intValue()
+            : MMCEGuiExtConfig.upgradeBus.backgroundTextureOffsetY;
+        java.util.SortedSet<Integer> priorities = GlobalTextureLayerConfig.collectPriorities(this.textureLayers, true, 0);
+        for (Integer priority : priorities) {
+            if (priority.intValue() == 0) {
+                drawUpgradeBusForegroundContent();
+            }
+            GlobalTextureLayerConfig.drawLayers(
+                this.textureLayers,
+                true,
+                this.guiLeft,
+                this.guiTop,
+                layerOffsetX,
+                layerOffsetY,
+                priority
+            );
+        }
+    }
+
+    private void drawUpgradeBusForegroundContent() {
         GlStateManager.pushMatrix();
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
 

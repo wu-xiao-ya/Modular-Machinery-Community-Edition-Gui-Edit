@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 public final class GlobalTextureLayerConfig {
     private GlobalTextureLayerConfig() {
@@ -64,8 +66,23 @@ public final class GlobalTextureLayerConfig {
     }
 
     public static void drawLayers(List<LayerDef> layers, boolean foreground, int guiLeft, int guiTop, int originOffsetX, int originOffsetY) {
+        drawLayers(layers, foreground, guiLeft, guiTop, originOffsetX, originOffsetY, null);
+    }
+
+    public static void drawLayers(
+        List<LayerDef> layers,
+        boolean foreground,
+        int guiLeft,
+        int guiTop,
+        int originOffsetX,
+        int originOffsetY,
+        @Nullable Integer priorityFilter
+    ) {
         for (LayerDef layer : layers) {
             if (layer.foreground != foreground) {
+                continue;
+            }
+            if (priorityFilter != null && layer.priority != priorityFilter.intValue()) {
                 continue;
             }
             net.minecraft.client.Minecraft.getMinecraft().getTextureManager().bindTexture(layer.texture);
@@ -79,6 +96,17 @@ public final class GlobalTextureLayerConfig {
                 net.minecraft.client.gui.Gui.drawModalRectWithCustomSizedTexture(drawX, drawY, 0, 0, layer.width, layer.height, layer.textureWidth, layer.textureHeight);
             }
         }
+    }
+
+    public static SortedSet<Integer> collectPriorities(List<LayerDef> layers, boolean foreground, int basePriority) {
+        SortedSet<Integer> priorities = new TreeSet<Integer>();
+        priorities.add(Integer.valueOf(basePriority));
+        for (LayerDef layer : layers) {
+            if (layer != null && layer.foreground == foreground) {
+                priorities.add(Integer.valueOf(layer.priority));
+            }
+        }
+        return priorities;
     }
 
     public static class LayerDef {

@@ -78,15 +78,27 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
     @Override
     protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
         drawTankContents();
-        drawConfiguredTexts();
-        GlobalTextureLayerConfig.drawLayers(
-            this.textureLayers,
-            true,
-            this.guiLeft,
-            this.guiTop,
-            MMCEGuiExtConfig.fluidHatch.backgroundTextureOffsetX,
-            MMCEGuiExtConfig.fluidHatch.backgroundTextureOffsetY
-        );
+        int offsetX = this.styleFile.background != null && this.styleFile.background.offsetX != null
+            ? this.styleFile.background.offsetX.intValue()
+            : MMCEGuiExtConfig.fluidHatch.backgroundTextureOffsetX;
+        int offsetY = this.styleFile.background != null && this.styleFile.background.offsetY != null
+            ? this.styleFile.background.offsetY.intValue()
+            : MMCEGuiExtConfig.fluidHatch.backgroundTextureOffsetY;
+        java.util.SortedSet<Integer> priorities = GlobalTextureLayerConfig.collectPriorities(this.textureLayers, true, 0);
+        for (Integer priority : priorities) {
+            if (priority.intValue() == 0) {
+                drawConfiguredTexts();
+            }
+            GlobalTextureLayerConfig.drawLayers(
+                this.textureLayers,
+                true,
+                this.guiLeft,
+                this.guiTop,
+                offsetX,
+                offsetY,
+                priority
+            );
+        }
     }
 
     private void drawTankContents() {

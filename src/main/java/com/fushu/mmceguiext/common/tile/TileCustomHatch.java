@@ -61,6 +61,8 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     private IOInventory inventory = new IOInventory(this, new int[]{INPUT_SLOT}, new int[]{OUTPUT_SLOT});
     private int[] recipeInputSlots = new int[]{INPUT_SLOT};
     private int[] recipeOutputSlots = new int[]{OUTPUT_SLOT};
+    private boolean processingInventory = false;
+    private boolean pendingInventoryProcess = false;
 
     private int capacity = 1000;
     private int fluidCapacity = 1000;
@@ -200,13 +202,13 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
 
     @Override
     public void doRestrictedTick() {
-        if (!world.isRemote && ticksExisted % 20 == 0) {
+        if (!world.isRemote) {
             tryProcess();
         }
     }
 
     public void onPlayerInteract(EntityPlayer player, EnumHand hand) {
-        tryProcess();
+        scheduleInventoryProcess();
     }
 
     public boolean tryHeldItemInteraction(EntityPlayer player, EnumHand hand) {
@@ -221,17 +223,37 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     }
 
     private void onInventoryChanged(int slot) {
-        if (world != null && !world.isRemote) {
-            tryProcess();
+        if (slot < 0) {
+            return;
+        }
+        for (int inputSlot : this.recipeInputSlots) {
+            if (inputSlot == slot) {
+                scheduleInventoryProcess();
+                return;
+            }
+        }
+    }
+
+    private void scheduleInventoryProcess() {
+        if (this.world != null && !this.world.isRemote) {
+            this.pendingInventoryProcess = true;
         }
     }
 
     private void tryProcess() {
-        InventoryLayout layout = buildInventoryLayout(getDefinition());
-        for (int inputSlot : layout.inputSlots) {
-            if (tryProcessInputSlot(inputSlot, layout.outputSlots)) {
-                return;
+        if (this.processingInventory) {
+            return;
+        }
+        this.processingInventory = true;
+        try {
+            InventoryLayout layout = buildInventoryLayout(getDefinition());
+            for (int inputSlot : layout.inputSlots) {
+                if (tryProcessInputSlot(inputSlot, layout.outputSlots)) {
+                    return;
+                }
             }
+        } finally {
+            this.processingInventory = false;
         }
     }
 
@@ -286,16 +308,22 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         if (input.isEmpty()) {
             return false;
         }
-        FluidActionResult result = FluidUtil.tryFillContainer(input.copy(), this.tank, Fluid.BUCKET_VOLUME, null, true);
-        if (!result.isSuccess()) {
+        ItemStack singleInput = input.copy();
+        singleInput.setCount(1);
+        FluidActionResult simulated = FluidUtil.tryFillContainer(singleInput.copy(), this.tank, Fluid.BUCKET_VOLUME, null, false);
+        if (!simulated.isSuccess()) {
             return false;
         }
-        ItemStack filledContainer = result.getResult();
+        ItemStack filledContainer = simulated.getResult();
         int outputSlot = findOutputSlotFor(filledContainer, outputSlots);
         if (outputSlot < 0) {
             return false;
         }
-        return moveProcessedContainer(inputSlot, outputSlot, filledContainer);
+        FluidActionResult result = FluidUtil.tryFillContainer(singleInput, this.tank, Fluid.BUCKET_VOLUME, null, true);
+        if (!result.isSuccess()) {
+            return false;
+        }
+        return moveOneProcessedContainer(inputSlot, input, outputSlot, result.getResult());
     }
 
     @Optional.Method(modid = "mekanism")
@@ -365,20 +393,59 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         return true;
     }
 
+    private boolean moveOneProcessedContainer(int inputSlot, ItemStack originalInput, int outputSlot, ItemStack producedContainer) {
+        if (originalInput.isEmpty() || producedContainer.isEmpty()) {
+            return false;
+        }
+        ItemStack remainingInput = originalInput.copy();
+        remainingInput.shrink(1);
+        this.inventory.setStackInSlot(inputSlot, remainingInput.isEmpty() ? ItemStack.EMPTY : remainingInput);
+        ItemStack output = this.inventory.getStackInSlot(outputSlot);
+        if (output.isEmpty()) {
+            this.inventory.setStackInSlot(outputSlot, producedContainer.copy());
+        } else {
+            ItemStack grown = output.copy();
+            grown.grow(producedContainer.getCount());
+            this.inventory.setStackInSlot(outputSlot, grown);
+        }
+        markNoUpdateSync();
+        return true;
+    }
+
     private boolean tryProcessHeldFluidItem(EntityPlayer player, EnumHand hand, ItemStack held) {
-        FluidActionResult emptyResult = FluidUtil.tryEmptyContainer(held, this.tank, Fluid.BUCKET_VOLUME, player, true);
+        ItemStack singleHeld = held.copy();
+        singleHeld.setCount(1);
+
+        FluidActionResult emptyResult = FluidUtil.tryEmptyContainer(singleHeld, this.tank, Fluid.BUCKET_VOLUME, player, true);
         if (emptyResult.isSuccess()) {
-            player.setHeldItem(hand, emptyResult.getResult());
+            applyHeldContainerResult(player, hand, held, emptyResult.getResult());
             markNoUpdateSync();
             return true;
         }
-        FluidActionResult fillResult = FluidUtil.tryFillContainer(held, this.tank, Fluid.BUCKET_VOLUME, player, true);
+
+        FluidActionResult fillResult = FluidUtil.tryFillContainer(singleHeld, this.tank, Fluid.BUCKET_VOLUME, player, true);
         if (fillResult.isSuccess()) {
-            player.setHeldItem(hand, fillResult.getResult());
+            applyHeldContainerResult(player, hand, held, fillResult.getResult());
             markNoUpdateSync();
             return true;
         }
         return false;
+    }
+
+    private void applyHeldContainerResult(EntityPlayer player, EnumHand hand, ItemStack originalHeld, ItemStack result) {
+        if (originalHeld.getCount() <= 1) {
+            player.setHeldItem(hand, result);
+            return;
+        }
+
+        ItemStack remainingHeld = originalHeld.copy();
+        remainingHeld.shrink(1);
+        player.setHeldItem(hand, remainingHeld);
+
+        ItemStack remainder = player.inventory.addItemStackToInventory(result.copy()) ? ItemStack.EMPTY : result.copy();
+        if (!remainder.isEmpty()) {
+            player.dropItem(remainder, false);
+        }
     }
 
     @Optional.Method(modid = "mekanism")
@@ -426,13 +493,22 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             if (output.isEmpty()) {
                 return slot;
             }
-            if (ItemStack.areItemStacksEqual(output, stack)
-                && ItemStack.areItemStackTagsEqual(output, stack)
-                && output.getCount() + stack.getCount() <= output.getMaxStackSize()) {
+            int slotLimit = Math.min(this.inventory.getSlotLimit(slot), output.getMaxStackSize());
+            if (canStacksMerge(output, stack)
+                && output.getCount() + stack.getCount() <= slotLimit) {
                 return slot;
             }
         }
         return -1;
+    }
+
+    private static boolean canStacksMerge(ItemStack existing, ItemStack incoming) {
+        return !existing.isEmpty()
+            && !incoming.isEmpty()
+            && existing.isStackable()
+            && incoming.isStackable()
+            && existing.isItemEqual(incoming)
+            && ItemStack.areItemStackTagsEqual(existing, incoming);
     }
 
     @Nullable
@@ -707,6 +783,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
 
         @Override
         protected void onContentsChanged() {
+            scheduleInventoryProcess();
             markForUpdateSync();
         }
     }
@@ -714,7 +791,10 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     private class ProcessorGasTank extends MultiGasTank {
         public ProcessorGasTank(int capacity, int tankCount) {
             super(capacity, tankCount);
-            setOnSlotChanged(slot -> markForUpdateSync());
+            setOnSlotChanged(slot -> {
+                scheduleInventoryProcess();
+                markForUpdateSync();
+            });
         }
     }
 

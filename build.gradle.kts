@@ -15,10 +15,20 @@ minecraft {
     mcVersion.set("1.12.2")
     username.set("Developer")
     injectedTags.put("VERSION", project.version.toString())
+
+    val args = mutableListOf("-ea:${project.group}")
+    args.add("-Dfml.coreMods.load=com.fushu.mmceguiext.mixin.MMCEGuiExtEarlyMixinLoader")
+    args.add("-Dmixin.hotSwap=true")
+    args.add("-Dmixin.checks.interfaces=true")
+    args.add("-Dmixin.debug.export=true")
+    extraRunJvmArguments.addAll(args)
 }
 
 repositories {
     mavenCentral()
+    maven {
+        url = uri("https://repo.spongepowered.org/maven")
+    }
     maven {
         name = "GTNH Maven"
         url = uri("https://nexus.gtnewhorizons.com/repository/public/")
@@ -37,6 +47,28 @@ repositories {
 
 dependencies {
     patchedMinecraft("me.eigenraven.java8unsupported:java-8-unsupported-shim:1.0.0")
+
+    val mixin = modUtils.enableMixins("zone.rong:mixinbooter:8.9", "mixins.mmceguiext.refmap.json").toString()
+    val localMixinBooter = fileTree("${System.getProperty("user.home")}/.gradle/caches/modules-2/files-2.1/zone.rong/mixinbooter/8.9") {
+        include("**/mixinbooter-8.9.jar")
+    }.files.firstOrNull()
+    if (localMixinBooter != null) {
+        api(files(localMixinBooter))
+    } else {
+        api(mixin) {
+            isTransitive = false
+        }
+    }
+    annotationProcessor("org.ow2.asm:asm-debug-all:5.2")
+    annotationProcessor("com.google.guava:guava:30.0-jre")
+    annotationProcessor("com.google.code.gson:gson:2.8.9")
+    if (localMixinBooter != null) {
+        annotationProcessor(files(localMixinBooter))
+    } else {
+        annotationProcessor(mixin) {
+            isTransitive = false
+        }
+    }
 
     implementation(rfg.deobf("curse.maven:modular-machinery-community-edition-817377:7372953"))
     implementation("com.google.code.gson:gson:2.8.9")
@@ -76,6 +108,14 @@ publishing {
         create<MavenPublication>("maven") {
             from(components["java"])
         }
+    }
+}
+
+tasks.jar.configure {
+    manifest {
+        val attributes = manifest.attributes
+        attributes["FMLCorePlugin"] = "com.fushu.mmceguiext.mixin.MMCEGuiExtEarlyMixinLoader"
+        attributes["FMLCorePluginContainsFMLMod"] = true
     }
 }
 

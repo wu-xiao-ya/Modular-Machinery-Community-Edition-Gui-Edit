@@ -108,14 +108,20 @@ public class GuiItemBusCustom extends GuiContainerBase<ContainerItemBus> {
     @Override
     protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
         super.drawGuiContainerForegroundLayer(mouseX, mouseY);
-        GlobalTextureLayerConfig.drawLayers(
-            this.textureLayers,
-            true,
-            this.guiLeft,
-            this.guiTop,
-            this.styleFile.background != null && this.styleFile.background.offsetX != null ? this.styleFile.background.offsetX.intValue() : MMCEGuiExtConfig.itemBus.backgroundTextureOffsetX,
-            this.styleFile.background != null && this.styleFile.background.offsetY != null ? this.styleFile.background.offsetY.intValue() : MMCEGuiExtConfig.itemBus.backgroundTextureOffsetY
-        );
+        java.util.SortedSet<Integer> priorities = GlobalTextureLayerConfig.collectPriorities(this.textureLayers, true, 0);
+        int offsetX = this.styleFile.background != null && this.styleFile.background.offsetX != null ? this.styleFile.background.offsetX.intValue() : MMCEGuiExtConfig.itemBus.backgroundTextureOffsetX;
+        int offsetY = this.styleFile.background != null && this.styleFile.background.offsetY != null ? this.styleFile.background.offsetY.intValue() : MMCEGuiExtConfig.itemBus.backgroundTextureOffsetY;
+        for (Integer priority : priorities) {
+            GlobalTextureLayerConfig.drawLayers(
+                this.textureLayers,
+                true,
+                this.guiLeft,
+                this.guiTop,
+                offsetX,
+                offsetY,
+                priority
+            );
+        }
     }
 
     private void applySlotLayout() {

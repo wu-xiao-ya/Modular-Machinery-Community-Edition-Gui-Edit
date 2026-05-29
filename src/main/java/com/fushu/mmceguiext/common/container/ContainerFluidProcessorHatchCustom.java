@@ -10,10 +10,13 @@ import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.items.SlotItemHandler;
 
 import javax.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.List;
 import java.lang.reflect.Method;
 
 public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachinery.common.container.ContainerBase<TileEntity> {
     private final int customSlotCount;
+    private final List<Integer> customInputSlotIndices = new ArrayList<Integer>();
 
     public ContainerFluidProcessorHatchCustom(TileEntity owner, EntityPlayer opening, CustomHatchRegistry.CustomHatchDef def) {
         super(owner, opening);
@@ -30,13 +33,14 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
                     if (slotIndex < 0 || slotIndex >= itemHandler.getSlots()) {
                         continue;
                     }
-                    addSlotToContainer(new SlotItemHandler(itemHandler, slotIndex, component.x, component.y));
+                    boolean insertable = !"output".equalsIgnoreCase(component.role);
+                    addCustomSlot(itemHandler, slotIndex, component.x, component.y, insertable);
                     added++;
                 }
             }
             if (added == 0 && itemHandler.getSlots() >= 2) {
-                addSlotToContainer(new SlotItemHandler(itemHandler, 0, def.inputSlot.x, def.inputSlot.y));
-                addSlotToContainer(new SlotItemHandler(itemHandler, 1, def.outputSlot.x, def.outputSlot.y));
+                addCustomSlot(itemHandler, 0, def.inputSlot.x, def.inputSlot.y, true);
+                addCustomSlot(itemHandler, 1, def.outputSlot.x, def.outputSlot.y, false);
                 added = 2;
             }
             this.customSlotCount = added;
@@ -57,7 +61,7 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
 
             boolean changed = false;
             if (index < 36) {
-                if (this.customSlotCount > 0 && this.mergeItemStack(itemstack1, 36, 36 + this.customSlotCount, false)) {
+                if (!this.customInputSlotIndices.isEmpty() && this.mergeItemStackIntoCustomInputs(itemstack1)) {
                     changed = true;
                 }
             }
@@ -90,6 +94,31 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
         }
 
         return itemstack;
+    }
+
+    private void addCustomSlot(IItemHandlerModifiable itemHandler, int slotIndex, int x, int y, boolean insertable) {
+        addSlotToContainer(new SlotItemHandler(itemHandler, slotIndex, x, y) {
+            @Override
+            public boolean isItemValid(@Nonnull ItemStack stack) {
+                return insertable && super.isItemValid(stack);
+            }
+        });
+        if (insertable) {
+            this.customInputSlotIndices.add(this.inventorySlots.size() - 1);
+        }
+    }
+
+    private boolean mergeItemStackIntoCustomInputs(ItemStack stack) {
+        boolean changed = false;
+        for (int slotIndex : this.customInputSlotIndices) {
+            if (stack.isEmpty()) {
+                break;
+            }
+            if (this.mergeItemStack(stack, slotIndex, slotIndex + 1, false)) {
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     private static IItemHandlerModifiable resolveGuiAccess(TileEntity owner) {
