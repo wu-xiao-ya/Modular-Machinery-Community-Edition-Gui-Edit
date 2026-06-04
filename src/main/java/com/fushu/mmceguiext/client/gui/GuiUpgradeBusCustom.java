@@ -83,6 +83,9 @@ public class GuiUpgradeBusCustom extends GuiContainerBase<ContainerUpgradeBus> {
             : MMCEGuiExtConfig.upgradeBus.backgroundTextureOffsetY;
         java.util.SortedSet<Integer> priorities = GlobalTextureLayerConfig.collectPriorities(this.textureLayers, true, 0);
         for (Integer priority : priorities) {
+            if (priority.intValue() < 0) {
+                continue;
+            }
             if (priority.intValue() == 0) {
                 drawUpgradeBusForegroundContent();
             }
@@ -95,6 +98,15 @@ public class GuiUpgradeBusCustom extends GuiContainerBase<ContainerUpgradeBus> {
                 layerOffsetY,
                 priority
             );
+        }
+    }
+
+    private void drawNegativeForegroundLayers(int guiLeft, int guiTop, int offsetX, int offsetY) {
+        for (Integer priority : GlobalTextureLayerConfig.collectPriorities(this.textureLayers, true, 0)) {
+            if (priority.intValue() >= 0) {
+                continue;
+            }
+            GlobalTextureLayerConfig.drawLayers(this.textureLayers, true, guiLeft, guiTop, offsetX, offsetY, priority);
         }
     }
 
@@ -186,6 +198,7 @@ public class GuiUpgradeBusCustom extends GuiContainerBase<ContainerUpgradeBus> {
             offsetX,
             offsetY
         );
+        drawNegativeForegroundLayers(guiLeft, guiTop, offsetX, offsetY);
         scrollbar.draw(this, mc);
     }
 

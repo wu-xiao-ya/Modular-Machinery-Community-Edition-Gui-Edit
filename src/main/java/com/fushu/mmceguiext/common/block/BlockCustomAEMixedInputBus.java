@@ -6,6 +6,7 @@ import com.fushu.mmceguiext.common.tile.TileCustomAEMixedInputBus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import github.kasuminova.mmce.common.block.appeng.BlockMEMachineComponent;
+import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
@@ -27,8 +28,8 @@ public class BlockCustomAEMixedInputBus extends BlockMEMachineComponent {
     public BlockCustomAEMixedInputBus(CustomAEMixedInputBusRegistry.Def definition) {
         this.definition = definition;
         String path = normalizePath(definition == null ? null : definition.id);
-        setRegistryName(new ResourceLocation("mmceguiext", path));
-        setTranslationKey("mmceguiext." + path);
+        setRegistryNameSafe(this, new ResourceLocation("mmceguiext", path));
+        setTranslationKeySafe(this, "mmceguiext." + path);
     }
 
     @Nullable
@@ -80,5 +81,13 @@ public class BlockCustomAEMixedInputBus extends BlockMEMachineComponent {
             value = value.substring(value.indexOf(':') + 1);
         }
         return value.isEmpty() ? "custom_ae_mixed_input_bus" : value;
+    }
+
+    private static void setRegistryNameSafe(final Block block, final ResourceLocation name) {
+        block.setRegistryName(name);
+    }
+
+    private static void setTranslationKeySafe(final Block block, final String key) {
+        block.setTranslationKey(key);
     }
 }

@@ -103,6 +103,7 @@ public class GuiItemBusCustom extends GuiContainerBase<ContainerItemBus> {
             this.styleFile.background != null && this.styleFile.background.offsetX != null ? this.styleFile.background.offsetX.intValue() : cfg.backgroundTextureOffsetX,
             this.styleFile.background != null && this.styleFile.background.offsetY != null ? this.styleFile.background.offsetY.intValue() : cfg.backgroundTextureOffsetY
         );
+        drawNegativeForegroundLayers(guiLeft, guiTop);
     }
 
     @Override
@@ -112,6 +113,9 @@ public class GuiItemBusCustom extends GuiContainerBase<ContainerItemBus> {
         int offsetX = this.styleFile.background != null && this.styleFile.background.offsetX != null ? this.styleFile.background.offsetX.intValue() : MMCEGuiExtConfig.itemBus.backgroundTextureOffsetX;
         int offsetY = this.styleFile.background != null && this.styleFile.background.offsetY != null ? this.styleFile.background.offsetY.intValue() : MMCEGuiExtConfig.itemBus.backgroundTextureOffsetY;
         for (Integer priority : priorities) {
+            if (priority.intValue() < 0) {
+                continue;
+            }
             GlobalTextureLayerConfig.drawLayers(
                 this.textureLayers,
                 true,
@@ -121,6 +125,17 @@ public class GuiItemBusCustom extends GuiContainerBase<ContainerItemBus> {
                 offsetY,
                 priority
             );
+        }
+    }
+
+    private void drawNegativeForegroundLayers(int guiLeft, int guiTop) {
+        int offsetX = this.styleFile.background != null && this.styleFile.background.offsetX != null ? this.styleFile.background.offsetX.intValue() : MMCEGuiExtConfig.itemBus.backgroundTextureOffsetX;
+        int offsetY = this.styleFile.background != null && this.styleFile.background.offsetY != null ? this.styleFile.background.offsetY.intValue() : MMCEGuiExtConfig.itemBus.backgroundTextureOffsetY;
+        for (Integer priority : GlobalTextureLayerConfig.collectPriorities(this.textureLayers, true, 0)) {
+            if (priority.intValue() >= 0) {
+                continue;
+            }
+            GlobalTextureLayerConfig.drawLayers(this.textureLayers, true, guiLeft, guiTop, offsetX, offsetY, priority);
         }
     }
 

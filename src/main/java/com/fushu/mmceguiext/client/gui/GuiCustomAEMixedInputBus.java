@@ -55,6 +55,9 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
     public void drawFG(final int offsetX, final int offsetY, final int mouseX, final int mouseY) {
         java.util.SortedSet<Integer> priorities = GlobalTextureLayerConfig.collectPriorities(this.definition.textureLayers, true, 0);
         for (Integer priority : priorities) {
+            if (priority.intValue() < 0) {
+                continue;
+            }
             if (priority.intValue() == 0) {
                 String title = this.definition.displayName == null || this.definition.displayName.trim().isEmpty()
                     ? I18n.format("gui.meiteminputbus.title")
@@ -73,10 +76,20 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
         int texH = this.definition.backgroundTextureHeight > 0 ? this.definition.backgroundTextureHeight : this.ySize;
         drawModalRectWithCustomSizedTexture(offsetX, offsetY, 0, 0, this.xSize, this.ySize, texW, texH);
         GlobalTextureLayerConfig.drawLayers(this.definition.textureLayers, false, offsetX, offsetY, 0, 0);
+        drawNegativeForegroundLayers(offsetX, offsetY);
         drawFluidConfig(offsetX, offsetY);
         drawFluidTank(offsetX, offsetY);
         drawGasConfig(offsetX, offsetY);
         drawGasTank(offsetX, offsetY);
+    }
+
+    private void drawNegativeForegroundLayers(int guiLeft, int guiTop) {
+        for (Integer priority : GlobalTextureLayerConfig.collectPriorities(this.definition.textureLayers, true, 0)) {
+            if (priority.intValue() >= 0) {
+                continue;
+            }
+            GlobalTextureLayerConfig.drawLayers(this.definition.textureLayers, true, guiLeft, guiTop, 0, 0, priority);
+        }
     }
 
     private void applySlotLayout() {
@@ -84,7 +97,7 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
         for (Slot slot : slots) {
             if (slot instanceof SlotFake) {
                 int idx = slot.getSlotIndex();
-                if (idx >= 0 && idx < 15) {
+                if (idx >= 0) {
                     CustomAEMixedInputBusRegistry.ComponentDef component = findIndexedComponent("slot", "item_config", idx);
                     if (component != null) {
                         slot.xPos = component.x;
@@ -101,7 +114,7 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
             }
             if (slot instanceof SlotDisabled) {
                 int idx = slot.getSlotIndex();
-                if (idx >= 0 && idx < 15) {
+                if (idx >= 0) {
                     CustomAEMixedInputBusRegistry.ComponentDef component = findIndexedComponent("slot", "item_storage", idx);
                     if (component == null) {
                         component = findIndexedComponent("slot", "item_output", idx);
@@ -123,17 +136,27 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
-        CustomAEMixedInputBusRegistry.ComponentDef fluidConfig = findFirstComponent("slot", "fluid_config");
-        CustomAEMixedInputBusRegistry.ComponentDef gasConfig = findFirstComponent("slot", "gas_config");
         if (mouseButton == 0) {
-            CustomAEMixedInputBusRegistry.TankRect fluidRect = fluidConfig != null ? toTankRect(fluidConfig) : this.definition.fluidConfigTank;
-            if (fluidRect != null && isMouseOverTank(mouseX, mouseY, fluidRect)) {
-                MMCEGuiExt.NET_CHANNEL.sendToServer(new PktCustomAEMixedSlotUpdate(this.owner.getPos(), PktCustomAEMixedSlotUpdate.TARGET_FLUID));
+            for (CustomAEMixedInputBusRegistry.ComponentDef fluidConfig : findComponents("slot", "fluid_config")) {
+                CustomAEMixedInputBusRegistry.TankRect fluidRect = toTankRect(fluidConfig);
+                if (fluidRect != null && isMouseOverTank(mouseX, mouseY, fluidRect)) {
+                    MMCEGuiExt.NET_CHANNEL.sendToServer(new PktCustomAEMixedSlotUpdate(this.owner.getPos(), PktCustomAEMixedSlotUpdate.TARGET_FLUID, resolveComponentIndex(fluidConfig)));
+                    return;
+                }
+            }
+            for (CustomAEMixedInputBusRegistry.ComponentDef gasConfig : findComponents("slot", "gas_config")) {
+                CustomAEMixedInputBusRegistry.TankRect gasRect = toTankRect(gasConfig);
+                if (gasRect != null && isMouseOverTank(mouseX, mouseY, gasRect)) {
+                    MMCEGuiExt.NET_CHANNEL.sendToServer(new PktCustomAEMixedSlotUpdate(this.owner.getPos(), PktCustomAEMixedSlotUpdate.TARGET_GAS, resolveComponentIndex(gasConfig)));
+                    return;
+                }
+            }
+            if (findComponents("slot", "fluid_config").isEmpty() && this.definition.fluidConfigTank != null && isMouseOverTank(mouseX, mouseY, this.definition.fluidConfigTank)) {
+                MMCEGuiExt.NET_CHANNEL.sendToServer(new PktCustomAEMixedSlotUpdate(this.owner.getPos(), PktCustomAEMixedSlotUpdate.TARGET_FLUID, 0));
                 return;
             }
-            CustomAEMixedInputBusRegistry.TankRect gasRect = gasConfig != null ? toTankRect(gasConfig) : this.definition.gasConfigTank;
-            if (gasRect != null && isMouseOverTank(mouseX, mouseY, gasRect)) {
-                MMCEGuiExt.NET_CHANNEL.sendToServer(new PktCustomAEMixedSlotUpdate(this.owner.getPos(), PktCustomAEMixedSlotUpdate.TARGET_GAS));
+            if (findComponents("slot", "gas_config").isEmpty() && this.definition.gasConfigTank != null && isMouseOverTank(mouseX, mouseY, this.definition.gasConfigTank)) {
+                MMCEGuiExt.NET_CHANNEL.sendToServer(new PktCustomAEMixedSlotUpdate(this.owner.getPos(), PktCustomAEMixedSlotUpdate.TARGET_GAS, 0));
                 return;
             }
         }
@@ -147,10 +170,19 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
     }
 
     private void drawFluidConfig(int guiLeft, int guiTop) {
-        if (this.definition.fluidConfigTank == null) {
+        for (CustomAEMixedInputBusRegistry.ComponentDef component : findComponents("slot", "fluid_config")) {
+            drawFluidConfig(guiLeft, guiTop, toTankRect(component), resolveComponentIndex(component));
+        }
+        if (findComponents("slot", "fluid_config").isEmpty()) {
+            drawFluidConfig(guiLeft, guiTop, this.definition.fluidConfigTank, 0);
+        }
+    }
+
+    private void drawFluidConfig(int guiLeft, int guiTop, @Nullable CustomAEMixedInputBusRegistry.TankRect rect, int slot) {
+        if (rect == null || slot < 0 || slot >= this.owner.getFluidConfig().getSlots()) {
             return;
         }
-        appeng.api.storage.data.IAEFluidStack fluid = this.owner.getFluidConfig().getFluidInSlot(0);
+        appeng.api.storage.data.IAEFluidStack fluid = this.owner.getFluidConfig().getFluidInSlot(slot);
         if (fluid == null || fluid.getFluidStack() == null || fluid.getStackSize() <= 0) {
             return;
         }
@@ -165,21 +197,30 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
         float blue = (color & 0xFF) / 255F;
         GlStateManager.color(red, green, blue, 1.0F);
         this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
-        drawTiledSprite(guiLeft + this.definition.fluidConfigTank.x, guiTop + this.definition.fluidConfigTank.y, this.definition.fluidConfigTank.width, this.definition.fluidConfigTank.height, sprite);
+        drawTiledSprite(guiLeft + rect.x, guiTop + rect.y, rect.width, rect.height, sprite);
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         this.mc.getTextureManager().bindTexture(this.backgroundTexture == null ? DEFAULT_TEXTURE : this.backgroundTexture);
     }
 
     private void drawFluidTank(int guiLeft, int guiTop) {
-        if (this.definition.fluidStorageTank == null) {
+        for (CustomAEMixedInputBusRegistry.ComponentDef component : findComponents("tank", "fluid_storage")) {
+            drawFluidTank(guiLeft, guiTop, toTankRect(component), resolveComponentIndex(component));
+        }
+        if (findComponents("tank", "fluid_storage").isEmpty()) {
+            drawFluidTank(guiLeft, guiTop, this.definition.fluidStorageTank, 0);
+        }
+    }
+
+    private void drawFluidTank(int guiLeft, int guiTop, @Nullable CustomAEMixedInputBusRegistry.TankRect rect, int slot) {
+        if (rect == null || slot < 0 || slot >= this.owner.getFluidTanks().getSlots()) {
             return;
         }
-        appeng.api.storage.data.IAEFluidStack fluid = this.owner.getFluidTanks().getFluidInSlot(0);
+        appeng.api.storage.data.IAEFluidStack fluid = this.owner.getFluidTanks().getFluidInSlot(slot);
         if (fluid == null || fluid.getFluidStack() == null || fluid.getStackSize() <= 0) {
             return;
         }
         int capacity = Math.max(1, ((AEFluidInventoryUpgradeable) this.owner.getFluidTanks()).getCapacity());
-        int filled = MathHelper.ceil((float) fluid.getStackSize() / (float) capacity * this.definition.fluidStorageTank.height);
+        int filled = MathHelper.ceil((float) fluid.getStackSize() / (float) capacity * rect.height);
         ResourceLocation still = fluid.getFluidStack().getFluid().getStill(fluid.getFluidStack());
         TextureAtlasSprite sprite = this.mc.getTextureMapBlocks().getTextureExtry(still.toString());
         if (sprite == null) {
@@ -192,9 +233,9 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
         GlStateManager.color(red, green, blue, 1.0F);
         this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
         drawTiledSprite(
-            guiLeft + this.definition.fluidStorageTank.x,
-            guiTop + this.definition.fluidStorageTank.y + this.definition.fluidStorageTank.height - filled,
-            this.definition.fluidStorageTank.width,
+            guiLeft + rect.x,
+            guiTop + rect.y + rect.height - filled,
+            rect.width,
             filled,
             sprite
         );
@@ -203,10 +244,19 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
     }
 
     private void drawGasConfig(int guiLeft, int guiTop) {
-        if (this.definition.gasConfigTank == null) {
+        for (CustomAEMixedInputBusRegistry.ComponentDef component : findComponents("slot", "gas_config")) {
+            drawGasConfig(guiLeft, guiTop, toTankRect(component), resolveComponentIndex(component));
+        }
+        if (findComponents("slot", "gas_config").isEmpty()) {
+            drawGasConfig(guiLeft, guiTop, this.definition.gasConfigTank, 0);
+        }
+    }
+
+    private void drawGasConfig(int guiLeft, int guiTop, @Nullable CustomAEMixedInputBusRegistry.TankRect rect, int slot) {
+        if (rect == null || slot < 0 || slot >= this.owner.getGasConfig().size()) {
             return;
         }
-        GasStack gas = this.owner.getGasConfig().getGasStack(0);
+        GasStack gas = this.owner.getGasConfig().getGasStack(slot);
         if (gas == null || gas.amount <= 0) {
             return;
         }
@@ -220,21 +270,30 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
         float blue = (color & 0xFF) / 255F;
         GlStateManager.color(red, green, blue, 1.0F);
         this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
-        drawTiledSprite(guiLeft + this.definition.gasConfigTank.x, guiTop + this.definition.gasConfigTank.y, this.definition.gasConfigTank.width, this.definition.gasConfigTank.height, sprite);
+        drawTiledSprite(guiLeft + rect.x, guiTop + rect.y, rect.width, rect.height, sprite);
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         this.mc.getTextureManager().bindTexture(this.backgroundTexture == null ? DEFAULT_TEXTURE : this.backgroundTexture);
     }
 
     private void drawGasTank(int guiLeft, int guiTop) {
-        if (this.definition.gasStorageTank == null) {
+        for (CustomAEMixedInputBusRegistry.ComponentDef component : findComponents("tank", "gas_storage")) {
+            drawGasTank(guiLeft, guiTop, toTankRect(component), resolveComponentIndex(component));
+        }
+        if (findComponents("tank", "gas_storage").isEmpty()) {
+            drawGasTank(guiLeft, guiTop, this.definition.gasStorageTank, 0);
+        }
+    }
+
+    private void drawGasTank(int guiLeft, int guiTop, @Nullable CustomAEMixedInputBusRegistry.TankRect rect, int slot) {
+        if (rect == null || slot < 0 || slot >= this.owner.getGasTanks().size()) {
             return;
         }
-        GasStack gas = this.owner.getGasTanks().getGasStack(0);
+        GasStack gas = this.owner.getGasTanks().getGasStack(slot);
         if (gas == null || gas.amount <= 0) {
             return;
         }
-        int capacity = Math.max(1, this.owner.getGasTanks().getTanks()[0].getMaxGas());
-        int filled = MathHelper.ceil((float) gas.amount / (float) capacity * this.definition.gasStorageTank.height);
+        int capacity = Math.max(1, this.owner.getGasTanks().getTanks()[slot].getMaxGas());
+        int filled = MathHelper.ceil((float) gas.amount / (float) capacity * rect.height);
         TextureAtlasSprite sprite = gas.getGas().getSprite();
         if (sprite == null) {
             sprite = this.mc.getTextureMapBlocks().getMissingSprite();
@@ -246,14 +305,38 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
         GlStateManager.color(red, green, blue, 1.0F);
         this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
         drawTiledSprite(
-            guiLeft + this.definition.gasStorageTank.x,
-            guiTop + this.definition.gasStorageTank.y + this.definition.gasStorageTank.height - filled,
-            this.definition.gasStorageTank.width,
+            guiLeft + rect.x,
+            guiTop + rect.y + rect.height - filled,
+            rect.width,
             filled,
             sprite
         );
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         this.mc.getTextureManager().bindTexture(this.backgroundTexture == null ? DEFAULT_TEXTURE : this.backgroundTexture);
+    }
+
+    private java.util.List<CustomAEMixedInputBusRegistry.ComponentDef> findComponents(String type, String role) {
+        java.util.List<CustomAEMixedInputBusRegistry.ComponentDef> out = new java.util.ArrayList<CustomAEMixedInputBusRegistry.ComponentDef>();
+        if (this.definition.gui == null || this.definition.gui.components == null) {
+            return out;
+        }
+        for (CustomAEMixedInputBusRegistry.ComponentDef component : this.definition.gui.components) {
+            if (component == null) {
+                continue;
+            }
+            if (!type.equalsIgnoreCase(component.type == null ? "" : component.type)) {
+                continue;
+            }
+            if (!role.equalsIgnoreCase(component.role == null ? "" : component.role)) {
+                continue;
+            }
+            out.add(component);
+        }
+        return out;
+    }
+
+    private int resolveComponentIndex(CustomAEMixedInputBusRegistry.ComponentDef component) {
+        return component == null || component.index < 0 ? 0 : component.index;
     }
 
     private void drawTiledSprite(int x, int y, int width, int height, TextureAtlasSprite sprite) {

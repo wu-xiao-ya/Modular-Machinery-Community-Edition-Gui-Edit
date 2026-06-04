@@ -92,7 +92,7 @@ public final class CustomHatchGameRegistry {
                     return resolveStateModelLocation(modelBinding, state);
                 }
             });
-            ModelLoader.setCustomModelResourceLocation(item, 0, modelBinding.toModelResourceLocation());
+            ModelLoader.setCustomModelResourceLocation(item, 0, resolveInventoryModelLocation(modelBinding));
         }
     }
 
@@ -171,23 +171,17 @@ public final class CustomHatchGameRegistry {
             int slash = rest.indexOf('/');
             if (slash > 0) {
                 String namespace = rest.substring(0, slash);
-                String path = rest.substring(slash + 1);
-                if (path.startsWith("models/")) {
-                    path = path.substring("models/".length());
-                }
+                String path = normalizeModelPath(rest.substring(slash + 1));
                 return new ModelBinding(new ResourceLocation(namespace, path), normalizeVariant(variant));
             }
         }
         if (value.contains(":")) {
             String[] split = value.split(":", 2);
             String namespace = split[0];
-            String path = split[1];
-            if (path.startsWith("models/")) {
-                path = path.substring("models/".length());
-            }
+            String path = normalizeModelPath(split[1]);
             return new ModelBinding(new ResourceLocation(namespace, path), normalizeVariant(variant));
         }
-        return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, value), normalizeVariant(variant));
+        return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, normalizeModelPath(value)), normalizeVariant(variant));
     }
 
     private static String normalizeVariant(@Nullable String raw) {
@@ -197,11 +191,22 @@ public final class CustomHatchGameRegistry {
         return raw.trim();
     }
 
+    private static String normalizeModelPath(String raw) {
+        String path = raw == null ? "" : raw.trim();
+        while (path.startsWith("blockstates/")) {
+            path = path.substring("blockstates/".length());
+        }
+        while (path.startsWith("models/")) {
+            path = path.substring("models/".length());
+        }
+        return path;
+    }
+
     private static ModelResourceLocation resolveStateModelLocation(ModelBinding binding, IBlockState state) {
         if (binding == null) {
             return new ModelResourceLocation(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "normal");
         }
-        if (MMCEGuiExt.MODID.equals(binding.location.getNamespace()) && "custom_hatch".equals(binding.location.getPath())) {
+        if (usesFacingVariants(binding.location)) {
             if (state != null && state.getPropertyKeys().contains(BlockCustomHatch.FACING)) {
                 EnumFacing facing = state.getValue(BlockCustomHatch.FACING);
                 return new ModelResourceLocation(binding.location, "facing=" + facing.getName());
@@ -211,9 +216,28 @@ public final class CustomHatchGameRegistry {
         String variant = binding.variant;
         if (state != null && state.getPropertyKeys().contains(BlockCustomHatch.FACING)) {
             EnumFacing facing = state.getValue(BlockCustomHatch.FACING);
-            variant = applyFacingVariant(variant, facing);
+            if (variant != null && variant.contains("facing=")) {
+                variant = applyFacingVariant(variant, facing);
+            }
         }
         return new ModelResourceLocation(binding.location, variant);
+    }
+
+    private static ModelResourceLocation resolveInventoryModelLocation(ModelBinding binding) {
+        if (binding == null) {
+            return new ModelResourceLocation(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "inventory");
+        }
+        return new ModelResourceLocation(binding.location, "inventory");
+    }
+
+    private static boolean usesFacingVariants(ResourceLocation location) {
+        if (location == null || !MMCEGuiExt.MODID.equals(location.getNamespace())) {
+            return false;
+        }
+        String path = location.getPath();
+        return "custom_hatch".equals(path)
+            || "custom_gas_input_hatch".equals(path)
+            || "custom_gas_output_hatch".equals(path);
     }
 
     private static String applyFacingVariant(String variant, EnumFacing facing) {

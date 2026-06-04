@@ -1,14 +1,15 @@
 package com.fushu.mmceguiext.common.block;
 
 import appeng.api.implementations.items.IMemoryCard;
+import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.item.ItemBlockCustomMEItemInputBus;
 import com.fushu.mmceguiext.common.registry.CustomAEItemInputBusRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomMEItemInputBus;
 import github.kasuminova.mmce.common.block.appeng.BlockMEItemInputBus;
 import github.kasuminova.mmce.common.tile.MEItemInputBus;
 import hellfirepvp.modularmachinery.ModularMachinery;
-import hellfirepvp.modularmachinery.common.CommonProxy;
 import hellfirepvp.modularmachinery.common.util.IOInventory;
+import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
@@ -32,8 +33,8 @@ public class BlockCustomMEItemInputBus extends BlockMEItemInputBus {
     public BlockCustomMEItemInputBus(CustomAEItemInputBusRegistry.Def definition) {
         this.definition = definition;
         String path = normalizePath(definition == null ? null : definition.id);
-        setRegistryName(new ResourceLocation("mmceguiext", path));
-        setTranslationKey("mmceguiext." + path);
+        setRegistryNameSafe(this, new ResourceLocation("mmceguiext", path));
+        setTranslationKeySafe(this, "mmceguiext." + path);
     }
 
     @Nullable
@@ -64,7 +65,7 @@ public class BlockCustomMEItemInputBus extends BlockMEItemInputBus {
                         return true;
                     }
                 }
-                playerIn.openGui(ModularMachinery.MODID, CommonProxy.GuiType.ME_ITEM_INPUT_BUS.ordinal(), worldIn, pos.getX(), pos.getY(), pos.getZ());
+                playerIn.openGui(MMCEGuiExt.MODID, MMCEGuiExt.GUI_CUSTOM_AE_ITEM_INPUT, worldIn, pos.getX(), pos.getY(), pos.getZ());
             }
         }
         return true;
@@ -145,5 +146,13 @@ public class BlockCustomMEItemInputBus extends BlockMEItemInputBus {
             value = value.substring(value.indexOf(':') + 1);
         }
         return value.isEmpty() ? "custom_me_item_input_bus" : value;
+    }
+
+    private static void setRegistryNameSafe(final Block block, final ResourceLocation name) {
+        block.setRegistryName(name);
+    }
+
+    private static void setTranslationKeySafe(final Block block, final String key) {
+        block.setTranslationKey(key);
     }
 }

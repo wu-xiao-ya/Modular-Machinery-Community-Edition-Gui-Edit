@@ -2,6 +2,7 @@ package com.fushu.mmceguiext.common.block;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.tile.TileCustomHatch;
+import net.minecraft.block.Block;
 import hellfirepvp.modularmachinery.common.CommonProxy;
 import hellfirepvp.modularmachinery.common.block.BlockMachineComponent;
 import net.minecraft.block.SoundType;
@@ -9,6 +10,7 @@ import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.PropertyEnum;
 import net.minecraft.block.state.BlockStateContainer;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -17,6 +19,7 @@ import net.minecraft.util.BlockRenderLayer;
 import net.minecraft.util.EnumBlockRenderType;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.Rotation;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.BlockPos;
@@ -32,12 +35,12 @@ public class BlockCustomHatch extends BlockMachineComponent {
         super(resolveMaterial(definition));
         this.definition = definition;
         applyBlockProperties(definition);
-        setCreativeTab(CommonProxy.creativeTabModularMachinery);
+        setCreativeTabSafe(this, CommonProxy.creativeTabModularMachinery);
         String path = definition == null || definition.id == null || definition.id.trim().isEmpty()
             ? "custom_hatch"
             : normalizePath(definition.id);
-        setRegistryName(MMCEGuiExt.MODID, path);
-        setTranslationKey(MMCEGuiExt.MODID + "." + path);
+        setRegistryNameSafe(this, new ResourceLocation(MMCEGuiExt.MODID, path));
+        setTranslationKeySafe(this, MMCEGuiExt.MODID + "." + path);
         setDefaultState(this.blockState.getBaseState().withProperty(FACING, EnumFacing.NORTH));
     }
 
@@ -130,25 +133,25 @@ public class BlockCustomHatch extends BlockMachineComponent {
     private static void applyBlockProperties(BlockCustomHatch block, com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef definition) {
         com.fushu.mmceguiext.common.registry.CustomHatchRegistry.BlockDef props = definition == null ? null : definition.block;
         if (props == null) {
-            block.setHardness(2F);
-            block.setResistance(10F);
-            block.setSoundType(SoundType.METAL);
-            block.setHarvestLevel("pickaxe", 1);
+            setHardnessSafe(block, 2F);
+            setResistanceSafe(block, 10F);
+            setSoundTypeSafe(block, SoundType.METAL);
+            setHarvestLevelSafe(block, "pickaxe", 1);
             return;
         }
 
         if (props.unbreakable) {
-            block.setBlockUnbreakable();
+            setBlockUnbreakableSafe(block);
         } else {
-            block.setHardness(props.hardness);
+            setHardnessSafe(block, props.hardness);
         }
-        block.setResistance(props.resistance);
-        block.setSoundType(resolveSoundType(props.soundType));
+        setResistanceSafe(block, props.resistance);
+        setSoundTypeSafe(block, resolveSoundType(props.soundType));
         if (props.harvestTool != null && !props.harvestTool.trim().isEmpty()) {
-            block.setHarvestLevel(props.harvestTool.trim(), props.harvestLevel);
+            setHarvestLevelSafe(block, props.harvestTool.trim(), props.harvestLevel);
         }
-        block.setLightLevel(clamp(props.lightLevel, 0F, 1F));
-        block.setLightOpacity(Math.max(0, Math.min(255, props.lightOpacity)));
+        setLightLevelSafe(block, clamp(props.lightLevel, 0F, 1F));
+        setLightOpacitySafe(block, Math.max(0, Math.min(255, props.lightOpacity)));
         block.slipperiness = Math.max(0F, props.slipperiness);
     }
 
@@ -214,5 +217,45 @@ public class BlockCustomHatch extends BlockMachineComponent {
 
     private static float clamp(float value, float min, float max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static void setCreativeTabSafe(final Block block, @Nullable final CreativeTabs tab) {
+        block.setCreativeTab(tab);
+    }
+
+    private static void setRegistryNameSafe(final Block block, final ResourceLocation name) {
+        block.setRegistryName(name);
+    }
+
+    private static void setTranslationKeySafe(final Block block, final String key) {
+        block.setTranslationKey(key);
+    }
+
+    private static void setHardnessSafe(final Block block, final float hardness) {
+        block.setHardness(hardness);
+    }
+
+    private static void setResistanceSafe(final Block block, final float resistance) {
+        block.setResistance(resistance);
+    }
+
+    private static void setSoundTypeSafe(final BlockCustomHatch block, final SoundType soundType) {
+        block.blockSoundType = soundType;
+    }
+
+    private static void setHarvestLevelSafe(final Block block, final String toolClass, final int level) {
+        block.setHarvestLevel(toolClass, level);
+    }
+
+    private static void setBlockUnbreakableSafe(final Block block) {
+        block.setBlockUnbreakable();
+    }
+
+    private static void setLightLevelSafe(final Block block, final float level) {
+        block.setLightLevel(level);
+    }
+
+    private static void setLightOpacitySafe(final Block block, final int opacity) {
+        block.setLightOpacity(opacity);
     }
 }

@@ -1,0 +1,9 @@
+{
+  "variants": {
+    "facing=north": { "model": "mmceguiext:hatch/mix_in_lv1" },
+    "facing=south": { "model": "mmceguiext:hatch/mix_in_lv1", "y": 180 },
+    "facing=west": { "model": "mmceguiext:hatch/mix_in_lv1", "y": 270 },
+    "facing=east": { "model": "mmceguiext:hatch/mix_in_lv1", "y": 90 },
+    "inventory": { "model": "mmceguiext:hatch/mix_in_lv1" }
+  }
+}

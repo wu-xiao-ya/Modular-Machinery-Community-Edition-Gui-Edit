@@ -1,0 +1,63 @@
+{
+  "registryname": "demo:event_button_test",
+  "localizedname": "Event Button Test",
+  "parts": [],
+  "mmce_gui_ext": {
+    "machineController": {
+      "backgroundTexture": "modularmachinery:textures/gui/guicontroller.png",
+      "guiWidth": 176,
+      "guiHeight": 213,
+      "texts": [
+        {
+          "x": 8,
+          "y": 8,
+          "value": "Event button test"
+        },
+        {
+          "x": 8,
+          "y": 20,
+          "value": "Click button should update click_count."
+        },
+        {
+          "x": 8,
+          "y": 34,
+          "value": "Use zs to mirror customDataTag into GUI info."
+        }
+      ],
+      "buttons": [
+        {
+          "id": "event_test_button",
+          "buttonId": "event_test_button",
+          "x": 8,
+          "y": 52,
+          "width": 60,
+          "height": 20,
+          "label": "Click Me",
+          "action": "event"
+        },
+        {
+          "id": "smart_add_button",
+          "x": 74,
+          "y": 52,
+          "width": 36,
+          "height": 20,
+          "label": "+1",
+          "action": "smart_add",
+          "key": "pulse_counter",
+          "value": 1.0
+        },
+        {
+          "id": "smart_set_button",
+          "x": 116,
+          "y": 52,
+          "width": 52,
+          "height": 20,
+          "label": "Reset",
+          "action": "smart_set",
+          "key": "pulse_counter",
+          "value": 0.0
+        }
+      ]
+    }
+  }
+}

@@ -159,6 +159,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 maskPlayerInventoryArea();
             }
             drawConfiguredTextureLayers(false, cfg);
+            drawNegativeForegroundTextureLayers(cfg);
             return;
         }
 
@@ -198,6 +199,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         // Custom panel backgrounds are intentionally not rendered.
         // Users should draw panel areas directly in their custom GUI textures.
         drawConfiguredTextureLayers(false, cfg);
+        drawNegativeForegroundTextureLayers(cfg);
     }
 
     @Override
@@ -256,7 +258,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 }
             }
             drawConfiguredTexts(Integer.valueOf(priority));
-            drawConfiguredTextureLayers(true, cfg, Integer.valueOf(priority));
+            if (priority >= 0) {
+                drawConfiguredTextureLayers(true, cfg, Integer.valueOf(priority));
+            }
             if (this.smartInterfaceEditorPriority == priority) {
                 GlStateManager.pushMatrix();
                 GlStateManager.translate(-this.guiLeft, -this.guiTop, 0.0F);
@@ -275,6 +279,15 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             drawCustomSmartInterfaceEditorsForeground(Integer.valueOf(priority));
         }
         resetForegroundRenderState();
+    }
+
+    private void drawNegativeForegroundTextureLayers(MMCEGuiExtConfig.MachineController cfg) {
+        for (Integer priority : collectForegroundRenderPriorities()) {
+            if (priority.intValue() >= 0) {
+                continue;
+            }
+            drawConfiguredTextureLayers(true, cfg, priority);
+        }
     }
 
     @Override
@@ -2196,6 +2209,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 CustomButton button = new CustomButton();
                 button.id = style.id == null || style.id.trim().isEmpty() ? "button_" + this.customButtons.size() : style.id.trim();
                 button.action = style.action;
+                button.buttonId = style.buttonId == null || style.buttonId.trim().isEmpty() ? button.id : style.buttonId.trim();
                 button.key = style.key;
                 button.value = style.value == null ? ("smart_add".equals(style.action) ? 1.0F : 0.0F) : style.value.floatValue();
                 button.min = style.min;
@@ -2235,7 +2249,22 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             if (!button.visible || !isPageVisible(button.page) || button.button == null) {
                 continue;
             }
+            button.button.enabled = !"page".equals(button.action) || !button.targetPage.equals(this.activePageId);
             if (button.button.mousePressed(this.mc, mouseX, mouseY)) {
+                ModularMachinery.log.info(
+                    "[MMCEGE] Machine GUI button hit id={} action={} key={} value={} mouse=({}, {}) rect=({}, {}, {}, {})",
+                    button.id,
+                    button.action,
+                    button.key,
+                    button.value,
+                    mouseX,
+                    mouseY,
+                    button.button.x,
+                    button.button.y,
+                    button.button.width,
+                    button.button.height
+                );
+                button.button.playPressSound(this.mc.getSoundHandler());
                 activateCustomButton(button);
                 return true;
             }
@@ -2252,13 +2281,26 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             this.activePageId = button.targetPage;
             return;
         }
+        if ("event".equals(button.action)) {
+            MMCEGuiExt.NET_CHANNEL.sendToServer(PktControllerButtonAction.event(this.controller.getPos(), button.buttonId));
+            return;
+        }
         if (!"smart_set".equals(button.action) && !"smart_add".equals(button.action)) {
             return;
         }
         if (button.key == null || button.key.trim().isEmpty() || !Float.isFinite(button.value)) {
             return;
         }
-        MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerButtonAction(
+        ModularMachinery.log.info(
+            "[MMCEGE] Machine GUI send smart button id={} key={} additive={} value={} min={} max={}",
+            button.id,
+            button.key,
+            "smart_add".equals(button.action),
+            button.value,
+            button.min,
+            button.max
+        );
+        MMCEGuiExt.NET_CHANNEL.sendToServer(PktControllerButtonAction.smart(
             this.controller.getPos(),
             button.key,
             "smart_add".equals(button.action),
@@ -2780,6 +2822,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     private static class CustomButton {
         private String id;
         private String action;
+        private String buttonId;
         @Nullable
         private String key;
         private float value;

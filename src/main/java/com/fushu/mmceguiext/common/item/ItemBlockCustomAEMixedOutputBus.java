@@ -3,8 +3,10 @@ package com.fushu.mmceguiext.common.item;
 import com.fushu.mmceguiext.common.block.BlockCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry;
 import net.minecraft.block.Block;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
 
 import javax.annotation.Nonnull;
 
@@ -14,7 +16,7 @@ public class ItemBlockCustomAEMixedOutputBus extends ItemBlock {
     public ItemBlockCustomAEMixedOutputBus(Block block, CustomAEMixedOutputBusRegistry.Def definition) {
         super(block);
         this.definition = definition;
-        setRegistryName(block.getRegistryName());
+        setRegistryNameSafe(this, block.getRegistryName());
     }
 
     @Override
@@ -32,5 +34,9 @@ public class ItemBlockCustomAEMixedOutputBus extends ItemBlock {
     @Nonnull
     public CustomAEMixedOutputBusRegistry.Def getDefinition() {
         return this.definition;
+    }
+
+    private static void setRegistryNameSafe(final Item item, @Nonnull final ResourceLocation name) {
+        item.setRegistryName(name);
     }
 }

@@ -102,13 +102,64 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         }
         GlobalTextureLayerConfig.drawLayers(this.textureLayers, false, left, top, offsetX, offsetY);
         drawTankOverlays(left, top);
+        drawNegativePriorityForegroundContent(left, top);
         drawSlotGridScrollbars(mouseX, mouseY);
     }
 
     @Override
     protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
-        drawConfiguredTexts();
-        GlobalTextureLayerConfig.drawLayers(this.textureLayers, true, 0, 0, 0, 0);
+        java.util.SortedSet<Integer> priorities = new java.util.TreeSet<Integer>();
+        for (CustomHatchRegistry.ComponentDef component : this.components) {
+            if (component == null) {
+                continue;
+            }
+            if ("text".equalsIgnoreCase(component.type)) {
+                priorities.add(Integer.valueOf(component.priority));
+            }
+            if ("slot".equalsIgnoreCase(component.type) && component.itemOverlay != null && component.itemOverlay.booleanValue()) {
+                priorities.add(Integer.valueOf(component.priority));
+            }
+        }
+        for (GlobalTextureLayerConfig.LayerDef layer : this.textureLayers) {
+            if (layer != null && layer.foreground) {
+                priorities.add(Integer.valueOf(layer.priority));
+            }
+        }
+        if (priorities.isEmpty()) {
+            drawConfiguredTexts(null);
+            drawItemSlotOverlays(null);
+            GlobalTextureLayerConfig.drawLayers(this.textureLayers, true, 0, 0, 0, 0);
+            return;
+        }
+        for (Integer priority : priorities) {
+            if (priority.intValue() < 0) {
+                continue;
+            }
+            drawConfiguredTexts(priority);
+            drawItemSlotOverlays(priority);
+            drawConfiguredForegroundLayers(priority);
+        }
+    }
+
+    private void drawNegativePriorityForegroundContent(int guiLeft, int guiTop) {
+        java.util.SortedSet<Integer> priorities = new java.util.TreeSet<Integer>();
+        for (CustomHatchRegistry.ComponentDef component : this.components) {
+            if (component == null) {
+                continue;
+            }
+            if ("slot".equalsIgnoreCase(component.type) && component.itemOverlay != null && component.itemOverlay.booleanValue() && component.priority < 0) {
+                priorities.add(Integer.valueOf(component.priority));
+            }
+        }
+        for (GlobalTextureLayerConfig.LayerDef layer : this.textureLayers) {
+            if (layer != null && layer.foreground && layer.priority < 0) {
+                priorities.add(Integer.valueOf(layer.priority));
+            }
+        }
+        for (Integer priority : priorities) {
+            drawItemSlotOverlays(priority);
+            GlobalTextureLayerConfig.drawLayers(this.textureLayers, true, guiLeft, guiTop, this.backgroundOffsetX, this.backgroundOffsetY, priority);
+        }
     }
 
     @Override
@@ -138,6 +189,14 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
     }
 
     @Override
+    protected void mouseClickMove(int mouseX, int mouseY, int clickedMouseButton, long timeSinceLastClick) {
+        if (clickedMouseButton == 0) {
+            dragSlotGridScrollbars(mouseY);
+        }
+        super.mouseClickMove(mouseX, mouseY, clickedMouseButton, timeSinceLastClick);
+    }
+
+    @Override
     protected void renderHoveredToolTip(int mouseX, int mouseY) {
         super.renderHoveredToolTip(mouseX, mouseY);
         CustomHatchRegistry.ComponentDef tankComponent = findHoveredTankComponent(mouseX, mouseY);
@@ -157,7 +216,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         drawHoveringText(tooltip, mouseX, mouseY, this.fontRenderer);
     }
 
-    private void drawConfiguredTexts() {
+    private void drawConfiguredTexts(@Nullable Integer priorityFilter) {
         FluidStack fluid = getFluid();
         GasStack gas = getGas();
         boolean useGas = shouldUseGas(null, fluid, gas);
@@ -165,6 +224,9 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         int capacity = getTankCapacity(null, useGas);
         for (CustomHatchRegistry.ComponentDef component : this.components) {
             if (component == null || component.value == null || !("text".equalsIgnoreCase(component.type))) {
+                continue;
+            }
+            if (priorityFilter != null && component.priority != priorityFilter.intValue()) {
                 continue;
             }
             String value = resolveTextValue(component.value, fluid, gas, useGas, amount, capacity);
@@ -186,6 +248,57 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             } else {
                 this.fontRenderer.drawStringWithShadow(value, alignedX, componentGuiY(component), color);
             }
+        }
+    }
+
+    private void drawItemSlotOverlays(@Nullable Integer priorityFilter) {
+        if (this.inventorySlots == null || this.inventorySlots.inventorySlots == null) {
+            return;
+        }
+        for (int i = 36; i < this.inventorySlots.inventorySlots.size(); i++) {
+            net.minecraft.inventory.Slot slot = this.inventorySlots.inventorySlots.get(i);
+            if (slot == null || !slot.getHasStack()) {
+                continue;
+            }
+            CustomHatchRegistry.ComponentDef component = findSlotComponent(i - 36);
+            if (component == null || component.itemOverlay == null || !component.itemOverlay.booleanValue()) {
+                continue;
+            }
+            if (priorityFilter != null && component.priority != priorityFilter.intValue()) {
+                continue;
+            }
+            ResourceLocation overlayTexture = GuiRenderUtils.parseOptionalTexture(component.itemOverlayTexture);
+            if (overlayTexture == null) {
+                continue;
+            }
+            if (slot.xPos <= -1000 || slot.yPos <= -1000) {
+                continue;
+            }
+            this.mc.getTextureManager().bindTexture(overlayTexture);
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            Gui.drawModalRectWithCustomSizedTexture(
+                slot.xPos,
+                slot.yPos,
+                component.itemOverlayU,
+                component.itemOverlayV,
+                16,
+                16,
+                Math.max(1, component.itemOverlayTextureWidth),
+                Math.max(1, component.itemOverlayTextureHeight)
+            );
+        }
+    }
+
+    private void drawConfiguredForegroundLayers(@Nullable Integer priorityFilter) {
+        for (GlobalTextureLayerConfig.LayerDef layer : this.textureLayers) {
+            if (layer == null || !layer.foreground) {
+                continue;
+            }
+            if (priorityFilter != null && layer.priority != priorityFilter.intValue()) {
+                continue;
+            }
+            java.util.List<GlobalTextureLayerConfig.LayerDef> single = java.util.Collections.singletonList(layer);
+            GlobalTextureLayerConfig.drawLayers(single, true, 0, 0, 0, 0);
         }
     }
 
@@ -227,15 +340,20 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             float blue = (gasColor & 0xFF) / 255F;
             float filledPercent = MathHelper.clamp(amount / (float) capacity, 0F, 1F);
             int filled = MathHelper.ceil(filledPercent * tankHeight);
-            TextureAtlasSprite sprite = gas.getGas().getSprite();
-            if (sprite == null) {
-                sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
-            }
+            float alpha = resolveTankAlpha(component);
+            if (usesSolidTankRender(resolveTankRenderMode(component))) {
+                drawSolidTankFill(tankX, tankY + tankHeight - filled, tankWidth, filled, red, green, blue, alpha);
+            } else {
+                TextureAtlasSprite sprite = gas.getGas().getSprite();
+                if (sprite == null) {
+                    sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
+                }
 
-            GlStateManager.color(red, green, blue, 1.0F);
-            this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
-            drawTiledFluidSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+                GlStateManager.color(red, green, blue, alpha);
+                this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
+                drawTiledFluidSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
+                GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            }
         } else if (fluid != null && amount > 0) {
             int fluidColor = fluid.getFluid().getColor(fluid);
             float red = (fluidColor >> 16 & 0xFF) / 255F;
@@ -244,16 +362,21 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
 
             float filledPercent = MathHelper.clamp(amount / (float) capacity, 0F, 1F);
             int filled = MathHelper.ceil(filledPercent * tankHeight);
-            ResourceLocation still = fluid.getFluid().getStill(fluid);
-            TextureAtlasSprite sprite = Minecraft.getMinecraft().getTextureMapBlocks().getTextureExtry(still.toString());
-            if (sprite == null) {
-                sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
-            }
+            float alpha = resolveTankAlpha(component);
+            if (usesSolidTankRender(resolveTankRenderMode(component))) {
+                drawSolidTankFill(tankX, tankY + tankHeight - filled, tankWidth, filled, red, green, blue, alpha);
+            } else {
+                ResourceLocation still = fluid.getFluid().getStill(fluid);
+                TextureAtlasSprite sprite = Minecraft.getMinecraft().getTextureMapBlocks().getTextureExtry(still.toString());
+                if (sprite == null) {
+                    sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
+                }
 
-            GlStateManager.color(red, green, blue, 1.0F);
-            this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
-            drawTiledFluidSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+                GlStateManager.color(red, green, blue, alpha);
+                this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
+                drawTiledFluidSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
+                GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            }
         }
 
         boolean overlay = component == null ? true : Boolean.TRUE.equals(component.overlay);
@@ -279,6 +402,17 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             drawY += tileHeight;
             remainingHeight -= tileHeight;
         }
+    }
+
+    private void drawSolidTankFill(int x, int y, int width, int height, float red, float green, float blue, float alpha) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        int a = MathHelper.clamp(Math.round(alpha * 255.0F), 0, 255);
+        int r = MathHelper.clamp(Math.round(red * 255.0F), 0, 255);
+        int g = MathHelper.clamp(Math.round(green * 255.0F), 0, 255);
+        int b = MathHelper.clamp(Math.round(blue * 255.0F), 0, 255);
+        Gui.drawRect(x, y, x + width, y + height, (a << 24) | (r << 16) | (g << 8) | b);
     }
 
     @Nullable
@@ -312,7 +446,9 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             return null;
         }
         if ("fluid.name".equalsIgnoreCase(key)) {
-            return fluid == null ? I18n.format("tooltip.fluidhatch.empty") : fluid.getLocalizedName();
+            return useGas
+                ? gas == null ? I18n.format("tooltip.fluidhatch.empty") : gas.getGas().getLocalizedName()
+                : fluid == null ? I18n.format("tooltip.fluidhatch.empty") : fluid.getLocalizedName();
         }
         if ("gas.name".equalsIgnoreCase(key)) {
             return gas == null ? I18n.format("tooltip.fluidhatch.empty") : gas.getGas().getLocalizedName();
@@ -356,6 +492,24 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             return true;
         }
         return "fluid_gas".equalsIgnoreCase(content) && (fluid == null || fluid.amount <= 0) && gas != null && gas.amount > 0;
+    }
+
+    private float resolveTankAlpha(@Nullable CustomHatchRegistry.ComponentDef component) {
+        Float alpha = component != null && component.alpha != null ? component.alpha : this.definition.tank.alpha;
+        return alpha == null ? 1.0F : MathHelper.clamp(alpha.floatValue(), 0.0F, 1.0F);
+    }
+
+    @Nullable
+    private String resolveTankRenderMode(@Nullable CustomHatchRegistry.ComponentDef component) {
+        return component != null && component.renderMode != null && !component.renderMode.trim().isEmpty()
+            ? component.renderMode
+            : this.definition.tank.renderMode;
+    }
+
+    private boolean usesSolidTankRender(@Nullable String renderMode) {
+        return "solid".equalsIgnoreCase(renderMode)
+            || "flat".equalsIgnoreCase(renderMode)
+            || "color".equalsIgnoreCase(renderMode);
     }
 
     private int getTankCapacity(@Nullable CustomHatchRegistry.ComponentDef component, boolean useGas) {
@@ -570,6 +724,9 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             state.scrollbar.width = Math.max(4, scaledWidth(component.scrollbarWidth));
             state.scrollbar.thumbHeight = Math.max(8, scaledHeight(component.scrollbarThumbHeight));
             state.scrollbar.texture = component.scrollbarTexture == null ? null : GuiRenderUtils.parseOptionalTexture(component.scrollbarTexture);
+            state.scrollbar.hoverTexture = component.scrollbarHoverTexture == null ? null : GuiRenderUtils.parseOptionalTexture(component.scrollbarHoverTexture);
+            state.scrollbar.pressedTexture = component.scrollbarPressedTexture == null ? null : GuiRenderUtils.parseOptionalTexture(component.scrollbarPressedTexture);
+            state.scrollbar.disabledTexture = component.scrollbarDisabledTexture == null ? null : GuiRenderUtils.parseOptionalTexture(component.scrollbarDisabledTexture);
             state.scrollbar.textureWidth = Math.max(1, component.scrollbarTextureWidth);
             state.scrollbar.textureHeight = Math.max(1, component.scrollbarTextureHeight);
             state.scrollbar.u = component.scrollbarU;
@@ -617,6 +774,22 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             if (state.scrollbar != null) {
                 state.scrollbar.release();
             }
+        }
+    }
+
+    private void dragSlotGridScrollbars(int mouseY) {
+        for (SlotGridState state : this.slotGridStates.values()) {
+            if (!state.scrollbarEnabled || state.scrollbar == null) {
+                continue;
+            }
+            if (!state.scrollbar.isPressed()) {
+                continue;
+            }
+            if (state.scrollbar.dragTo(mouseY)) {
+                state.scrollOffset = state.scrollbar.currentScroll;
+                applyConfiguredSlotPositions();
+            }
+            return;
         }
     }
 
@@ -737,6 +910,12 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         private int currentScroll = 0;
         @Nullable
         private ResourceLocation texture;
+        @Nullable
+        private ResourceLocation hoverTexture;
+        @Nullable
+        private ResourceLocation pressedTexture;
+        @Nullable
+        private ResourceLocation disabledTexture;
         private int textureWidth = 256;
         private int textureHeight = 256;
         private int u = 232;
@@ -748,6 +927,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         private int disabledU = 244;
         private int disabledV = 0;
         private boolean pressed;
+        private int dragOffsetY;
 
         private void setRange(int min, int max, int pageSize) {
             this.minScroll = min;
@@ -765,24 +945,65 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         }
 
         private boolean isMouseOver(int x, int y) {
-            return x > this.left && x <= this.left + this.width && y > this.top && y <= this.top + this.height;
+            return x >= this.left && x < this.left + this.width && y >= this.top && y < this.top + this.height;
+        }
+
+        private boolean isPressed() {
+            return this.pressed;
+        }
+
+        private int getThumbTravel() {
+            return Math.max(1, this.height - this.thumbHeight);
+        }
+
+        private int getThumbOffset() {
+            if (this.getRange() <= 0) {
+                return 0;
+            }
+            return (this.currentScroll - this.minScroll) * getThumbTravel() / this.getRange();
+        }
+
+        private boolean isMouseOverThumb(int x, int y) {
+            int thumbTop = this.top + getThumbOffset();
+            return x >= this.left && x < this.left + this.width && y >= thumbTop && y < thumbTop + this.thumbHeight;
         }
 
         private void click(int x, int y) {
             if (this.getRange() == 0) {
                 return;
             }
-            if (isMouseOver(x, y)) {
+            if (!isMouseOver(x, y)) {
+                return;
+            }
+            if (isMouseOverThumb(x, y)) {
                 this.pressed = true;
-                this.currentScroll = (y - this.top);
-                this.currentScroll = this.minScroll + ((this.currentScroll * 2 * this.getRange() / this.height));
-                this.currentScroll = (this.currentScroll + 1) >> 1;
+                this.dragOffsetY = y - (this.top + getThumbOffset());
+            } else {
+                this.pressed = false;
+                this.dragOffsetY = this.thumbHeight / 2;
+                int available = getThumbTravel();
+                int thumbTop = Math.max(0, Math.min(available, y - this.top - this.dragOffsetY));
+                this.currentScroll = this.minScroll + Math.round((thumbTop * this.getRange()) / (float) available);
                 this.applyRange();
+                this.dragOffsetY = 0;
             }
         }
 
         private void release() {
             this.pressed = false;
+            this.dragOffsetY = 0;
+        }
+
+        private boolean dragTo(int mouseY) {
+            if (!this.pressed || this.getRange() <= 0) {
+                return false;
+            }
+            int available = getThumbTravel();
+            int thumbTop = Math.max(0, Math.min(available, mouseY - this.top - this.dragOffsetY));
+            int previous = this.currentScroll;
+            this.currentScroll = this.minScroll + Math.round((thumbTop * this.getRange()) / (float) available);
+            this.applyRange();
+            return this.currentScroll != previous;
         }
 
         private void wheel(int delta) {
@@ -792,11 +1013,12 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         }
 
         private void draw(Gui gui, Minecraft mc) {
-            ResourceLocation tex = this.texture == null ? DEFAULT_SCROLLBAR_TEXTURE : this.texture;
-            mc.getTextureManager().bindTexture(tex);
-            GlStateManager.color(1.0f, 1.0f, 1.0f, 1.0f);
-
             if (this.getRange() == 0) {
+                ResourceLocation tex = this.disabledTexture != null
+                    ? this.disabledTexture
+                    : this.texture == null ? DEFAULT_SCROLLBAR_TEXTURE : this.texture;
+                mc.getTextureManager().bindTexture(tex);
+                GlStateManager.color(1.0f, 1.0f, 1.0f, 1.0f);
                 Gui.drawModalRectWithCustomSizedTexture(this.left, this.top, this.disabledU, this.disabledV, this.width, this.thumbHeight, this.textureWidth, this.textureHeight);
                 return;
             }
@@ -805,15 +1027,24 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             int mouseY = mc.currentScreen.height - org.lwjgl.input.Mouse.getY() * mc.currentScreen.height / mc.displayHeight - 1;
             int available = Math.max(1, this.height - this.thumbHeight);
             int offset = (this.currentScroll - this.minScroll) * available / this.getRange();
+            ResourceLocation tex = this.texture == null ? DEFAULT_SCROLLBAR_TEXTURE : this.texture;
             int drawU = this.u;
             int drawV = this.v;
             if (this.pressed) {
+                if (this.pressedTexture != null) {
+                    tex = this.pressedTexture;
+                }
                 drawU = this.pressedU;
                 drawV = this.pressedV;
-            } else if (isMouseOver(mouseX, mouseY)) {
+            } else if (isMouseOverThumb(mouseX, mouseY)) {
+                if (this.hoverTexture != null) {
+                    tex = this.hoverTexture;
+                }
                 drawU = this.hoverU;
                 drawV = this.hoverV;
             }
+            mc.getTextureManager().bindTexture(tex);
+            GlStateManager.color(1.0f, 1.0f, 1.0f, 1.0f);
             Gui.drawModalRectWithCustomSizedTexture(this.left, this.top + offset, drawU, drawV, this.width, this.thumbHeight, this.textureWidth, this.textureHeight);
         }
     }

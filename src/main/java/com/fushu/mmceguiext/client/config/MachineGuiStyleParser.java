@@ -488,6 +488,7 @@ final class MachineGuiStyleParser {
             Integer y = validateMinInt(getInt(obj, result, itemScope, "y"), 0, result, itemScope, "y");
             String label = getTrimmedString(obj, result, itemScope, "label", "text", "title");
             String action = getTrimmedString(obj, result, itemScope, "action", "mode", "type");
+            String buttonId = getTrimmedString(obj, result, itemScope, "buttonId", "button_id", "eventId", "event_id", "id", "name");
             String targetPage = getTrimmedString(obj, result, itemScope, "targetPage", "target_page", "pageTarget", "page_target");
             String key = getTrimmedString(obj, result, itemScope, "key", "virtualKey", "virtual_key", "interfaceType", "interface_type");
             Float value = getFloat(obj, result, itemScope, "value", "delta", "amount");
@@ -512,6 +513,10 @@ final class MachineGuiStyleParser {
                 result.warnForMachine(scope, itemScope + " page action requires targetPage.");
                 continue;
             }
+            if ("event".equals(normalizedAction) && (buttonId == null || buttonId.isEmpty())) {
+                result.warnForMachine(scope, itemScope + " event action requires buttonId.");
+                continue;
+            }
             if (("smart_set".equals(normalizedAction) || "smart_add".equals(normalizedAction))
                 && (key == null || key.isEmpty())) {
                 result.warnForMachine(scope, itemScope + " smart action requires key.");
@@ -530,6 +535,7 @@ final class MachineGuiStyleParser {
             button.height = validateMinInt(getInt(obj, result, itemScope, "height", "h"), 1, result, itemScope, "height");
             button.label = label;
             button.action = normalizedAction;
+            button.buttonId = buttonId;
             button.key = key;
             button.value = value;
             button.min = getFloat(obj, result, itemScope, "min", "minimum");
@@ -690,6 +696,9 @@ final class MachineGuiStyleParser {
         if ("page".equals(text) || "switchpage".equals(text) || "switch_page".equals(text)
             || "page_switch".equals(text) || "setpage".equals(text) || "set_page".equals(text)) {
             return "page";
+        }
+        if ("event".equals(text) || "click_event".equals(text) || "button_event".equals(text)) {
+            return "event";
         }
         if ("smart_set".equals(text) || "smartset".equals(text) || "set".equals(text)) {
             return "smart_set";

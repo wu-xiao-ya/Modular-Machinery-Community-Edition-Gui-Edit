@@ -87,7 +87,7 @@ public class ClientGuiEventHandler {
             if (container instanceof github.kasuminova.mmce.common.container.ContainerMEItemInputBus) {
                 MEItemInputBus bus = ((github.kasuminova.mmce.common.container.ContainerMEItemInputBus) container).getOwner();
                 if (bus instanceof TileCustomMEItemInputBus) {
-                    event.setGui(new GuiMEItemInputBusCustom(bus, net.minecraft.client.Minecraft.getMinecraft().player));
+                    event.setGui(new GuiMEItemInputBusCustom((TileCustomMEItemInputBus) bus, net.minecraft.client.Minecraft.getMinecraft().player));
                 }
             }
             return;

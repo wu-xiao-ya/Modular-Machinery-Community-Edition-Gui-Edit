@@ -73,6 +73,7 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
             this.drawTexturedModalRect(i, j, 0, 0, this.xSize, this.ySize);
         }
         GlobalTextureLayerConfig.drawLayers(this.textureLayers, false, i, j, offsetX, offsetY);
+        drawNegativeForegroundLayers(i, j, offsetX, offsetY);
     }
 
     @Override
@@ -86,6 +87,9 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
             : MMCEGuiExtConfig.fluidHatch.backgroundTextureOffsetY;
         java.util.SortedSet<Integer> priorities = GlobalTextureLayerConfig.collectPriorities(this.textureLayers, true, 0);
         for (Integer priority : priorities) {
+            if (priority.intValue() < 0) {
+                continue;
+            }
             if (priority.intValue() == 0) {
                 drawConfiguredTexts();
             }
@@ -98,6 +102,15 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
                 offsetY,
                 priority
             );
+        }
+    }
+
+    private void drawNegativeForegroundLayers(int guiLeft, int guiTop, int offsetX, int offsetY) {
+        for (Integer priority : GlobalTextureLayerConfig.collectPriorities(this.textureLayers, true, 0)) {
+            if (priority.intValue() >= 0) {
+                continue;
+            }
+            GlobalTextureLayerConfig.drawLayers(this.textureLayers, true, guiLeft, guiTop, offsetX, offsetY, priority);
         }
     }
 
@@ -118,15 +131,20 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
             float blue = (fluidColor & 0xFF) / 255F;
             float fillPercent = MathHelper.clamp(fluid.amount / (float) Math.max(1, getCapacity()), 0F, 1F);
             int filled = MathHelper.ceil(fillPercent * tankHeight);
-            ResourceLocation still = fluid.getFluid().getStill(fluid);
-            TextureAtlasSprite sprite = Minecraft.getMinecraft().getTextureMapBlocks().getTextureExtry(still.toString());
-            if (sprite == null) {
-                sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
+            float alpha = resolveTankAlpha();
+            if (usesSolidTankRender()) {
+                drawSolidTankFill(tankX, tankY + tankHeight - filled, tankWidth, filled, red, green, blue, alpha);
+            } else {
+                ResourceLocation still = fluid.getFluid().getStill(fluid);
+                TextureAtlasSprite sprite = Minecraft.getMinecraft().getTextureMapBlocks().getTextureExtry(still.toString());
+                if (sprite == null) {
+                    sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
+                }
+                GlStateManager.color(red, green, blue, alpha);
+                this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
+                drawTiledSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
+                GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
             }
-            GlStateManager.color(red, green, blue, 1.0F);
-            this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
-            drawTiledSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         } else {
             GasStack gas = getGas();
             if (gas != null && gas.amount > 0) {
@@ -136,19 +154,35 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
                 float blue = (gasColor & 0xFF) / 255F;
                 float fillPercent = MathHelper.clamp(gas.amount / (float) Math.max(1, getCapacity()), 0F, 1F);
                 int filled = MathHelper.ceil(fillPercent * tankHeight);
-                TextureAtlasSprite sprite = gas.getGas().getSprite();
-                if (sprite == null) {
-                    sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
+                float alpha = resolveTankAlpha();
+                if (usesSolidTankRender()) {
+                    drawSolidTankFill(tankX, tankY + tankHeight - filled, tankWidth, filled, red, green, blue, alpha);
+                } else {
+                    TextureAtlasSprite sprite = gas.getGas().getSprite();
+                    if (sprite == null) {
+                        sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
+                    }
+                    GlStateManager.color(red, green, blue, alpha);
+                    this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
+                    drawTiledSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
+                    GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
                 }
-                GlStateManager.color(red, green, blue, 1.0F);
-                this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
-                drawTiledSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
-                GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
             }
         }
 
         this.mc.getTextureManager().bindTexture(DEFAULT_TEXTURE);
         this.drawTexturedModalRect(tankX, tankY, 176, 0, tankWidth, tankHeight);
+    }
+
+    private void drawSolidTankFill(int x, int y, int width, int height, float red, float green, float blue, float alpha) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        int a = MathHelper.clamp(Math.round(alpha * 255.0F), 0, 255);
+        int r = MathHelper.clamp(Math.round(red * 255.0F), 0, 255);
+        int g = MathHelper.clamp(Math.round(green * 255.0F), 0, 255);
+        int b = MathHelper.clamp(Math.round(blue * 255.0F), 0, 255);
+        drawRect(x, y, x + width, y + height, (a << 24) | (r << 16) | (g << 8) | b);
     }
 
     private void drawTiledSprite(int x, int y, int width, int height, TextureAtlasSprite sprite) {
@@ -184,10 +218,15 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
             return;
         }
         FluidStack fluid = getFluid();
+        GasStack gas = getGas();
+        boolean useGas = fluid == null && gas != null && gas.amount > 0;
         int amount = fluid == null ? 0 : fluid.amount;
+        if (useGas) {
+            amount = gas.amount;
+        }
         int capacity = getCapacity();
         for (GlobalGuiStyleManager.TextDef text : this.styleFile.texts) {
-            String value = resolveTextValue(text.value, fluid, amount, capacity);
+            String value = resolveTextValue(text.value, fluid, gas, useGas, amount, capacity);
             if (value == null || value.isEmpty()) {
                 continue;
             }
@@ -211,12 +250,24 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
     }
 
     @Nullable
-    private String resolveTextValue(@Nullable String key, @Nullable FluidStack fluid, int amount, int capacity) {
+    private String resolveTextValue(@Nullable String key,
+                                    @Nullable FluidStack fluid,
+                                    @Nullable GasStack gas,
+                                    boolean useGas,
+                                    int amount,
+                                    int capacity) {
         if (key == null) {
             return null;
         }
         if ("fluid.name".equalsIgnoreCase(key)) {
-            return fluid == null ? I18n.format("tooltip.fluidhatch.empty") : fluid.getLocalizedName();
+            return useGas
+                ? gas == null ? I18n.format("tooltip.fluidhatch.empty") : gas.getGas().getLocalizedName()
+                : fluid == null ? I18n.format("tooltip.fluidhatch.empty") : fluid.getLocalizedName();
+        }
+        if ("gas.name".equalsIgnoreCase(key) || "tank.name".equalsIgnoreCase(key)) {
+            return useGas
+                ? gas == null ? I18n.format("tooltip.fluidhatch.empty") : gas.getGas().getLocalizedName()
+                : fluid == null ? I18n.format("tooltip.fluidhatch.empty") : fluid.getLocalizedName();
         }
         if ("tank.amount".equalsIgnoreCase(key)) {
             return Integer.toString(amount);
@@ -290,6 +341,18 @@ public class GuiFluidHatchCustom extends GuiContainerFluidHatch {
     private int getTankHeight() {
         int height = this.styleFile.tank != null && this.styleFile.tank.height != null ? this.styleFile.tank.height.intValue() : 61;
         return Math.max(1, height);
+    }
+
+    private float resolveTankAlpha() {
+        Float alpha = this.styleFile.tank == null ? null : this.styleFile.tank.alpha;
+        return alpha == null ? 1.0F : MathHelper.clamp(alpha.floatValue(), 0.0F, 1.0F);
+    }
+
+    private boolean usesSolidTankRender() {
+        String renderMode = this.styleFile.tank == null ? null : this.styleFile.tank.renderMode;
+        return "solid".equalsIgnoreCase(renderMode)
+            || "flat".equalsIgnoreCase(renderMode)
+            || "color".equalsIgnoreCase(renderMode);
     }
 
     @Nullable

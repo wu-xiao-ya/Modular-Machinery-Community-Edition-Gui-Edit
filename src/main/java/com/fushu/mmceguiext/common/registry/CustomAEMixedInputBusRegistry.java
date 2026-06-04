@@ -103,8 +103,24 @@ public final class CustomAEMixedInputBusRegistry {
             def.fluidStorageTank = parseTankRect(root.getAsJsonObject("fluidStorageTank"));
             def.gasConfigSlot = parseSlotPoint(root.getAsJsonObject("gasConfigSlot"));
             def.gasStorageTank = parseTankRect(root.getAsJsonObject("gasStorageTank"));
+            def.fluidConfigTanks = new ArrayList<TankRect>(parseTankRects(root.getAsJsonArray("fluidConfigTanks")));
+            def.gasConfigTanks = new ArrayList<TankRect>(parseTankRects(root.getAsJsonArray("gasConfigTanks")));
             def.fluidConfigTank = parseTankRect(root.getAsJsonObject("fluidConfigTank"));
             def.gasConfigTank = parseTankRect(root.getAsJsonObject("gasConfigTank"));
+            def.fluidStorageTanks = new ArrayList<TankRect>(parseTankRects(root.getAsJsonArray("fluidStorageTanks")));
+            def.gasStorageTanks = new ArrayList<TankRect>(parseTankRects(root.getAsJsonArray("gasStorageTanks")));
+            if (def.fluidConfigTank != null && def.fluidConfigTanks.isEmpty()) {
+                def.fluidConfigTanks.add(def.fluidConfigTank);
+            }
+            if (def.gasConfigTank != null && def.gasConfigTanks.isEmpty()) {
+                def.gasConfigTanks.add(def.gasConfigTank);
+            }
+            if (def.fluidStorageTank != null && def.fluidStorageTanks.isEmpty()) {
+                def.fluidStorageTanks.add(def.fluidStorageTank);
+            }
+            if (def.gasStorageTank != null && def.gasStorageTanks.isEmpty()) {
+                def.gasStorageTanks.add(def.gasStorageTank);
+            }
             def.blockTexture = getString(root, "blockTexture");
             def.blockModel = getString(root, "blockModel");
             def.gui = parseGui(root.getAsJsonObject("gui"));
@@ -204,17 +220,37 @@ public final class CustomAEMixedInputBusRegistry {
                         def.storageSlots.set(component.index, toSlotPoint(component));
                     }
                 } else if ("fluid_config".equals(component.role)) {
-                    def.fluidConfigSlot = toSlotPoint(component);
-                    def.fluidConfigTank = toTankRect(component);
+                    int index = component.index >= 0 ? component.index : def.fluidConfigTanks.size();
+                    ensureTankListSize(def.fluidConfigTanks, index + 1);
+                    def.fluidConfigTanks.set(index, toTankRect(component));
+                    if (def.fluidConfigTank == null || index == 0) {
+                        def.fluidConfigSlot = toSlotPoint(component);
+                        def.fluidConfigTank = toTankRect(component);
+                    }
                 } else if ("gas_config".equals(component.role)) {
-                    def.gasConfigSlot = toSlotPoint(component);
-                    def.gasConfigTank = toTankRect(component);
+                    int index = component.index >= 0 ? component.index : def.gasConfigTanks.size();
+                    ensureTankListSize(def.gasConfigTanks, index + 1);
+                    def.gasConfigTanks.set(index, toTankRect(component));
+                    if (def.gasConfigTank == null || index == 0) {
+                        def.gasConfigSlot = toSlotPoint(component);
+                        def.gasConfigTank = toTankRect(component);
+                    }
                 }
             } else if ("tank".equals(component.type)) {
                 if ("fluid_storage".equals(component.role)) {
-                    def.fluidStorageTank = toTankRect(component);
+                    int index = component.index >= 0 ? component.index : def.fluidStorageTanks.size();
+                    ensureTankListSize(def.fluidStorageTanks, index + 1);
+                    def.fluidStorageTanks.set(index, toTankRect(component));
+                    if (def.fluidStorageTank == null || index == 0) {
+                        def.fluidStorageTank = toTankRect(component);
+                    }
                 } else if ("gas_storage".equals(component.role)) {
-                    def.gasStorageTank = toTankRect(component);
+                    int index = component.index >= 0 ? component.index : def.gasStorageTanks.size();
+                    ensureTankListSize(def.gasStorageTanks, index + 1);
+                    def.gasStorageTanks.set(index, toTankRect(component));
+                    if (def.gasStorageTank == null || index == 0) {
+                        def.gasStorageTank = toTankRect(component);
+                    }
                 }
             } else if ("player_inventory".equals(component.type)) {
                 def.playerInventoryX = component.x;
@@ -259,46 +295,72 @@ public final class CustomAEMixedInputBusRegistry {
             components.add(component);
         }
         if (def.fluidConfigTank != null) {
-            ComponentDef component = new ComponentDef();
-            component.type = "slot";
-            component.role = "fluid_config";
-            component.index = 0;
-            component.x = def.fluidConfigTank.x;
-            component.y = def.fluidConfigTank.y;
-            component.width = def.fluidConfigTank.width;
-            component.height = def.fluidConfigTank.height;
-            components.add(component);
+            for (int i = 0; i < def.fluidConfigTanks.size(); i++) {
+                TankRect tank = def.fluidConfigTanks.get(i);
+                if (tank == null) {
+                    continue;
+                }
+                ComponentDef component = new ComponentDef();
+                component.type = "slot";
+                component.role = "fluid_config";
+                component.index = i;
+                component.x = tank.x;
+                component.y = tank.y;
+                component.width = tank.width;
+                component.height = tank.height;
+                components.add(component);
+            }
         }
         if (def.fluidStorageTank != null) {
-            ComponentDef component = new ComponentDef();
-            component.type = "tank";
-            component.role = "fluid_storage";
-            component.x = def.fluidStorageTank.x;
-            component.y = def.fluidStorageTank.y;
-            component.width = def.fluidStorageTank.width;
-            component.height = def.fluidStorageTank.height;
-            components.add(component);
+            for (int i = 0; i < def.fluidStorageTanks.size(); i++) {
+                TankRect tank = def.fluidStorageTanks.get(i);
+                if (tank == null) {
+                    continue;
+                }
+                ComponentDef component = new ComponentDef();
+                component.type = "tank";
+                component.role = "fluid_storage";
+                component.index = i;
+                component.x = tank.x;
+                component.y = tank.y;
+                component.width = tank.width;
+                component.height = tank.height;
+                components.add(component);
+            }
         }
         if (def.gasConfigTank != null) {
-            ComponentDef component = new ComponentDef();
-            component.type = "slot";
-            component.role = "gas_config";
-            component.index = 0;
-            component.x = def.gasConfigTank.x;
-            component.y = def.gasConfigTank.y;
-            component.width = def.gasConfigTank.width;
-            component.height = def.gasConfigTank.height;
-            components.add(component);
+            for (int i = 0; i < def.gasConfigTanks.size(); i++) {
+                TankRect tank = def.gasConfigTanks.get(i);
+                if (tank == null) {
+                    continue;
+                }
+                ComponentDef component = new ComponentDef();
+                component.type = "slot";
+                component.role = "gas_config";
+                component.index = i;
+                component.x = tank.x;
+                component.y = tank.y;
+                component.width = tank.width;
+                component.height = tank.height;
+                components.add(component);
+            }
         }
         if (def.gasStorageTank != null) {
-            ComponentDef component = new ComponentDef();
-            component.type = "tank";
-            component.role = "gas_storage";
-            component.x = def.gasStorageTank.x;
-            component.y = def.gasStorageTank.y;
-            component.width = def.gasStorageTank.width;
-            component.height = def.gasStorageTank.height;
-            components.add(component);
+            for (int i = 0; i < def.gasStorageTanks.size(); i++) {
+                TankRect tank = def.gasStorageTanks.get(i);
+                if (tank == null) {
+                    continue;
+                }
+                ComponentDef component = new ComponentDef();
+                component.type = "tank";
+                component.role = "gas_storage";
+                component.index = i;
+                component.x = tank.x;
+                component.y = tank.y;
+                component.width = tank.width;
+                component.height = tank.height;
+                components.add(component);
+            }
         }
         ComponentDef playerInv = new ComponentDef();
         playerInv.type = "player_inventory";
@@ -310,6 +372,12 @@ public final class CustomAEMixedInputBusRegistry {
     }
 
     private static void ensureListSize(List<SlotPoint> list, int targetSize) {
+        while (list.size() < targetSize) {
+            list.add(null);
+        }
+    }
+
+    private static void ensureTankListSize(List<TankRect> list, int targetSize) {
         while (list.size() < targetSize) {
             list.add(null);
         }
@@ -371,6 +439,22 @@ public final class CustomAEMixedInputBusRegistry {
         return rect;
     }
 
+    private static List<TankRect> parseTankRects(@Nullable com.google.gson.JsonArray array) {
+        if (array == null || array.size() == 0) {
+            return Collections.emptyList();
+        }
+        List<TankRect> out = new ArrayList<TankRect>();
+        for (int i = 0; i < array.size(); i++) {
+            if (array.get(i).isJsonObject()) {
+                TankRect rect = parseTankRect(array.get(i).getAsJsonObject());
+                if (rect != null) {
+                    out.add(rect);
+                }
+            }
+        }
+        return out;
+    }
+
     @Nullable
     private static String getString(JsonObject obj, String key) {
         return obj != null && obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsString() : null;
@@ -421,6 +505,10 @@ public final class CustomAEMixedInputBusRegistry {
         public TankRect gasStorageTank;
         public TankRect fluidConfigTank;
         public TankRect gasConfigTank;
+        public List<TankRect> fluidConfigTanks = Collections.emptyList();
+        public List<TankRect> gasConfigTanks = Collections.emptyList();
+        public List<TankRect> fluidStorageTanks = Collections.emptyList();
+        public List<TankRect> gasStorageTanks = Collections.emptyList();
         public String blockTexture;
         public String blockModel;
         public GuiDef gui = new GuiDef();

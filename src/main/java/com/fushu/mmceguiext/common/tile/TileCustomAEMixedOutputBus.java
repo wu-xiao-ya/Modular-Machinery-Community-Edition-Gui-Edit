@@ -109,7 +109,6 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
                 }
             }
         });
-        final long combinedGroupId = github.kasuminova.mmce.common.tile.base.MachineCombinationComponent.GROUP_ACQUIRER.incrementAndGet();
         this.combinedComponent = new MachineComponent<InfItemFluidHandler>(IOType.OUTPUT) {
             @Override
             public ComponentType getComponentType() {
@@ -119,11 +118,6 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
             @Override
             public InfItemFluidHandler getContainerProvider() {
                 return combinedHandler;
-            }
-
-            @Override
-            public long getGroupID() {
-                return combinedGroupId;
             }
         };
     }
@@ -686,5 +680,8 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     @Override
     public void securityBreak() {
         getWorld().destroyBlock(getPos(), true);
+    }
+
+    private void logOutputExposure(final String phase) {
     }
 }

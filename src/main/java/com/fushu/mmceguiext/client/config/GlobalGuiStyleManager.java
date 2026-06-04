@@ -78,6 +78,17 @@ public final class GlobalGuiStyleManager {
         rect.y = getInt(obj, "y");
         rect.width = getInt(obj, "width");
         rect.height = getInt(obj, "height");
+        rect.renderMode = normalizeRenderMode(
+            getString(obj, "renderMode"),
+            getString(obj, "render_mode"),
+            getString(obj, "render"),
+            getString(obj, "mode")
+        );
+        rect.alpha = normalizeAlpha(
+            getFloat(obj, "alpha"),
+            getFloat(obj, "opacity"),
+            getFloat(obj, "transparency")
+        );
         return rect;
     }
 
@@ -98,10 +109,16 @@ public final class GlobalGuiStyleManager {
             def.color = getString(obj, "color");
             def.scale = getFloat(obj, "scale");
             def.align = normalizeTextAlign(getString(obj, "align"), getString(obj, "alignment"), getString(obj, "textAlign"), getString(obj, "text_align"));
+            def.priority = getInt(obj, "priority");
+            if (def.priority == null) def.priority = getInt(obj, "zIndex");
+            if (def.priority == null) def.priority = getInt(obj, "z_index");
+            if (def.priority == null) def.priority = getInt(obj, "z");
+            if (def.priority == null) def.priority = getInt(obj, "layer");
             if (def.value != null && !def.value.trim().isEmpty()) {
                 out.add(def);
             }
         }
+        out.sort(java.util.Comparator.comparingInt(a -> a.priority == null ? 0 : a.priority.intValue()));
         return out;
     }
 
@@ -191,6 +208,47 @@ public final class GlobalGuiStyleManager {
         return null;
     }
 
+    @Nullable
+    private static String normalizeRenderMode(@Nullable String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (@Nullable String value : values) {
+            if (value == null) {
+                continue;
+            }
+            String text = value.trim().toLowerCase(java.util.Locale.ROOT);
+            if (!text.isEmpty()) {
+                return text;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Float normalizeAlpha(@Nullable Float... values) {
+        if (values == null) {
+            return null;
+        }
+        for (@Nullable Float value : values) {
+            if (value == null) {
+                continue;
+            }
+            float alpha = value.floatValue();
+            if (alpha > 1.0F && alpha <= 255.0F) {
+                alpha /= 255.0F;
+            }
+            if (alpha < 0.0F) {
+                alpha = 0.0F;
+            }
+            if (alpha > 1.0F) {
+                alpha = 1.0F;
+            }
+            return Float.valueOf(alpha);
+        }
+        return null;
+    }
+
     private static Path resolveStyleDir() {
         Object mcHome = Launch.blackboard.get("mcLocation");
         Path base = mcHome instanceof java.io.File ? ((java.io.File) mcHome).toPath() : Paths.get(".");
@@ -238,6 +296,10 @@ public final class GlobalGuiStyleManager {
         public Integer width;
         @Nullable
         public Integer height;
+        @Nullable
+        public String renderMode;
+        @Nullable
+        public Float alpha;
     }
 
     public static class TextDef {
@@ -250,5 +312,7 @@ public final class GlobalGuiStyleManager {
         public Float scale;
         @Nullable
         public String align;
+        @Nullable
+        public Integer priority;
     }
 }

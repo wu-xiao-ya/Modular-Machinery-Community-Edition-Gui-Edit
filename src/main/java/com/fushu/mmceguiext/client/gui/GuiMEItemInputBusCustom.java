@@ -1,6 +1,9 @@
 package com.fushu.mmceguiext.client.gui;
 
 import com.fushu.mmceguiext.MMCEGuiExtConfig;
+import com.fushu.mmceguiext.MMCEGuiExt;
+import com.fushu.mmceguiext.common.container.ContainerCustomMEItemInputBus;
+import com.fushu.mmceguiext.common.network.PktCustomMEItemInputBusInvAction;
 import com.fushu.mmceguiext.common.registry.CustomAEItemInputBusRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomMEItemInputBus;
 import appeng.container.slot.SlotDisabled;
@@ -26,10 +29,19 @@ public class GuiMEItemInputBusCustom extends GuiMEItemInputBus {
     @Nullable
     private final CustomAEItemInputBusRegistry.Def definition;
 
-    public GuiMEItemInputBusCustom(final MEItemInputBus te, final EntityPlayer player) {
+    public GuiMEItemInputBusCustom(final TileCustomMEItemInputBus te, final EntityPlayer player) {
         super(te, player);
+        this.inventorySlots = new ContainerCustomMEItemInputBus(te, player);
         this.definition = te instanceof TileCustomMEItemInputBus ? ((TileCustomMEItemInputBus) te).getDefinition() : null;
         this.customBackgroundTexture = resolveTexture();
+    }
+
+    @Override
+    public void sendInvActionToServer(int slotNumber, int amountToSend) {
+        if (amountToSend == 0) {
+            return;
+        }
+        MMCEGuiExt.NET_CHANNEL.sendToServer(new PktCustomMEItemInputBusInvAction(amountToSend, slotNumber));
     }
 
     @Override

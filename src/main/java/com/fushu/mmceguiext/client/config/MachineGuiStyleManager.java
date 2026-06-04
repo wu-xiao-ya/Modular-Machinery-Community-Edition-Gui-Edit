@@ -345,6 +345,8 @@ public final class MachineGuiStyleManager {
         @Nullable
         public String action;
         @Nullable
+        public String buttonId;
+        @Nullable
         public String key;
         @Nullable
         public Float value;

@@ -4,7 +4,6 @@ import appeng.fluids.util.AEFluidStack;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedInputBus;
 import com.mekeng.github.common.me.data.impl.AEGasStack;
 import com.mekeng.github.util.Utils;
-import hellfirepvp.modularmachinery.ModularMachinery;
 import io.netty.buffer.ByteBuf;
 import mekanism.api.gas.GasStack;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -23,25 +22,33 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
 
     private BlockPos pos = BlockPos.ORIGIN;
     private int target = TARGET_FLUID;
+    private int slotIndex = 0;
 
     public PktCustomAEMixedSlotUpdate() {
     }
 
     public PktCustomAEMixedSlotUpdate(BlockPos pos, int target) {
+        this(pos, target, 0);
+    }
+
+    public PktCustomAEMixedSlotUpdate(BlockPos pos, int target, int slotIndex) {
         this.pos = pos == null ? BlockPos.ORIGIN : pos;
         this.target = target;
+        this.slotIndex = Math.max(0, slotIndex);
     }
 
     @Override
     public void fromBytes(ByteBuf buf) {
         this.pos = BlockPos.fromLong(buf.readLong());
         this.target = buf.readInt();
+        this.slotIndex = buf.readInt();
     }
 
     @Override
     public void toBytes(ByteBuf buf) {
         buf.writeLong(this.pos.toLong());
         buf.writeInt(this.target);
+        buf.writeInt(this.slotIndex);
     }
 
     @Override
@@ -64,26 +71,24 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
         }
 
         if (message.target == TARGET_FLUID) {
+            int slot = Math.max(0, Math.min(message.slotIndex, bus.getFluidConfig().getSlots() - 1));
             if (held.isEmpty()) {
-                bus.getFluidConfig().setFluidInSlot(0, null);
-                ModularMachinery.log.info("[MMCEGE] Clear mixed fluid config at {}", message.pos);
+                bus.getFluidConfig().setFluidInSlot(slot, null);
             } else {
                 FluidStack fluid = FluidUtil.getFluidContained(held);
-                bus.getFluidConfig().setFluidInSlot(0, fluid == null ? null : AEFluidStack.fromFluidStack(fluid));
-                ModularMachinery.log.info("[MMCEGE] Update mixed fluid config at {} using {} -> {}", message.pos, held.getDisplayName(), fluid == null ? "null" : fluid.getLocalizedName());
+                bus.getFluidConfig().setFluidInSlot(slot, fluid == null ? null : AEFluidStack.fromFluidStack(fluid));
             }
             bus.markForUpdateSync();
             return null;
         }
 
         if (message.target == TARGET_GAS) {
+            int slot = Math.max(0, Math.min(message.slotIndex, bus.getGasConfig().size() - 1));
             if (held.isEmpty()) {
-                bus.getGasConfig().setGas(0, null);
-                ModularMachinery.log.info("[MMCEGE] Clear mixed gas config at {}", message.pos);
+                bus.getGasConfig().setGas(slot, null);
             } else {
                 GasStack gas = Utils.getGasFromItem(held);
-                bus.getGasConfig().setGas(0, gas == null ? null : gas.copy());
-                ModularMachinery.log.info("[MMCEGE] Update mixed gas config at {} using {} -> {}", message.pos, held.getDisplayName(), gas == null ? "null" : gas.getGas().getLocalizedName());
+                bus.getGasConfig().setGas(slot, gas == null ? null : gas.copy());
             }
             bus.markForUpdateSync();
         }

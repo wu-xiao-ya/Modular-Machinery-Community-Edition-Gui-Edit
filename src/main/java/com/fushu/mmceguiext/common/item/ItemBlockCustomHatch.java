@@ -3,9 +3,10 @@ package com.fushu.mmceguiext.common.item;
 import com.fushu.mmceguiext.common.block.BlockCustomHatch;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
 import net.minecraft.block.Block;
-import net.minecraft.creativetab.CreativeTabs;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
 
 import javax.annotation.Nonnull;
 
@@ -15,7 +16,7 @@ public class ItemBlockCustomHatch extends ItemBlock {
     public ItemBlockCustomHatch(Block block, CustomHatchRegistry.CustomHatchDef definition) {
         super(block);
         this.definition = definition;
-        setRegistryName(block.getRegistryName());
+        setRegistryNameSafe(this, block.getRegistryName());
     }
 
     @Override
@@ -33,5 +34,9 @@ public class ItemBlockCustomHatch extends ItemBlock {
     @Nonnull
     public CustomHatchRegistry.CustomHatchDef getDefinition() {
         return this.definition;
+    }
+
+    private static void setRegistryNameSafe(final Item item, @Nonnull final ResourceLocation name) {
+        item.setRegistryName(name);
     }
 }

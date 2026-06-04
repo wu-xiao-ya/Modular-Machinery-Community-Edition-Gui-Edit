@@ -49,6 +49,9 @@ public class GuiCustomAEMixedOutputBus extends AEBaseGui {
     public void drawFG(int offsetX, int offsetY, int mouseX, int mouseY) {
         java.util.SortedSet<Integer> priorities = GlobalTextureLayerConfig.collectPriorities(this.definition.textureLayers, true, 0);
         for (Integer priority : priorities) {
+            if (priority.intValue() < 0) {
+                continue;
+            }
             if (priority.intValue() == 0) {
                 String title = this.definition.displayName == null || this.definition.displayName.trim().isEmpty()
                     ? I18n.format("gui.meitemoutputbus.title")
@@ -67,8 +70,18 @@ public class GuiCustomAEMixedOutputBus extends AEBaseGui {
         int texH = this.definition.backgroundTextureHeight > 0 ? this.definition.backgroundTextureHeight : this.ySize;
         drawModalRectWithCustomSizedTexture(offsetX, offsetY, 0, 0, this.xSize, this.ySize, texW, texH);
         GlobalTextureLayerConfig.drawLayers(this.definition.textureLayers, false, offsetX, offsetY, 0, 0);
+        drawNegativeForegroundLayers(offsetX, offsetY);
         drawFluidTanks(offsetX, offsetY);
         drawGasTanks(offsetX, offsetY);
+    }
+
+    private void drawNegativeForegroundLayers(int guiLeft, int guiTop) {
+        for (Integer priority : GlobalTextureLayerConfig.collectPriorities(this.definition.textureLayers, true, 0)) {
+            if (priority.intValue() >= 0) {
+                continue;
+            }
+            GlobalTextureLayerConfig.drawLayers(this.definition.textureLayers, true, guiLeft, guiTop, 0, 0, priority);
+        }
     }
 
     private void drawFluidTanks(int guiLeft, int guiTop) {
