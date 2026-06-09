@@ -110,9 +110,9 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
     private void configureSlotLayout() {
         int required = resolveSlotCount(getDefinition());
         this.activeSlots = required;
-        resizeInternalInventory(required);
-        resizeConfigInventory(required);
-        ensureCustomSlotTrackingCapacity(required);
+        resizeInternalInventory(Math.max(1, required));
+        resizeConfigInventory(Math.max(1, required));
+        ensureCustomSlotTrackingCapacity(Math.max(1, required));
     }
 
     private void resizeInternalInventory(int size) {
@@ -193,6 +193,13 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
         return Math.min(this.activeSlots, Math.min(getInternalInventory().getSlots(), getConfigInventory().getSlots()));
     }
 
+    private boolean isSlotDefined(int slot) {
+        CustomAEItemInputBusRegistry.Def def = getDefinition();
+        return def == null || slot >= 0
+            && slot < def.configSlots.size() && def.configSlots.get(slot) != null
+            && slot < def.storageSlots.size() && def.storageSlots.get(slot) != null;
+    }
+
     @Nullable
     @Override
     public MachineComponent.ItemBus provideComponent() {
@@ -231,6 +238,12 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
         for (int slot = 0; slot < slotCount; slot++) {
             ItemStack cfgStack = getConfigInventory().getStackInSlot(slot);
             ItemStack invStack = getInternalInventory().getStackInSlot(slot);
+            if (!isSlotDefined(slot)) {
+                if (!invStack.isEmpty()) {
+                    return true;
+                }
+                continue;
+            }
             if (cfgStack.isEmpty()) {
                 if (!invStack.isEmpty()) {
                     return true;
@@ -268,7 +281,7 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
             int slotBound = getActiveSlotBound();
             ensureCustomSlotTrackingCapacity(slotBound);
             for (final int slot : needUpdateSlots) {
-                if (slot < 0 || slot >= slotBound) {
+                if (slot < 0 || slot >= slotBound || !isSlotDefined(slot)) {
                     continue;
                 }
                 changedSlots[slot] = false;
@@ -374,7 +387,7 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
     @Override
     public boolean hasItem() {
         for (int i = 0; i < getActiveSlotBound(); i++) {
-            if (!getInternalInventory().getStackInSlot(i).isEmpty()) {
+            if (isSlotDefined(i) && !getInternalInventory().getStackInSlot(i).isEmpty()) {
                 return true;
             }
         }
@@ -384,7 +397,7 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
     @Override
     public boolean configInvHasItem() {
         for (int i = 0; i < getActiveSlotBound(); i++) {
-            if (!getConfigInventory().getStackInSlot(i).isEmpty()) {
+            if (isSlotDefined(i) && !getConfigInventory().getStackInSlot(i).isEmpty()) {
                 return true;
             }
         }
@@ -429,7 +442,7 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
         if (def == null) {
             return 16;
         }
-        return Math.max(16, Math.max(def.configSlots.size(), def.storageSlots.size()));
+        return Math.max(def.configSlots.size(), def.storageSlots.size());
     }
 
     private class ActiveItemHandler implements IItemHandlerModifiable {
@@ -443,7 +456,7 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
 
         @Override
         public void setStackInSlot(int slot, @Nonnull ItemStack stack) {
-            if (!this.allowInsert || slot < 0 || slot >= getActiveSlotBound()) {
+            if (!this.allowInsert || slot < 0 || slot >= getActiveSlotBound() || !isSlotDefined(slot)) {
                 return;
             }
             getInternalInventory().setStackInSlot(slot, stack);
@@ -457,7 +470,7 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
         @Nonnull
         @Override
         public ItemStack getStackInSlot(int slot) {
-            if (slot < 0 || slot >= getActiveSlotBound()) {
+            if (slot < 0 || slot >= getActiveSlotBound() || !isSlotDefined(slot)) {
                 return ItemStack.EMPTY;
             }
             return getInternalInventory().getStackInSlot(slot);
@@ -466,7 +479,7 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
         @Nonnull
         @Override
         public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate) {
-            if (!this.allowInsert || slot < 0 || slot >= getActiveSlotBound()) {
+            if (!this.allowInsert || slot < 0 || slot >= getActiveSlotBound() || !isSlotDefined(slot)) {
                 return stack;
             }
             return getInternalInventory().insertItem(slot, stack, simulate);
@@ -475,7 +488,7 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
         @Nonnull
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            if (!this.allowExtract || slot < 0 || slot >= getActiveSlotBound()) {
+            if (!this.allowExtract || slot < 0 || slot >= getActiveSlotBound() || !isSlotDefined(slot)) {
                 return ItemStack.EMPTY;
             }
             return getInternalInventory().extractItem(slot, amount, simulate);
@@ -483,7 +496,7 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
 
         @Override
         public int getSlotLimit(int slot) {
-            if (slot < 0 || slot >= getActiveSlotBound()) {
+            if (slot < 0 || slot >= getActiveSlotBound() || !isSlotDefined(slot)) {
                 return 0;
             }
             return getInternalInventory().getSlotLimit(slot);
