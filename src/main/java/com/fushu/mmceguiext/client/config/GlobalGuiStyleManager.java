@@ -33,7 +33,12 @@ public final class GlobalGuiStyleManager {
         if (fileName == null || fileName.trim().isEmpty()) {
             return StyleFile.EMPTY;
         }
-        Path path = STYLE_DIR.resolve(fileName.trim());
+        Path styleDir = STYLE_DIR.toAbsolutePath().normalize();
+        Path path = styleDir.resolve(fileName.trim()).normalize();
+        if (!path.startsWith(styleDir)) {
+            LOGGER.warn("MMCE GUI ext style file escapes style dir: {}", fileName);
+            return StyleFile.EMPTY;
+        }
         if (!Files.exists(path)) {
             LOGGER.warn("MMCE GUI ext style file not found: {}", path);
             return StyleFile.EMPTY;
@@ -42,10 +47,10 @@ public final class GlobalGuiStyleManager {
             String text = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
             JsonObject root = new JsonParser().parse(text).getAsJsonObject();
             StyleFile style = new StyleFile();
-            style.background = parseBackground(root.getAsJsonObject("background"));
-            style.tank = parseRect(root.getAsJsonObject("tank"));
-            style.texts = parseTexts(root.getAsJsonArray("texts"));
-            style.layers = parseLayers(root.getAsJsonArray("layers"));
+            style.background = parseBackground(getObject(root, "background"));
+            style.tank = parseRect(getObject(root, "tank"));
+            style.texts = parseTexts(getArray(root, "texts"));
+            style.layers = parseLayers(getArray(root, "layers"));
             return style;
         } catch (Exception ex) {
             LOGGER.warn("Failed to load MMCE GUI ext style file {}: {}", path, ex.getMessage());
@@ -161,25 +166,65 @@ public final class GlobalGuiStyleManager {
     @Nullable
     private static String getString(JsonObject obj, String key) {
         JsonElement e = obj.get(key);
-        return e == null || e.isJsonNull() ? null : e.getAsString();
+        if (e == null || e.isJsonNull() || !e.isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            return e.getAsString();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     @Nullable
     private static Integer getInt(JsonObject obj, String key) {
         JsonElement e = obj.get(key);
-        return e == null || e.isJsonNull() ? null : Integer.valueOf(e.getAsInt());
+        if (e == null || e.isJsonNull() || !e.isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(e.getAsInt());
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     @Nullable
     private static Boolean getBoolean(JsonObject obj, String key) {
         JsonElement e = obj.get(key);
-        return e == null || e.isJsonNull() ? null : Boolean.valueOf(e.getAsBoolean());
+        if (e == null || e.isJsonNull() || !e.isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            return Boolean.valueOf(e.getAsBoolean());
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     @Nullable
     private static Float getFloat(JsonObject obj, String key) {
         JsonElement e = obj.get(key);
-        return e == null || e.isJsonNull() ? null : Float.valueOf(e.getAsFloat());
+        if (e == null || e.isJsonNull() || !e.isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            return Float.valueOf(e.getAsFloat());
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static JsonObject getObject(JsonObject obj, String key) {
+        JsonElement e = obj.get(key);
+        return e != null && e.isJsonObject() ? e.getAsJsonObject() : null;
+    }
+
+    @Nullable
+    private static JsonArray getArray(JsonObject obj, String key) {
+        JsonElement e = obj.get(key);
+        return e != null && e.isJsonArray() ? e.getAsJsonArray() : null;
     }
 
     @Nullable
