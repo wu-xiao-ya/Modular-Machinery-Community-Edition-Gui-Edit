@@ -87,7 +87,8 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
         }
 
         if (message.target == TARGET_FLUID) {
-            if (message.slotIndex < 0 || message.slotIndex >= bus.getActiveFluidSlots()) {
+            if (message.slotIndex < 0 || message.slotIndex >= bus.getActiveFluidSlots()
+                || !bus.isFluidConfigSlotDefined(message.slotIndex)) {
                 return;
             }
             int slot = message.slotIndex;
@@ -102,7 +103,8 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
         }
 
         if (message.target == TARGET_GAS) {
-            if (message.slotIndex < 0 || message.slotIndex >= bus.getActiveGasSlots()) {
+            if (message.slotIndex < 0 || message.slotIndex >= bus.getActiveGasSlots()
+                || !bus.isGasConfigSlotDefined(message.slotIndex)) {
                 return;
             }
             int slot = message.slotIndex;

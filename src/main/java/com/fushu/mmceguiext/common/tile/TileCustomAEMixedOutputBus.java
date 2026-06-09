@@ -163,7 +163,10 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         this.activeItemSlots = itemSlots;
         this.activeFluidSlots = fluidSlots;
         this.activeGasSlots = gasSlots;
-        if (this.inventory.getSlots() >= itemSlots && this.fluidTanks.getSlots() >= fluidSlots && this.gasTanks.size() >= gasSlots) {
+        int physicalItemSlots = Math.max(1, itemSlots);
+        int physicalFluidSlots = Math.max(1, fluidSlots);
+        int physicalGasSlots = Math.max(1, gasSlots);
+        if (this.inventory.getSlots() >= physicalItemSlots && this.fluidTanks.getSlots() >= physicalFluidSlots && this.gasTanks.size() >= physicalGasSlots) {
             return;
         }
 
@@ -172,10 +175,10 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         this.fluidTanks.writeToNBT(fluidData, "tanks");
         NBTTagCompound gasData = this.gasTanks.save();
 
-        this.inventory = buildInventory(Math.max(this.inventory.getSlots(), itemSlots));
+        this.inventory = buildInventory(Math.max(this.inventory.getSlots(), physicalItemSlots));
         copyInventory(oldInventory, this.inventory);
-        this.fluidTanks = createFluidTanks(Math.max(this.fluidTanks.getSlots(), fluidSlots));
-        this.gasTanks = createGasTanks(Math.max(this.gasTanks.size(), gasSlots));
+        this.fluidTanks = createFluidTanks(Math.max(this.fluidTanks.getSlots(), physicalFluidSlots));
+        this.gasTanks = createGasTanks(Math.max(this.gasTanks.size(), physicalGasSlots));
         this.gasHandler = new GasInventoryHandler(this.gasTanks);
 
         this.fluidTanks.readFromNBT(fluidData, "tanks");
@@ -209,7 +212,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
                 maxIndexed = Math.max(maxIndexed, component.index + 1);
             }
         }
-        return Math.max(DEFAULT_ITEM_SLOT_COUNT, Math.max(count, maxIndexed));
+        return Math.max(count, maxIndexed);
     }
 
     private static void copyInventory(@Nullable IOInventory oldInv, IOInventory next) {
@@ -245,7 +248,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
                 maxIndexed = Math.max(maxIndexed, component.index + 1);
             }
         }
-        return Math.max(DEFAULT_TANK_SLOT_COUNT, Math.max(count, maxIndexed));
+        return Math.max(count, maxIndexed);
     }
 
     @Override

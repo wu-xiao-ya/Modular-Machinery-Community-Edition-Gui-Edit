@@ -331,10 +331,10 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         this.activeItemSlots = itemSlots;
         this.activeFluidSlots = fluidSlots;
         this.activeGasSlots = gasSlots;
-        resizeInventory(itemSlots);
-        resizeConfigInventory(itemSlots);
-        resizeFluidInventories(fluidSlots);
-        resizeGasInventories(gasSlots);
+        resizeInventory(Math.max(1, itemSlots));
+        resizeConfigInventory(Math.max(1, itemSlots));
+        resizeFluidInventories(Math.max(1, fluidSlots));
+        resizeGasInventories(Math.max(1, gasSlots));
         bindInventoryListeners();
         ensureItemTrackingCapacity(this.inventory.getSlots());
     }
@@ -414,11 +414,10 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
     private int resolveItemSlotCount() {
         CustomAEMixedInputBusRegistry.Def def = getDefinition();
-        int count = DEFAULT_ITEM_SLOT_COUNT;
         if (def == null) {
-            return count;
+            return DEFAULT_ITEM_SLOT_COUNT;
         }
-        count = Math.max(count, Math.max(def.configSlots.size(), def.storageSlots.size()));
+        int count = Math.max(def.configSlots.size(), def.storageSlots.size());
         if (def.gui != null && def.gui.components != null) {
             for (CustomAEMixedInputBusRegistry.ComponentDef component : def.gui.components) {
                 if (component == null || !"slot".equalsIgnoreCase(component.type == null ? "" : component.type)) {
@@ -435,11 +434,10 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
     private int resolveFluidSlotCount() {
         CustomAEMixedInputBusRegistry.Def def = getDefinition();
-        int count = DEFAULT_TANK_SLOT_COUNT;
         if (def == null) {
-            return count;
+            return DEFAULT_TANK_SLOT_COUNT;
         }
-        count = Math.max(count, Math.max(def.fluidConfigTanks.size(), def.fluidStorageTanks.size()));
+        int count = Math.max(def.fluidConfigTanks.size(), def.fluidStorageTanks.size());
         if (def.gui != null && def.gui.components != null) {
             for (CustomAEMixedInputBusRegistry.ComponentDef component : def.gui.components) {
                 if (component == null) {
@@ -457,11 +455,10 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
     private int resolveGasSlotCount() {
         CustomAEMixedInputBusRegistry.Def def = getDefinition();
-        int count = DEFAULT_TANK_SLOT_COUNT;
         if (def == null) {
-            return count;
+            return DEFAULT_TANK_SLOT_COUNT;
         }
-        count = Math.max(count, Math.max(def.gasConfigTanks.size(), def.gasStorageTanks.size()));
+        int count = Math.max(def.gasConfigTanks.size(), def.gasStorageTanks.size());
         if (def.gui != null && def.gui.components != null) {
             for (CustomAEMixedInputBusRegistry.ComponentDef component : def.gui.components) {
                 if (component == null) {
@@ -517,6 +514,16 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         return getActiveGasSlotBound();
     }
 
+    public boolean isFluidConfigSlotDefined(int slot) {
+        CustomAEMixedInputBusRegistry.Def def = getDefinition();
+        return def == null || slot >= 0 && slot < def.fluidConfigTanks.size() && def.fluidConfigTanks.get(slot) != null;
+    }
+
+    public boolean isGasConfigSlotDefined(int slot) {
+        CustomAEMixedInputBusRegistry.Def def = getDefinition();
+        return def == null || slot >= 0 && slot < def.gasConfigTanks.size() && def.gasConfigTanks.get(slot) != null;
+    }
+
     public void setDefinitionId(@Nullable String id) {
         String sanitized = CustomIdValidator.sanitizeResourceLocation(id);
         this.definitionId = sanitized == null ? "" : sanitized;
@@ -535,7 +542,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     }
 
     public boolean configInvHasItem() {
-        for (int i = 0; i < this.configInventory.getSlots(); i++) {
+        for (int i = 0; i < getActiveItemSlotBound(); i++) {
             if (!this.configInventory.getStackInSlot(i).isEmpty()) {
                 return true;
             }
