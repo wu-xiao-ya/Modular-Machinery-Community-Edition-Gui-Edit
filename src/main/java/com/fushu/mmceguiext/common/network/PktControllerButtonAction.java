@@ -16,6 +16,8 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
 public class PktControllerButtonAction implements IMessage, IMessageHandler<PktControllerButtonAction, IMessage> {
+    private static final int MAX_KEY_LENGTH = 128;
+    private static final int MAX_BUTTON_ID_LENGTH = 128;
     private static final byte KIND_SMART_SET = 0;
     private static final byte KIND_SMART_ADD = 1;
     private static final byte KIND_EVENT = 2;
@@ -113,21 +115,23 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
 
         if (message.kind == KIND_EVENT) {
-            if (message.buttonId == null || message.buttonId.trim().isEmpty()) {
+            String buttonId = normalizeBounded(message.buttonId, MAX_BUTTON_ID_LENGTH);
+            if (buttonId == null) {
                 return;
             }
-            postControllerButtonClickEvent(controller, message.buttonId);
+            postControllerButtonClickEvent(controller, buttonId);
             return;
         }
 
-        if (message.key == null || message.key.trim().isEmpty() || !Float.isFinite(message.value)) {
+        String key = normalizeBounded(message.key, MAX_KEY_LENGTH);
+        if (key == null || !Float.isFinite(message.value)) {
             return;
         }
 
         float resolved = message.value;
         if (message.kind == KIND_SMART_ADD) {
-            SmartInterfaceData current = controller.getSmartInterfaceData(message.key);
-            Float customValue = readControllerCustomData(controller, message.key);
+            SmartInterfaceData current = controller.getSmartInterfaceData(key);
+            Float customValue = readControllerCustomData(controller, key);
             if (current == null && customValue == null) {
                 return;
             }
@@ -135,8 +139,8 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
                 ? current.getValue()
                 : customValue != null && Float.isFinite(customValue.floatValue()) ? customValue.floatValue() : 0.0F;
             resolved = base + message.value;
-        } else if (controller.getSmartInterfaceData(message.key) == null
-            && !PktControllerSmartInterfaceUpdate.hasControllerCustomData(controller, message.key)) {
+        } else if (controller.getSmartInterfaceData(key) == null
+            && !PktControllerSmartInterfaceUpdate.hasControllerCustomData(controller, key)) {
             return;
         }
         if (!Float.isFinite(resolved)) {
@@ -156,7 +160,15 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         if (!Float.isFinite(resolved)) {
             return;
         }
-        PktControllerSmartInterfaceUpdate.applySmartInterfaceUpdate(controller, message.controllerPos, message.key, resolved);
+        PktControllerSmartInterfaceUpdate.applySmartInterfaceUpdate(controller, message.controllerPos, key, resolved);
+    }
+
+    private static String normalizeBounded(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() || trimmed.length() > maxLength ? null : trimmed;
     }
 
     private static Float readControllerCustomData(TileMultiblockMachineController controller, String key) {

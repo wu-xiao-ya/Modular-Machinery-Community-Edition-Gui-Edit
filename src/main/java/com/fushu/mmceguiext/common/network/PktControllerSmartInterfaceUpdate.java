@@ -19,6 +19,7 @@ import java.lang.reflect.Method;
 import java.util.Map;
 
 public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHandler<PktControllerSmartInterfaceUpdate, IMessage> {
+    private static final int MAX_INTERFACE_TYPE_LENGTH = 128;
     private BlockPos controllerPos = BlockPos.ORIGIN;
     private String interfaceType = "";
     private float value = 0.0F;
@@ -57,7 +58,11 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
     }
 
     private static void handle(PktControllerSmartInterfaceUpdate message, EntityPlayerMP player) {
-        if (message == null || message.interfaceType == null || message.interfaceType.trim().isEmpty()) {
+        if (message == null) {
+            return;
+        }
+        String interfaceType = normalizeBounded(message.interfaceType, MAX_INTERFACE_TYPE_LENGTH);
+        if (interfaceType == null) {
             return;
         }
         if (!Float.isFinite(message.value)) {
@@ -76,11 +81,12 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
             return;
         }
         TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
-        applySmartInterfaceUpdate(controller, message.controllerPos, message.interfaceType, message.value);
+        applySmartInterfaceUpdate(controller, message.controllerPos, interfaceType, message.value);
     }
 
     static boolean applySmartInterfaceUpdate(TileMultiblockMachineController controller, BlockPos controllerPos, String interfaceType, float value) {
-        if (controller == null || controllerPos == null || interfaceType == null || interfaceType.trim().isEmpty() || !Float.isFinite(value)) {
+        interfaceType = normalizeBounded(interfaceType, MAX_INTERFACE_TYPE_LENGTH);
+        if (controller == null || controllerPos == null || interfaceType == null || !Float.isFinite(value)) {
             return false;
         }
         if (tryInvokeControllerSmartUpdate(controller, interfaceType, value)) {
@@ -113,6 +119,14 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
             controller.markForUpdateSync();
         }
         return updated;
+    }
+
+    private static String normalizeBounded(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() || trimmed.length() > maxLength ? null : trimmed;
     }
 
     private static boolean tryInvokeControllerSmartUpdate(TileMultiblockMachineController controller, String interfaceType, float value) {
