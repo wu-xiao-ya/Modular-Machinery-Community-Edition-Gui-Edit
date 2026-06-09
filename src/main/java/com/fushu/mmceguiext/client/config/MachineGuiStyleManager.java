@@ -132,14 +132,14 @@ public final class MachineGuiStyleManager {
                 ControllerStyle machineStyle = parsed.machineStyle == ControllerStyle.EMPTY
                     ? new ControllerStyle()
                     : parsed.machineStyle;
-                putStyle(MACHINE_CONTROLLER_STYLES, parsed.namespacedKey, parsed.pathKey, machineStyle, "machine", path);
+                putStyle(MACHINE_CONTROLLER_STYLES, parsed.namespacedKey, parsed.pathKey, parsed.allowPathFallback, machineStyle, "machine", path);
             }
 
             if (parsed.factoryNodePresent) {
                 ControllerStyle factoryStyle = parsed.factoryStyle == ControllerStyle.EMPTY
                     ? new ControllerStyle()
                     : parsed.factoryStyle;
-                putStyle(FACTORY_CONTROLLER_STYLES, parsed.namespacedKey, parsed.pathKey, factoryStyle, "factory", path);
+                putStyle(FACTORY_CONTROLLER_STYLES, parsed.namespacedKey, parsed.pathKey, parsed.allowPathFallback, factoryStyle, "factory", path);
             }
         } catch (Exception ex) {
             LOGGER.warn("Failed to read MMCE GUI ext config {}: {}", path, ex.getMessage());
@@ -150,12 +150,13 @@ public final class MachineGuiStyleManager {
         Map<String, ControllerStyle> target,
         String namespacedKey,
         String pathKey,
+        boolean allowPathFallback,
         ControllerStyle style,
         String controllerKind,
         Path sourcePath
     ) {
         ControllerStyle previousNamespaced = target.put(namespacedKey, style);
-        ControllerStyle previousPath = target.put(pathKey, style);
+        ControllerStyle previousPath = allowPathFallback ? target.put(pathKey, style) : null;
         if (previousNamespaced != null || previousPath != null) {
             LOGGER.warn(
                 "MMCE GUI ext {} style for {} was overridden by {}.",

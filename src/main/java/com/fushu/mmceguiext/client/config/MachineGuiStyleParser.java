@@ -46,6 +46,7 @@ final class MachineGuiStyleParser {
         result.namespacedKey = normalizedRegistryName.contains(":")
             ? normalizedRegistryName
             : "modularmachinery:" + normalizedRegistryName;
+        result.allowPathFallback = !normalizedRegistryName.contains(":");
         result.pathKey = result.namespacedKey.contains(":")
             ? result.namespacedKey.substring(result.namespacedKey.indexOf(':') + 1)
             : result.namespacedKey;
@@ -935,6 +936,7 @@ final class MachineGuiStyleParser {
         String namespacedKey;
         @Nullable
         String pathKey;
+        boolean allowPathFallback;
         boolean machineNodePresent;
         boolean factoryNodePresent;
         @Nullable

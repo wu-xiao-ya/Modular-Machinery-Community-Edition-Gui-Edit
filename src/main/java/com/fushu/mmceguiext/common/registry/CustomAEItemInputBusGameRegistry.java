@@ -10,6 +10,8 @@ import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.registry.GameRegistry;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -18,6 +20,7 @@ import java.util.Map;
 
 @Mod.EventBusSubscriber(modid = MMCEGuiExt.MODID)
 public final class CustomAEItemInputBusGameRegistry {
+    private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private static final Map<String, BlockCustomMEItemInputBus> BLOCKS = new LinkedHashMap<String, BlockCustomMEItemInputBus>();
 
     private CustomAEItemInputBusGameRegistry() {
@@ -35,6 +38,14 @@ public final class CustomAEItemInputBusGameRegistry {
                 continue;
             }
             String path = normalizePath(def.id);
+            if (!isValidRegistryPath(path)) {
+                LOGGER.warn("Skipping custom AE item input bus with invalid id '{}'.", def.id);
+                continue;
+            }
+            if (BLOCKS.containsKey(path)) {
+                LOGGER.warn("Skipping duplicate custom AE item input bus id '{}'.", def.id);
+                continue;
+            }
             BlockCustomMEItemInputBus block = new BlockCustomMEItemInputBus(def);
             event.getRegistry().register(block);
             BLOCKS.put(path, block);
@@ -58,6 +69,13 @@ public final class CustomAEItemInputBusGameRegistry {
             value = value.substring(value.indexOf(':') + 1);
         }
         return value;
+    }
+
+    private static boolean isValidRegistryPath(String path) {
+        return path != null
+            && !path.trim().isEmpty()
+            && !path.contains("..")
+            && path.matches("[a-z0-9_./-]+");
     }
 
     public static Map<String, BlockCustomMEItemInputBus> getRegisteredBlocks() {

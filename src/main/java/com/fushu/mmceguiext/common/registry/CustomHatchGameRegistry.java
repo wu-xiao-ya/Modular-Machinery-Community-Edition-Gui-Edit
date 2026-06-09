@@ -11,6 +11,8 @@ import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.registry.GameRegistry;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nullable;
 import java.util.Collections;
@@ -20,6 +22,7 @@ import java.util.Map;
 
 @Mod.EventBusSubscriber(modid = MMCEGuiExt.MODID)
 public final class CustomHatchGameRegistry {
+    private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private static final Map<String, BlockCustomHatch> BLOCKS = new LinkedHashMap<String, BlockCustomHatch>();
     private static final Map<String, ModelBinding> MODEL_BINDINGS = new LinkedHashMap<String, ModelBinding>();
 
@@ -39,6 +42,14 @@ public final class CustomHatchGameRegistry {
                 continue;
             }
             String path = normalizePath(def.id);
+            if (!isValidRegistryPath(path)) {
+                LOGGER.warn("Skipping custom hatch with invalid id '{}'.", def.id);
+                continue;
+            }
+            if (BLOCKS.containsKey(path)) {
+                LOGGER.warn("Skipping duplicate custom hatch id '{}'.", def.id);
+                continue;
+            }
             BlockCustomHatch block = new BlockCustomHatch(def);
             event.getRegistry().register(block);
             BLOCKS.put(path, block);
@@ -77,6 +88,13 @@ public final class CustomHatchGameRegistry {
             value = value.substring(value.indexOf(':') + 1);
         }
         return value;
+    }
+
+    private static boolean isValidRegistryPath(String path) {
+        return path != null
+            && !path.trim().isEmpty()
+            && !path.contains("..")
+            && path.matches("[a-z0-9_./-]+");
     }
 
     private static ModelBinding resolveModelBinding(CustomHatchRegistry.CustomHatchDef def) {

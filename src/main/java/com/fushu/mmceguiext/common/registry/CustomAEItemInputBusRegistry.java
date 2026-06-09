@@ -1,6 +1,7 @@
 package com.fushu.mmceguiext.common.registry;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraftforge.fml.common.Loader;
@@ -23,6 +24,7 @@ import java.util.stream.Stream;
 public final class CustomAEItemInputBusRegistry {
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private static final Path BUS_DIR = resolveBusDir();
+    private static final int MAX_SLOT_POINTS = 4096;
     private static final List<Def> CACHE = new ArrayList<Def>();
     private static final Map<String, Def> REGISTERED = new LinkedHashMap<String, Def>();
 
@@ -92,8 +94,8 @@ public final class CustomAEItemInputBusRegistry {
             def.id = getString(root, "id");
             def.displayName = getString(root, "displayName");
             def.guiBackgroundTexture = getString(root, "guiBackgroundTexture");
-            def.configSlots = parseSlotPoints(root.getAsJsonArray("configSlots"));
-            def.storageSlots = parseSlotPoints(root.getAsJsonArray("storageSlots"));
+            def.configSlots = parseSlotPoints(getArray(root, "configSlots"));
+            def.storageSlots = parseSlotPoints(getArray(root, "storageSlots"));
             def.playerInventoryX = getInt(root, "playerInventoryX", 0);
             def.playerInventoryY = getInt(root, "playerInventoryY", 123);
             def.playerHotbarY = getInt(root, "playerHotbarY", 181);
@@ -109,7 +111,7 @@ public final class CustomAEItemInputBusRegistry {
 
     private static CustomHatchRegistry.BlockDef parseBlock(JsonObject root) {
         CustomHatchRegistry.BlockDef block = new CustomHatchRegistry.BlockDef();
-        JsonObject obj = root.getAsJsonObject("block");
+        JsonObject obj = getObject(root, "block");
         block.model = getString(obj, root, "model", getString(root, "blockModel"));
         block.material = getString(obj, root, "material", block.material);
         block.hardness = getFloat(obj, root, "hardness", block.hardness);
@@ -129,7 +131,11 @@ public final class CustomAEItemInputBusRegistry {
             return Collections.emptyList();
         }
         List<SlotPoint> out = new ArrayList<SlotPoint>();
-        for (int i = 0; i < array.size(); i++) {
+        int limit = Math.min(array.size(), MAX_SLOT_POINTS);
+        if (array.size() > MAX_SLOT_POINTS) {
+            LOGGER.warn("Skipping {} extra AE item input slot points; max is {}", array.size() - MAX_SLOT_POINTS, MAX_SLOT_POINTS);
+        }
+        for (int i = 0; i < limit; i++) {
             if (!array.get(i).isJsonObject()) {
                 continue;
             }
@@ -143,14 +149,34 @@ public final class CustomAEItemInputBusRegistry {
     }
 
     @Nullable
+    private static com.google.gson.JsonArray getArray(@Nullable JsonObject obj, String key) {
+        JsonElement e = obj == null ? null : obj.get(key);
+        return e != null && e.isJsonArray() ? e.getAsJsonArray() : null;
+    }
+
+    @Nullable
+    private static JsonObject getObject(@Nullable JsonObject obj, String key) {
+        JsonElement e = obj == null ? null : obj.get(key);
+        return e != null && e.isJsonObject() ? e.getAsJsonObject() : null;
+    }
+
+    @Nullable
     private static String getString(JsonObject obj, String key) {
         if (obj == null) {
             return null;
         }
-        return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsString() : null;
+        JsonElement e = obj.get(key);
+        if (e == null || e.isJsonNull() || !e.isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            return e.getAsString();
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
-    private static String getString(@Nullable JsonObject primary, JsonObject fallbackObj, String key, String fallback) {
+    private static String getString(@Nullable JsonObject primary, @Nullable JsonObject fallbackObj, String key, String fallback) {
         String value = getString(primary, key);
         if (value == null) {
             value = getString(fallbackObj, key);
@@ -162,12 +188,16 @@ public final class CustomAEItemInputBusRegistry {
         if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
             return fallback;
         }
-        return obj.get(key).getAsInt();
+        try {
+            return obj.get(key).getAsInt();
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
     }
 
-    private static int getInt(@Nullable JsonObject primary, JsonObject fallbackObj, String key, int fallback) {
+    private static int getInt(@Nullable JsonObject primary, @Nullable JsonObject fallbackObj, String key, int fallback) {
         if (primary != null && primary.has(key) && !primary.get(key).isJsonNull()) {
-            return primary.get(key).getAsInt();
+            return getInt(primary, key, fallback);
         }
         return getInt(fallbackObj, key, fallback);
     }
@@ -176,12 +206,16 @@ public final class CustomAEItemInputBusRegistry {
         if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
             return fallback;
         }
-        return obj.get(key).getAsFloat();
+        try {
+            return obj.get(key).getAsFloat();
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
     }
 
-    private static float getFloat(@Nullable JsonObject primary, JsonObject fallbackObj, String key, float fallback) {
+    private static float getFloat(@Nullable JsonObject primary, @Nullable JsonObject fallbackObj, String key, float fallback) {
         if (primary != null && primary.has(key) && !primary.get(key).isJsonNull()) {
-            return primary.get(key).getAsFloat();
+            return getFloat(primary, key, fallback);
         }
         return getFloat(fallbackObj, key, fallback);
     }
@@ -190,12 +224,16 @@ public final class CustomAEItemInputBusRegistry {
         if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
             return fallback;
         }
-        return obj.get(key).getAsBoolean();
+        try {
+            return obj.get(key).getAsBoolean();
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
     }
 
-    private static boolean getBoolean(@Nullable JsonObject primary, JsonObject fallbackObj, String key, boolean fallback) {
+    private static boolean getBoolean(@Nullable JsonObject primary, @Nullable JsonObject fallbackObj, String key, boolean fallback) {
         if (primary != null && primary.has(key) && !primary.get(key).isJsonNull()) {
-            return primary.get(key).getAsBoolean();
+            return getBoolean(primary, key, fallback);
         }
         return getBoolean(fallbackObj, key, fallback);
     }
