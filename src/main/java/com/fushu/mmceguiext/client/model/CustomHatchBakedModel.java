@@ -48,25 +48,30 @@ public class CustomHatchBakedModel extends BakedModelWrapper<IBakedModel> {
     @Nullable
     private IBakedModel resolveVariantModel(@Nullable String id) {
         ResourceLocation texture = CustomHatchModelRegistry.getTexture(id);
-        if (texture == null) {
+        ResourceLocation sourceModel = CustomHatchModelRegistry.getSourceModel(id);
+        if (texture == null && sourceModel == null) {
             return null;
         }
-        String key = texture.toString();
+        if (sourceModel == null) {
+            sourceModel = this.sourceModel;
+        }
+        String key = sourceModel.toString() + "|" + (texture == null ? "" : texture.toString());
         IBakedModel cachedModel = this.cache.get(key);
         if (cachedModel != null) {
             return cachedModel;
         }
         try {
-            String texturePath = texture.toString();
-            IBakedModel baked = ModelLoaderRegistry
-                .getModel(this.sourceModel)
-                .retexture(com.google.common.collect.ImmutableMap.of(
+            net.minecraftforge.client.model.IModel model = ModelLoaderRegistry.getModel(sourceModel);
+            if (texture != null) {
+                String texturePath = texture.toString();
+                model = model.retexture(com.google.common.collect.ImmutableMap.of(
                     "all", texturePath,
                     "top", texturePath,
                     "side", texturePath,
                     "bottom", texturePath
-                ))
-                .bake(net.minecraftforge.common.model.TRSRTransformation.identity(), net.minecraft.client.renderer.vertex.DefaultVertexFormats.ITEM, location ->
+                ));
+            }
+            IBakedModel baked = model.bake(net.minecraftforge.common.model.TRSRTransformation.identity(), net.minecraft.client.renderer.vertex.DefaultVertexFormats.ITEM, location ->
                     net.minecraft.client.Minecraft.getMinecraft().getTextureMapBlocks().getAtlasSprite(location.toString())
                 );
             this.cache.put(key, baked);

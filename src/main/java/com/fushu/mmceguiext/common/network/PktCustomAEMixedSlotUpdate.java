@@ -71,8 +71,11 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
             return;
         }
         TileCustomAEMixedInputBus bus = (TileCustomAEMixedInputBus) tile;
-        if (!(player.openContainer instanceof ContainerCustomAEMixedInputBus)
-            || ((ContainerCustomAEMixedInputBus) player.openContainer).getOwner() != bus) {
+        if (!(player.openContainer instanceof ContainerCustomAEMixedInputBus)) {
+            return;
+        }
+        ContainerCustomAEMixedInputBus container = (ContainerCustomAEMixedInputBus) player.openContainer;
+        if (container.getOwner() != bus || !container.canInteractWith(player)) {
             return;
         }
         ItemStack held = player.inventory.getItemStack();

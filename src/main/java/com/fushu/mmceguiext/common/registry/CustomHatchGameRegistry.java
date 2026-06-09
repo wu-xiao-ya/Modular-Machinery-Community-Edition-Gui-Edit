@@ -93,11 +93,8 @@ public final class CustomHatchGameRegistry {
         } else if (def != null && def.blockModel != null && !def.blockModel.trim().isEmpty()) {
             model = def.blockModel.trim();
         }
-        if (isDirectHatchModelPath(model) && def != null && def.id != null) {
-            String path = CustomIdValidator.normalizePath(def.id, "");
-            if (CustomIdValidator.isValidPath(path)) {
-                return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, path), "facing=north");
-            }
+        if (isDirectHatchModelPath(model)) {
+            return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "facing=north");
         }
         ModelBinding location = parseModelBinding(model);
         if (location == null) {
@@ -106,29 +103,45 @@ public final class CustomHatchGameRegistry {
         return location;
     }
 
-    private static boolean isDirectHatchModelPath(@Nullable String raw) {
+    @Nullable
+    private static String normalizeComparableModelPath(@Nullable String raw) {
         if (raw == null) {
-            return false;
+            return null;
         }
         String value = raw.trim().replace('\\', '/').toLowerCase();
+        if (value.isEmpty()) {
+            return null;
+        }
+        if (value.contains("#")) {
+            value = value.substring(0, value.indexOf('#'));
+        } else if (value.contains("[")) {
+            value = value.substring(0, value.indexOf('['));
+        }
         if (value.endsWith(".json")) {
             value = value.substring(0, value.length() - 5);
         }
         if (value.contains(":")) {
             value = value.substring(value.indexOf(':') + 1);
         }
-        while (value.startsWith("assets/")) {
+        if (value.startsWith("assets/")) {
             int models = value.indexOf("/models/");
-            if (models < 0) {
-                break;
+            if (models >= 0) {
+                value = value.substring(models + "/models/".length());
             }
-            value = value.substring(models + "/models/".length());
         }
         while (value.startsWith("models/")) {
             value = value.substring("models/".length());
         }
         while (value.startsWith("block/")) {
             value = value.substring("block/".length());
+        }
+        return value;
+    }
+
+    private static boolean isDirectHatchModelPath(@Nullable String raw) {
+        String value = normalizeComparableModelPath(raw);
+        if (value == null) {
+            return false;
         }
         return value.startsWith("hatch/");
     }
