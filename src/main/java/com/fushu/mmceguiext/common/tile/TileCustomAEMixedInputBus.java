@@ -1465,6 +1465,9 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         int filled = 0;
         int slotBound = getActiveFluidSlotBound();
         for (int slot = 0; slot < slotBound && insert.amount > 0; slot++) {
+            if (!isFluidSlotDefined(slot)) {
+                continue;
+            }
             int slotFilled = this.fluidTanks.fill(slot, insert, doFill);
             filled += slotFilled;
             insert.amount -= slotFilled;
@@ -1481,6 +1484,9 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         net.minecraftforge.fluids.FluidStack drained = null;
         int slotBound = getActiveFluidSlotBound();
         for (int slot = 0; slot < slotBound && remaining.amount > 0; slot++) {
+            if (!isFluidSlotDefined(slot)) {
+                continue;
+            }
             net.minecraftforge.fluids.FluidStack slotDrained = this.fluidTanks.drain(slot, remaining, doDrain);
             if (slotDrained == null || slotDrained.amount <= 0) {
                 continue;
@@ -1504,6 +1510,9 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         int remaining = maxDrain;
         int slotBound = getActiveFluidSlotBound();
         for (int slot = 0; slot < slotBound && remaining > 0; slot++) {
+            if (!isFluidSlotDefined(slot)) {
+                continue;
+            }
             net.minecraftforge.fluids.FluidStack slotDrained = this.fluidTanks.drain(slot, remaining, doDrain);
             if (slotDrained == null || slotDrained.amount <= 0) {
                 continue;
@@ -1528,6 +1537,9 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         int received = 0;
         int slotBound = getActiveGasSlotBound();
         for (int slot = 0; slot < slotBound && remaining.amount > 0; slot++) {
+            if (!isGasSlotDefined(slot)) {
+                continue;
+            }
             int slotReceived = this.gasTanks.addGas(slot, remaining, doTransfer);
             received += slotReceived;
             remaining.amount -= slotReceived;
@@ -1544,6 +1556,9 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         GasStack drawn = null;
         int slotBound = getActiveGasSlotBound();
         for (int slot = 0; slot < slotBound && remaining.amount > 0; slot++) {
+            if (!isGasSlotDefined(slot)) {
+                continue;
+            }
             GasStack slotDrawn = this.gasTanks.removeGas(slot, remaining, doTransfer);
             if (slotDrawn == null || slotDrawn.amount <= 0) {
                 continue;
@@ -1567,6 +1582,9 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         int remaining = amount;
         int slotBound = getActiveGasSlotBound();
         for (int slot = 0; slot < slotBound && remaining > 0; slot++) {
+            if (!isGasSlotDefined(slot)) {
+                continue;
+            }
             GasStack slotDrawn = this.gasTanks.removeGas(slot, remaining, doTransfer);
             if (slotDrawn == null || slotDrawn.amount <= 0) {
                 continue;
