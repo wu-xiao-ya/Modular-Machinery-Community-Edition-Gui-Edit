@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public final class CustomAEItemInputBusRegistry {
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
@@ -34,8 +35,8 @@ public final class CustomAEItemInputBusRegistry {
         if (!Files.isDirectory(BUS_DIR)) {
             return Collections.emptyList();
         }
-        try {
-            Files.list(BUS_DIR).filter(p -> p.toString().endsWith(".json")).forEach(path -> {
+        try (Stream<Path> stream = Files.list(BUS_DIR)) {
+            stream.filter(p -> p.toString().endsWith(".json")).forEach(path -> {
                 Def def = load(path);
                 if (def != null) {
                     CACHE.add(def);

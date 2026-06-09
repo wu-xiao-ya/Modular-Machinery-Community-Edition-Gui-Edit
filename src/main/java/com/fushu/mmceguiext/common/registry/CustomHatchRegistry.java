@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public final class CustomHatchRegistry {
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
@@ -36,8 +37,8 @@ public final class CustomHatchRegistry {
         if (!Files.isDirectory(HATCH_DIR)) {
             return Collections.emptyList();
         }
-        try {
-            Files.list(HATCH_DIR).filter(p -> p.toString().endsWith(".json")).forEach(path -> {
+        try (Stream<Path> stream = Files.list(HATCH_DIR)) {
+            stream.filter(p -> p.toString().endsWith(".json")).forEach(path -> {
                 CustomHatchDef def = load(path);
                 if (def != null) {
                     CACHE.add(def);
