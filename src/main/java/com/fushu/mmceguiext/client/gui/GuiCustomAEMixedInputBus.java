@@ -179,7 +179,7 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
     }
 
     private void drawFluidConfig(int guiLeft, int guiTop, @Nullable CustomAEMixedInputBusRegistry.TankRect rect, int slot) {
-        if (rect == null || slot < 0 || slot >= this.owner.getFluidConfig().getSlots()) {
+        if (rect == null || slot < 0 || slot >= this.owner.getActiveFluidSlots()) {
             return;
         }
         appeng.api.storage.data.IAEFluidStack fluid = this.owner.getFluidConfig().getFluidInSlot(slot);
@@ -212,7 +212,7 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
     }
 
     private void drawFluidTank(int guiLeft, int guiTop, @Nullable CustomAEMixedInputBusRegistry.TankRect rect, int slot) {
-        if (rect == null || slot < 0 || slot >= this.owner.getFluidTanks().getSlots()) {
+        if (rect == null || slot < 0 || slot >= this.owner.getActiveFluidSlots()) {
             return;
         }
         appeng.api.storage.data.IAEFluidStack fluid = this.owner.getFluidTanks().getFluidInSlot(slot);
@@ -253,7 +253,7 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
     }
 
     private void drawGasConfig(int guiLeft, int guiTop, @Nullable CustomAEMixedInputBusRegistry.TankRect rect, int slot) {
-        if (rect == null || slot < 0 || slot >= this.owner.getGasConfig().size()) {
+        if (rect == null || slot < 0 || slot >= this.owner.getActiveGasSlots()) {
             return;
         }
         GasStack gas = this.owner.getGasConfig().getGasStack(slot);
@@ -285,7 +285,7 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
     }
 
     private void drawGasTank(int guiLeft, int guiTop, @Nullable CustomAEMixedInputBusRegistry.TankRect rect, int slot) {
-        if (rect == null || slot < 0 || slot >= this.owner.getGasTanks().size()) {
+        if (rect == null || slot < 0 || slot >= this.owner.getActiveGasSlots()) {
             return;
         }
         GasStack gas = this.owner.getGasTanks().getGasStack(slot);

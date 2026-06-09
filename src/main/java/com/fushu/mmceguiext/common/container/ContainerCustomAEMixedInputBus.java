@@ -25,7 +25,8 @@ public class ContainerCustomAEMixedInputBus extends AEBaseContainer {
         this.bindPlayerInventory(getInventoryPlayer(), playerInventoryX, playerInventoryY);
 
         IItemHandlerModifiable internal = this.owner.getInternalInventory().asGUIAccess();
-        for (int i = 0; i < internal.getSlots(); i++) {
+        int activeItemSlots = Math.min(internal.getSlots(), this.owner.getActiveItemSlots());
+        for (int i = 0; i < activeItemSlots; i++) {
             int x = -10000;
             int y = -10000;
             CustomAEMixedInputBusRegistry.ComponentDef component = findIndexedComponent(def, "slot", "item_storage", i);
@@ -46,7 +47,8 @@ public class ContainerCustomAEMixedInputBus extends AEBaseContainer {
         }
 
         IItemHandlerModifiable config = this.owner.getConfigInventory().asGUIAccess();
-        for (int i = 0; i < config.getSlots(); i++) {
+        int activeConfigSlots = Math.min(config.getSlots(), this.owner.getActiveItemSlots());
+        for (int i = 0; i < activeConfigSlots; i++) {
             int x = -10000;
             int y = -10000;
             CustomAEMixedInputBusRegistry.ComponentDef component = findIndexedComponent(def, "slot", "item_config", i);

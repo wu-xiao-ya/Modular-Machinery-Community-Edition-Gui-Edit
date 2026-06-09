@@ -89,7 +89,7 @@ public class GuiCustomAEMixedOutputBus extends AEBaseGui {
         int fallbackIndex = 0;
         for (CustomAEMixedOutputBusRegistry.ComponentDef fluidStorage : fluidComponents) {
             int slot = fluidStorage.index >= 0 ? fluidStorage.index : fallbackIndex++;
-            if (slot < 0 || slot >= this.owner.getFluidTanks().getSlots()) {
+            if (slot < 0 || slot >= this.owner.getActiveFluidSlots()) {
                 continue;
             }
             appeng.api.storage.data.IAEFluidStack fluid = this.owner.getFluidTanks().getFluidInSlot(slot);
@@ -133,7 +133,7 @@ public class GuiCustomAEMixedOutputBus extends AEBaseGui {
         int fallbackIndex = 0;
         for (CustomAEMixedOutputBusRegistry.ComponentDef gasStorage : gasComponents) {
             int slot = gasStorage.index >= 0 ? gasStorage.index : fallbackIndex++;
-            if (slot < 0 || slot >= this.owner.getGasTanks().size()) {
+            if (slot < 0 || slot >= this.owner.getActiveGasSlots()) {
                 continue;
             }
             GasStack gas = this.owner.getGasTanks().getGasStack(slot);
