@@ -49,14 +49,27 @@ public final class CustomBlockModelResolver {
             if (slash > 0) {
                 String namespace = rest.substring(0, slash);
                 String path = normalizeModelPath(rest.substring(slash + 1));
-                return new ModelBinding(new ResourceLocation(namespace, path), normalizeVariant(variant));
+                return createModelBinding(namespace, path, variant);
             }
         }
         if (value.contains(":")) {
             String[] split = value.split(":", 2);
-            return new ModelBinding(new ResourceLocation(split[0], normalizeModelPath(split[1])), normalizeVariant(variant));
+            return createModelBinding(split[0], normalizeModelPath(split[1]), variant);
         }
-        return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, normalizeModelPath(value)), normalizeVariant(variant));
+        return createModelBinding(MMCEGuiExt.MODID, normalizeModelPath(value), variant);
+    }
+
+    @Nullable
+    private static ModelBinding createModelBinding(String namespace, String path, @Nullable String variant) {
+        if (namespace == null || namespace.trim().isEmpty() || path == null || path.trim().isEmpty()
+            || path.contains("..") || path.startsWith("/")) {
+            return null;
+        }
+        try {
+            return new ModelBinding(new ResourceLocation(namespace, path), normalizeVariant(variant));
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
     private static String normalizeModelPath(String raw) {

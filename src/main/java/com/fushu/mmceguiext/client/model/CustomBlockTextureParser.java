@@ -25,16 +25,29 @@ public final class CustomBlockTextureParser {
         }
         if (value.contains(":")) {
             String[] split = value.split(":", 2);
-            return new ResourceLocation(split[0], normalizeTexturePath(split[1]));
+            return createTextureLocation(split[0], normalizeTexturePath(split[1]));
         }
         if (value.startsWith("assets/")) {
             String rest = value.substring("assets/".length());
             int slash = rest.indexOf('/');
             if (slash > 0) {
-                return new ResourceLocation(rest.substring(0, slash), normalizeTexturePath(rest.substring(slash + 1)));
+                return createTextureLocation(rest.substring(0, slash), normalizeTexturePath(rest.substring(slash + 1)));
             }
         }
-        return new ResourceLocation(MMCEGuiExt.MODID, normalizeTexturePath(value));
+        return createTextureLocation(MMCEGuiExt.MODID, normalizeTexturePath(value));
+    }
+
+    @Nullable
+    private static ResourceLocation createTextureLocation(String namespace, String path) {
+        if (namespace == null || namespace.trim().isEmpty() || path == null || path.trim().isEmpty()
+            || path.contains("..") || path.startsWith("/")) {
+            return null;
+        }
+        try {
+            return new ResourceLocation(namespace, path);
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
     private static String normalizeTexturePath(String raw) {

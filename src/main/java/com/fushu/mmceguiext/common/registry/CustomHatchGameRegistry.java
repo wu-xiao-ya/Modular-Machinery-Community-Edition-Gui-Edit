@@ -142,16 +142,30 @@ public final class CustomHatchGameRegistry {
             if (slash > 0) {
                 String namespace = rest.substring(0, slash);
                 String path = normalizeModelPath(rest.substring(slash + 1));
-                return new ModelBinding(new ResourceLocation(namespace, path), normalizeVariant(variant));
+                return createModelBinding(namespace, path, variant);
             }
         }
         if (value.contains(":")) {
             String[] split = value.split(":", 2);
             String namespace = split[0];
             String path = normalizeModelPath(split[1]);
-            return new ModelBinding(new ResourceLocation(namespace, path), normalizeVariant(variant));
+            return createModelBinding(namespace, path, variant);
         }
-        return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, normalizeModelPath(value)), normalizeVariant(variant));
+        return createModelBinding(MMCEGuiExt.MODID, normalizeModelPath(value), variant);
+    }
+
+    @Nullable
+    private static ModelBinding createModelBinding(String namespace, String path, @Nullable String variant) {
+        if (namespace == null || namespace.trim().isEmpty() || path == null || path.trim().isEmpty()
+            || path.contains("..") || path.startsWith("/")) {
+            return null;
+        }
+        try {
+            return new ModelBinding(new ResourceLocation(namespace, path), normalizeVariant(variant));
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Ignoring invalid custom hatch model location {}:{}", namespace, path);
+            return null;
+        }
     }
 
     private static String normalizeVariant(@Nullable String raw) {
