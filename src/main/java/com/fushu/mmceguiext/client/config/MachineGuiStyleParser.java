@@ -11,6 +11,10 @@ import java.util.List;
 import java.util.Locale;
 
 final class MachineGuiStyleParser {
+    private static final int MAX_ARRAY_ENTRIES = 512;
+    private static final int MAX_TEXTURE_LAYERS = 256;
+    private static final int MAX_WARNINGS = 256;
+
     private MachineGuiStyleParser() {
     }
 
@@ -333,7 +337,8 @@ final class MachineGuiStyleParser {
 
         List<MachineGuiStyleManager.InfoSectionStyle> out = new ArrayList<MachineGuiStyleManager.InfoSectionStyle>();
         JsonArray array = match.element.getAsJsonArray();
-        for (int i = 0; i < array.size(); i++) {
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
             JsonElement child = array.get(i);
             String itemScope = field(scope, match.key + "[" + i + "]");
             if (child == null || !child.isJsonObject()) {
@@ -371,7 +376,8 @@ final class MachineGuiStyleParser {
 
         List<MachineGuiStyleManager.TextStyle> texts = new ArrayList<MachineGuiStyleManager.TextStyle>();
         JsonArray array = match.element.getAsJsonArray();
-        for (int i = 0; i < array.size(); i++) {
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
             JsonElement child = array.get(i);
             String itemScope = field(scope, match.key + "[" + i + "]");
             if (child == null || !child.isJsonObject()) {
@@ -423,7 +429,8 @@ final class MachineGuiStyleParser {
 
         List<MachineGuiStyleManager.SmartInterfaceEditorStyle> editors = new ArrayList<MachineGuiStyleManager.SmartInterfaceEditorStyle>();
         JsonArray array = match.element.getAsJsonArray();
-        for (int i = 0; i < array.size(); i++) {
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
             JsonElement child = array.get(i);
             String itemScope = field(scope, match.key + "[" + i + "]");
             if (child == null || !child.isJsonObject()) {
@@ -476,7 +483,8 @@ final class MachineGuiStyleParser {
 
         List<MachineGuiStyleManager.ButtonStyle> buttons = new ArrayList<MachineGuiStyleManager.ButtonStyle>();
         JsonArray array = match.element.getAsJsonArray();
-        for (int i = 0; i < array.size(); i++) {
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
             JsonElement child = array.get(i);
             String itemScope = field(scope, match.key + "[" + i + "]");
             if (child == null || !child.isJsonObject()) {
@@ -582,7 +590,8 @@ final class MachineGuiStyleParser {
 
         List<String> values = new ArrayList<String>();
         JsonArray array = match.element.getAsJsonArray();
-        for (int i = 0; i < array.size(); i++) {
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
             JsonElement child = array.get(i);
             String itemScope = field(scope, match.key + "[" + i + "]");
             if (child == null || !child.isJsonPrimitive() || !child.getAsJsonPrimitive().isString()) {
@@ -617,7 +626,13 @@ final class MachineGuiStyleParser {
         }
 
         JsonArray array = match.element.getAsJsonArray();
-        for (int i = 0; i < array.size(); i++) {
+        int remaining = MAX_TEXTURE_LAYERS - out.size();
+        if (remaining <= 0) {
+            result.warnForMachine(scope, "Ignoring " + field(scope, match.key) + " because max texture layers is " + MAX_TEXTURE_LAYERS + ".");
+            return;
+        }
+        int limit = cappedArraySize(array, result, scope, match.key, remaining);
+        for (int i = 0; i < limit; i++) {
             MachineGuiStyleManager.TextureLayerStyle layer = parseTextureLayer(
                 array.get(i),
                 forceForeground,
@@ -906,6 +921,20 @@ final class MachineGuiStyleParser {
         return text == null ? "" : text.trim();
     }
 
+    private static int cappedArraySize(
+        JsonArray array,
+        MachineFileParseResult result,
+        String scope,
+        String key,
+        int maxEntries
+    ) {
+        int limit = Math.min(array.size(), maxEntries);
+        if (array.size() > maxEntries) {
+            result.warnForMachine(scope, field(scope, key) + " has " + array.size() + " entries; only first " + maxEntries + " are used.");
+        }
+        return limit;
+    }
+
     @Nullable
     private static String normalizeTextAlign(@Nullable String raw) {
         String text = safeTrim(raw).toLowerCase(Locale.ROOT);
@@ -953,10 +982,16 @@ final class MachineGuiStyleParser {
         }
 
         void warn(String message) {
+            if (warnings.size() >= MAX_WARNINGS) {
+                return;
+            }
             warnings.add(sourceName + ": " + message);
         }
 
         void warnForMachine(String controllerKind, String message) {
+            if (warnings.size() >= MAX_WARNINGS) {
+                return;
+            }
             String registry = "machine".equals(controllerKind) ? machineRegistryName : factoryRegistryName;
             if (registry != null && !registry.trim().isEmpty()) {
                 warnings.add(sourceName + " [" + registry + "/" + controllerKind + "]: " + message);

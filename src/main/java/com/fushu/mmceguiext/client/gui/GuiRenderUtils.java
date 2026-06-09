@@ -64,7 +64,7 @@ public final class GuiRenderUtils {
             return null;
         }
         String text = value.trim().replace('\\', '/');
-        if (text.isEmpty()) {
+        if (text.isEmpty() || text.contains("..") || text.startsWith("/") || text.matches("^[A-Za-z]:.*")) {
             return null;
         }
         return text;

@@ -19,6 +19,7 @@ import java.util.stream.Stream;
 
 public final class MachineGuiStyleManager {
     private static final long RELOAD_INTERVAL_MS = 5000L;
+    private static final long MAX_MACHINE_STYLE_FILE_BYTES = 1024L * 1024L;
     private static final String MACHINERY_DIR = "modularmachinery/machinery";
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
 
@@ -116,6 +117,10 @@ public final class MachineGuiStyleManager {
 
     private static void loadMachineJson(Path path) {
         try {
+            if (Files.size(path) > MAX_MACHINE_STYLE_FILE_BYTES) {
+                LOGGER.warn("Skipping MMCE GUI ext machine config {} because it is larger than {} bytes.", path, MAX_MACHINE_STYLE_FILE_BYTES);
+                return;
+            }
             String content = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
             MachineGuiStyleParser.MachineFileParseResult parsed =
                 MachineGuiStyleParser.parseMachineJson(path.toString(), content);

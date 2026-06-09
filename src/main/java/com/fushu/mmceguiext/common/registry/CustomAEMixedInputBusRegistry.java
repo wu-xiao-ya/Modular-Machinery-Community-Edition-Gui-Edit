@@ -27,6 +27,7 @@ public final class CustomAEMixedInputBusRegistry {
     private static final Path BUS_DIR = resolveBusDir();
     private static final int MAX_GUI_COMPONENTS = 2048;
     private static final int MAX_COMPONENT_INDEX = 4095;
+    private static final int MAX_TEXTURE_LAYERS = 256;
     private static final List<Def> CACHE = new ArrayList<Def>();
     private static final Map<String, Def> REGISTERED = new LinkedHashMap<String, Def>();
 
@@ -42,7 +43,7 @@ public final class CustomAEMixedInputBusRegistry {
         try (Stream<Path> stream = Files.list(BUS_DIR)) {
             stream.filter(p -> p.toString().endsWith(".json")).forEach(path -> {
                 Def def = load(path);
-                if (def != null) {
+                if (def != null && !REGISTERED.containsKey(normalizeId(def.id))) {
                     CACHE.add(def);
                     REGISTERED.put(normalizeId(def.id), def);
                 }
@@ -184,7 +185,11 @@ public final class CustomAEMixedInputBusRegistry {
             return Collections.emptyList();
         }
         List<TextureLayerDef> out = new ArrayList<TextureLayerDef>();
-        for (int i = 0; i < array.size(); i++) {
+        int limit = Math.min(array.size(), MAX_TEXTURE_LAYERS);
+        if (array.size() > MAX_TEXTURE_LAYERS) {
+            LOGGER.warn("Skipping {} extra AE mixed input texture layers; max is {}", array.size() - MAX_TEXTURE_LAYERS, MAX_TEXTURE_LAYERS);
+        }
+        for (int i = 0; i < limit; i++) {
             if (!array.get(i).isJsonObject()) {
                 continue;
             }
@@ -198,11 +203,11 @@ public final class CustomAEMixedInputBusRegistry {
             def.texture = texture;
             def.x = getInt(obj, "x", 0);
             def.y = getInt(obj, "y", 0);
-            def.width = getInt(obj, "width", 16);
-            def.height = getInt(obj, "height", 16);
-            def.textureWidth = getInt(obj, "textureWidth", def.width);
-            def.textureHeight = getInt(obj, "textureHeight", def.height);
-            def.corner = getInt(obj, "corner", 0);
+            def.width = clamp(getInt(obj, "width", 16), 1, 4096);
+            def.height = clamp(getInt(obj, "height", 16), 1, 4096);
+            def.textureWidth = clamp(getInt(obj, "textureWidth", def.width), 1, 4096);
+            def.textureHeight = clamp(getInt(obj, "textureHeight", def.height), 1, 4096);
+            def.corner = clamp(getInt(obj, "corner", 0), 0, 1024);
             def.useNineSlice = obj.has("useNineSlice") && !obj.get("useNineSlice").isJsonNull() && obj.get("useNineSlice").getAsBoolean();
             def.priority = getInt(obj, "priority", 0);
             out.add(def);
@@ -527,7 +532,11 @@ public final class CustomAEMixedInputBusRegistry {
             return Collections.emptyList();
         }
         List<SlotPoint> out = new ArrayList<SlotPoint>();
-        for (int i = 0; i < array.size(); i++) {
+        int limit = Math.min(array.size(), MAX_COMPONENT_INDEX + 1);
+        if (array.size() > limit) {
+            LOGGER.warn("Skipping {} extra AE mixed input slot points; max is {}", array.size() - limit, limit);
+        }
+        for (int i = 0; i < limit; i++) {
             if (!array.get(i).isJsonObject()) {
                 continue;
             }
@@ -557,8 +566,8 @@ public final class CustomAEMixedInputBusRegistry {
         TankRect rect = new TankRect();
         rect.x = getInt(obj, "x", 0);
         rect.y = getInt(obj, "y", 0);
-        rect.width = getInt(obj, "width", 16);
-        rect.height = getInt(obj, "height", 16);
+        rect.width = clamp(getInt(obj, "width", 16), 1, 4096);
+        rect.height = clamp(getInt(obj, "height", 16), 1, 4096);
         return rect;
     }
 
@@ -567,7 +576,11 @@ public final class CustomAEMixedInputBusRegistry {
             return Collections.emptyList();
         }
         List<TankRect> out = new ArrayList<TankRect>();
-        for (int i = 0; i < array.size(); i++) {
+        int limit = Math.min(array.size(), MAX_COMPONENT_INDEX + 1);
+        if (array.size() > limit) {
+            LOGGER.warn("Skipping {} extra AE mixed input tank rects; max is {}", array.size() - limit, limit);
+        }
+        for (int i = 0; i < limit; i++) {
             if (array.get(i).isJsonObject()) {
                 TankRect rect = parseTankRect(array.get(i).getAsJsonObject());
                 if (rect != null) {
@@ -595,6 +608,10 @@ public final class CustomAEMixedInputBusRegistry {
             return fallback;
         }
         return obj.get(key).getAsInt();
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     @Nullable

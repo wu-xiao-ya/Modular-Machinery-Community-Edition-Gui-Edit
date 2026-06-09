@@ -1,5 +1,6 @@
 package com.fushu.mmceguiext.common.network;
 
+import com.fushu.mmceguiext.common.config.ControllerButtonPolicyManager;
 import hellfirepvp.modularmachinery.common.container.ContainerController;
 import hellfirepvp.modularmachinery.common.container.ContainerFactoryController;
 import hellfirepvp.modularmachinery.ModularMachinery;
@@ -116,7 +117,7 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
 
         if (message.kind == KIND_EVENT) {
             String buttonId = normalizeBounded(message.buttonId, MAX_BUTTON_ID_LENGTH);
-            if (buttonId == null) {
+            if (buttonId == null || ControllerButtonPolicyManager.matchEvent(controller, buttonId) == null) {
                 return;
             }
             postControllerButtonClickEvent(controller, buttonId);
@@ -125,6 +126,11 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
 
         String key = normalizeBounded(message.key, MAX_KEY_LENGTH);
         if (key == null || !Float.isFinite(message.value)) {
+            return;
+        }
+        ControllerButtonPolicyManager.ButtonPolicy policy =
+            ControllerButtonPolicyManager.matchSmart(controller, message.kind, key, message.value);
+        if (policy == null) {
             return;
         }
 
@@ -146,16 +152,18 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         if (!Float.isFinite(resolved)) {
             return;
         }
-        if (message.hasMin && message.hasMax && message.min > message.max) {
-            float swap = message.min;
-            message.min = message.max;
-            message.max = swap;
+        Float min = policy.min;
+        Float max = policy.max;
+        if (min != null && max != null && min.floatValue() > max.floatValue()) {
+            Float swap = min;
+            min = max;
+            max = swap;
         }
-        if (message.hasMin) {
-            resolved = Math.max(message.min, resolved);
+        if (min != null && Float.isFinite(min.floatValue())) {
+            resolved = Math.max(min.floatValue(), resolved);
         }
-        if (message.hasMax) {
-            resolved = Math.min(message.max, resolved);
+        if (max != null && Float.isFinite(max.floatValue())) {
+            resolved = Math.min(max.floatValue(), resolved);
         }
         if (!Float.isFinite(resolved)) {
             return;

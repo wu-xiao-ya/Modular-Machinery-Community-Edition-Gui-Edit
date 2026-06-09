@@ -269,7 +269,7 @@ public class MMCEGuiExt {
             top.getClass()
                 .getMethod("registerProvider", Class.forName("mcjty.theoneprobe.api.IProbeInfoProvider"))
                 .invoke(top, Class.forName("com.fushu.mmceguiext.common.integration.theoneprobe.CustomHatchInfoProvider").newInstance());
-        } catch (Exception ignored) {
+        } catch (Exception | LinkageError ignored) {
         }
     }
 }

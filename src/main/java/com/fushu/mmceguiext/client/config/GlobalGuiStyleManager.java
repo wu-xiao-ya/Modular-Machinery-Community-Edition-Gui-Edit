@@ -25,6 +25,9 @@ import java.util.List;
 public final class GlobalGuiStyleManager {
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private static final Path STYLE_DIR = resolveStyleDir();
+    private static final long MAX_STYLE_FILE_BYTES = 1024L * 1024L;
+    private static final int MAX_TEXTS = 512;
+    private static final int MAX_LAYERS = 256;
 
     private GlobalGuiStyleManager() {
     }
@@ -44,6 +47,10 @@ public final class GlobalGuiStyleManager {
             return StyleFile.EMPTY;
         }
         try {
+            if (Files.size(path) > MAX_STYLE_FILE_BYTES) {
+                LOGGER.warn("MMCE GUI ext style file {} is larger than {} bytes.", path, MAX_STYLE_FILE_BYTES);
+                return StyleFile.EMPTY;
+            }
             String text = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
             JsonObject root = new JsonParser().parse(text).getAsJsonObject();
             StyleFile style = new StyleFile();
@@ -102,7 +109,12 @@ public final class GlobalGuiStyleManager {
             return Collections.emptyList();
         }
         List<TextDef> out = new ArrayList<TextDef>();
-        for (JsonElement element : array) {
+        int limit = Math.min(array.size(), MAX_TEXTS);
+        if (array.size() > MAX_TEXTS) {
+            LOGGER.warn("Skipping {} extra global GUI texts; max is {}", array.size() - MAX_TEXTS, MAX_TEXTS);
+        }
+        for (int i = 0; i < limit; i++) {
+            JsonElement element = array.get(i);
             if (!element.isJsonObject()) {
                 continue;
             }
@@ -132,7 +144,12 @@ public final class GlobalGuiStyleManager {
             return Collections.emptyList();
         }
         List<GlobalTextureLayerConfig.LayerDef> out = new ArrayList<GlobalTextureLayerConfig.LayerDef>();
-        for (JsonElement element : array) {
+        int limit = Math.min(array.size(), MAX_LAYERS);
+        if (array.size() > MAX_LAYERS) {
+            LOGGER.warn("Skipping {} extra global GUI layers; max is {}", array.size() - MAX_LAYERS, MAX_LAYERS);
+        }
+        for (int i = 0; i < limit; i++) {
+            JsonElement element = array.get(i);
             if (!element.isJsonObject()) {
                 continue;
             }
@@ -146,11 +163,11 @@ public final class GlobalGuiStyleManager {
             layer.texture = texture;
             layer.x = orZero(getInt(obj, "x"));
             layer.y = orZero(getInt(obj, "y"));
-            layer.width = orZero(getInt(obj, "width"));
-            layer.height = orZero(getInt(obj, "height"));
-            layer.textureWidth = orZero(getInt(obj, "textureWidth"));
-            layer.textureHeight = orZero(getInt(obj, "textureHeight"));
-            layer.corner = getInt(obj, "corner") == null ? 8 : getInt(obj, "corner").intValue();
+            layer.width = clamp(orZero(getInt(obj, "width")), 1, 4096);
+            layer.height = clamp(orZero(getInt(obj, "height")), 1, 4096);
+            layer.textureWidth = clamp(orZero(getInt(obj, "textureWidth")), 1, 4096);
+            layer.textureHeight = clamp(orZero(getInt(obj, "textureHeight")), 1, 4096);
+            layer.corner = clamp(getInt(obj, "corner") == null ? 8 : getInt(obj, "corner").intValue(), 0, 1024);
             layer.useNineSlice = getBoolean(obj, "useNineSlice") != null && getBoolean(obj, "useNineSlice").booleanValue();
             layer.priority = getInt(obj, "priority") == null ? 0 : getInt(obj, "priority").intValue();
             out.add(layer);
@@ -161,6 +178,10 @@ public final class GlobalGuiStyleManager {
 
     private static int orZero(@Nullable Integer value) {
         return value == null ? 0 : value.intValue();
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     @Nullable

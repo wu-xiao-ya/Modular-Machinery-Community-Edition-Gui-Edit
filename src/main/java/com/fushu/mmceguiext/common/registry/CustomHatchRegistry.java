@@ -28,6 +28,9 @@ public final class CustomHatchRegistry {
     private static final int MAX_GRID_ROWS = 256;
     private static final int MAX_GRID_COLUMNS = 256;
     private static final int MAX_GRID_SLOTS = 4096;
+    private static final int MAX_TEXTS = 512;
+    private static final int MAX_GUI_COMPONENTS = 4096;
+    private static final int MAX_MACHINE_COMPONENTS = 256;
     private static final List<CustomHatchDef> CACHE = new ArrayList<CustomHatchDef>();
     private static final Map<String, CustomHatchDef> REGISTERED = new LinkedHashMap<String, CustomHatchDef>();
 
@@ -43,7 +46,7 @@ public final class CustomHatchRegistry {
         try (Stream<Path> stream = Files.list(HATCH_DIR)) {
             stream.filter(p -> p.toString().endsWith(".json")).forEach(path -> {
                 CustomHatchDef def = load(path);
-                if (def != null) {
+                if (def != null && !REGISTERED.containsKey(normalizeId(def.id))) {
                     CACHE.add(def);
                     REGISTERED.put(normalizeId(def.id), def);
                 }
@@ -176,7 +179,12 @@ public final class CustomHatchRegistry {
             return Collections.emptyList();
         }
         List<TextDef> out = new ArrayList<TextDef>();
-        for (JsonElement element : array) {
+        int limit = Math.min(array.size(), MAX_TEXTS);
+        if (array.size() > MAX_TEXTS) {
+            LOGGER.warn("Skipping {} extra custom hatch texts; max is {}", array.size() - MAX_TEXTS, MAX_TEXTS);
+        }
+        for (int i = 0; i < limit; i++) {
+            JsonElement element = array.get(i);
             if (!element.isJsonObject()) {
                 continue;
             }
@@ -211,7 +219,12 @@ public final class CustomHatchRegistry {
             return Collections.emptyList();
         }
         List<ComponentDef> out = new ArrayList<ComponentDef>();
-        for (JsonElement element : array) {
+        int limit = Math.min(array.size(), MAX_GUI_COMPONENTS);
+        if (array.size() > MAX_GUI_COMPONENTS) {
+            LOGGER.warn("Skipping {} extra custom hatch GUI components; max is {}", array.size() - MAX_GUI_COMPONENTS, MAX_GUI_COMPONENTS);
+        }
+        for (int i = 0; i < limit; i++) {
+            JsonElement element = array.get(i);
             if (!element.isJsonObject()) {
                 continue;
             }
@@ -324,6 +337,10 @@ public final class CustomHatchRegistry {
             LOGGER.warn("Skipping slot grid with overflowing base index {}", baseIndex);
             return;
         }
+        if (out.size() > MAX_GUI_COMPONENTS - (rows * columns)) {
+            LOGGER.warn("Skipping slot grid with {} cells because custom hatch GUI component cap is {}", rows * columns, MAX_GUI_COMPONENTS);
+            return;
+        }
         int ordinal = 0;
         for (int row = 0; row < rows; row++) {
             for (int column = 0; column < columns; column++) {
@@ -381,7 +398,12 @@ public final class CustomHatchRegistry {
             return Collections.emptyList();
         }
         List<MachineComponentDef> out = new ArrayList<MachineComponentDef>();
-        for (JsonElement element : array) {
+        int limit = Math.min(array.size(), MAX_MACHINE_COMPONENTS);
+        if (array.size() > MAX_MACHINE_COMPONENTS) {
+            LOGGER.warn("Skipping {} extra custom hatch machine components; max is {}", array.size() - MAX_MACHINE_COMPONENTS, MAX_MACHINE_COMPONENTS);
+        }
+        for (int i = 0; i < limit; i++) {
+            JsonElement element = array.get(i);
             if (!element.isJsonObject()) {
                 continue;
             }
