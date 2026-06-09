@@ -48,11 +48,15 @@ public class PktCustomMEItemInputBusInvAction implements IMessage, IMessageHandl
         if (!(player.openContainer instanceof ContainerCustomMEItemInputBus)) {
             return;
         }
-        if (message.slotID < 0 || message.slotID >= player.openContainer.inventorySlots.size()) {
+        ContainerCustomMEItemInputBus container = (ContainerCustomMEItemInputBus) player.openContainer;
+        if (message.slotID < 0 || message.slotID >= container.inventorySlots.size()) {
+            return;
+        }
+        if (!container.isConfigSlotNumber(message.slotID)) {
             return;
         }
 
-        Slot slot = player.openContainer.getSlot(message.slotID);
+        Slot slot = container.getSlot(message.slotID);
         if (!(slot instanceof SlotFake)) {
             return;
         }
