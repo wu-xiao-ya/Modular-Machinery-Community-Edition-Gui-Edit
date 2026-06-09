@@ -118,15 +118,15 @@ public final class CustomHatchRegistry {
             def.guiStyleFile = getString(root, "guiStyleFile");
             def.componentType = lower(getString(root, "componentType"));
             def.ioType = lower(getString(root, "ioType"));
-            def.machineComponents = parseMachineComponents(root.getAsJsonArray("components"));
+            def.machineComponents = parseMachineComponents(getArray(root, "components"));
             def.capacity = getInt(root, "capacity", 1000);
             def.fluidCapacity = getInt(root, "fluidCapacity", def.capacity);
             def.gasCapacity = getInt(root, "gasCapacity", def.capacity);
-            def.inputSlot = parseSlot(root.getAsJsonObject("inputSlot"));
-            def.outputSlot = parseSlot(root.getAsJsonObject("outputSlot"));
-            def.tank = parseTank(root.getAsJsonObject("tank"));
-            def.texts = parseTexts(root.getAsJsonArray("texts"));
-            def.gui = parseGui(root.getAsJsonObject("gui"));
+            def.inputSlot = parseSlot(getObject(root, "inputSlot"));
+            def.outputSlot = parseSlot(getObject(root, "outputSlot"));
+            def.tank = parseTank(getObject(root, "tank"));
+            def.texts = parseTexts(getArray(root, "texts"));
+            def.gui = parseGui(getObject(root, "gui"));
             if (def.gui != null && !def.gui.components.isEmpty()) {
                 applyGuiComponents(def);
             }
@@ -149,7 +149,7 @@ public final class CustomHatchRegistry {
 
     private static BlockDef parseBlock(JsonObject root) {
         BlockDef block = new BlockDef();
-        JsonObject obj = root.getAsJsonObject("block");
+        JsonObject obj = getObject(root, "block");
         block.model = getString(obj, root, "model", getString(root, "blockModel"));
         block.material = getString(obj, root, "material", block.material);
         block.hardness = getFloat(obj, root, "hardness", block.hardness);
@@ -215,7 +215,7 @@ public final class CustomHatchRegistry {
         gui.height = clamp(getInt(obj, "height", 166), 1, 4096);
         gui.coordinateWidth = clampCoordinateSize(getInt(obj, "coordinateWidth", -1));
         gui.coordinateHeight = clampCoordinateSize(getInt(obj, "coordinateHeight", -1));
-        gui.components = parseComponents(obj.getAsJsonArray("components"));
+        gui.components = parseComponents(getArray(obj, "components"));
         return gui;
     }
 
@@ -469,6 +469,18 @@ public final class CustomHatchRegistry {
     private static String getString(JsonObject obj, String key) {
         JsonElement e = obj.get(key);
         return asString(e, null);
+    }
+
+    @Nullable
+    private static JsonObject getObject(@Nullable JsonObject obj, String key) {
+        JsonElement e = obj == null ? null : obj.get(key);
+        return e != null && e.isJsonObject() ? e.getAsJsonObject() : null;
+    }
+
+    @Nullable
+    private static JsonArray getArray(@Nullable JsonObject obj, String key) {
+        JsonElement e = obj == null ? null : obj.get(key);
+        return e != null && e.isJsonArray() ? e.getAsJsonArray() : null;
     }
 
     private static String getString(@Nullable JsonObject primary, JsonObject fallbackObj, String key, String fallback) {

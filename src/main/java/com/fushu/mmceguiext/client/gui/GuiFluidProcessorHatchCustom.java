@@ -660,6 +660,9 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             if (component == null || !"slot".equalsIgnoreCase(component.type)) {
                 continue;
             }
+            if (!isRuntimeSlotRole(component.role)) {
+                continue;
+            }
             if (ordinal++ == guiSlotOrdinal) {
                 return component;
             }
@@ -690,6 +693,9 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         this.slotGridStates.clear();
         for (CustomHatchRegistry.ComponentDef component : this.components) {
             if (component == null || !"slot".equalsIgnoreCase(component.type) || component.index < 0) {
+                continue;
+            }
+            if (!isRuntimeSlotRole(component.role)) {
                 continue;
             }
             if (component.rows <= 0 || component.columns <= 0 || component.visibleRows <= 0 || component.visibleRows >= component.rows) {
@@ -740,6 +746,10 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             state.scrollbar.setRange(0, state.maxScroll, state.scrollMode == ScrollMode.PAGE ? state.visibleRows : 1);
             this.slotGridStates.put(key, state);
         }
+    }
+
+    private static boolean isRuntimeSlotRole(@Nullable String role) {
+        return "input".equalsIgnoreCase(role) || "output".equalsIgnoreCase(role);
     }
 
     private void handleSlotGridWheel(int mouseX, int mouseY, int wheel) {

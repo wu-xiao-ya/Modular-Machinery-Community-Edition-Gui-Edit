@@ -2,6 +2,8 @@ package com.fushu.mmceguiext.common.registry;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.config.TextureLayerDef;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.util.ResourceLocation;
@@ -102,10 +104,10 @@ public final class CustomAEMixedOutputBusRegistry {
             def.guiHeight = clamp(getInt(root, "guiHeight", 235), 1, 4096);
             def.backgroundTextureWidth = clamp(getInt(root, "backgroundTextureWidth", def.guiWidth), 1, 4096);
             def.backgroundTextureHeight = clamp(getInt(root, "backgroundTextureHeight", def.guiHeight), 1, 4096);
-            def.textureLayers = parseTextureLayers(root.getAsJsonArray("textureLayers"));
+            def.textureLayers = parseTextureLayers(getArray(root, "textureLayers"));
             def.blockTexture = getString(root, "blockTexture");
             def.blockModel = getBlockModel(root);
-            def.gui = parseGui(root.getAsJsonObject("gui"));
+            def.gui = parseGui(getObject(root, "gui"));
             applyGuiComponents(def);
             return def.id == null || def.id.trim().isEmpty() ? null : def;
         } catch (Exception ex) {
@@ -121,7 +123,7 @@ public final class CustomAEMixedOutputBusRegistry {
         }
         gui.width = clamp(getInt(obj, "width", 176), 1, 4096);
         gui.height = clamp(getInt(obj, "height", 235), 1, 4096);
-        gui.components = parseComponents(obj.getAsJsonArray("components"));
+        gui.components = parseComponents(getArray(obj, "components"));
         return gui;
     }
 
@@ -310,9 +312,21 @@ public final class CustomAEMixedOutputBusRegistry {
 
     @Nullable
     private static String getBlockModel(JsonObject root) {
-        JsonObject block = root == null ? null : root.getAsJsonObject("block");
+        JsonObject block = getObject(root, "block");
         String nested = getString(block, "model");
         return nested == null || nested.trim().isEmpty() ? getString(root, "blockModel") : nested;
+    }
+
+    @Nullable
+    private static JsonObject getObject(@Nullable JsonObject obj, String key) {
+        JsonElement e = obj == null ? null : obj.get(key);
+        return e != null && e.isJsonObject() ? e.getAsJsonObject() : null;
+    }
+
+    @Nullable
+    private static JsonArray getArray(@Nullable JsonObject obj, String key) {
+        JsonElement e = obj == null ? null : obj.get(key);
+        return e != null && e.isJsonArray() ? e.getAsJsonArray() : null;
     }
 
     private static int getInt(@Nullable JsonObject obj, String key, int fallback) {

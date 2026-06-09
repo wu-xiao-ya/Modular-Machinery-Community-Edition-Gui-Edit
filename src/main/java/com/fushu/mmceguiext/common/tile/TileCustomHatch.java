@@ -612,6 +612,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             if (component == null || !"slot".equalsIgnoreCase(component.type)) {
                 continue;
             }
+            if (!isRuntimeSlotRole(component.role)) {
+                continue;
+            }
             int index;
             if (component.index >= 0) {
                 if (component.index > MAX_DYNAMIC_SLOT_INDEX) {
@@ -632,10 +635,29 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
                 inputs.add(Integer.valueOf(index));
             }
         }
-        if (maxIndex < 0) {
+        if (maxIndex < 0 && !hasGuiSlotComponents(def)) {
             return new InventoryLayout(new int[]{INPUT_SLOT}, new int[]{OUTPUT_SLOT}, 2);
         }
+        if (maxIndex < 0) {
+            return new InventoryLayout(new int[0], new int[0], 0);
+        }
         return new InventoryLayout(toSortedUniqueIntArray(inputs), toSortedUniqueIntArray(outputs), maxIndex + 1);
+    }
+
+    private static boolean hasGuiSlotComponents(CustomHatchRegistry.CustomHatchDef def) {
+        if (def == null || def.gui == null || def.gui.components == null) {
+            return false;
+        }
+        for (CustomHatchRegistry.ComponentDef component : def.gui.components) {
+            if (component != null && "slot".equalsIgnoreCase(component.type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isRuntimeSlotRole(@Nullable String role) {
+        return "input".equalsIgnoreCase(role) || "output".equalsIgnoreCase(role);
     }
 
     private static int[] toSortedUniqueIntArray(List<Integer> values) {

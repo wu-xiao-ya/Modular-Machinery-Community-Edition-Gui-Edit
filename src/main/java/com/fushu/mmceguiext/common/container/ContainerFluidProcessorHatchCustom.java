@@ -29,6 +29,9 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
                     if (component == null || !"slot".equalsIgnoreCase(component.type)) {
                         continue;
                     }
+                    if (!isRuntimeSlotRole(component.role)) {
+                        continue;
+                    }
                     int slotIndex;
                     if (component.index >= 0) {
                         slotIndex = component.index;
@@ -39,12 +42,12 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
                     if (slotIndex < 0 || slotIndex >= itemHandler.getSlots()) {
                         continue;
                     }
-                    boolean insertable = !"output".equalsIgnoreCase(component.role);
+                    boolean insertable = "input".equalsIgnoreCase(component.role);
                     addCustomSlot(itemHandler, slotIndex, component.x, component.y, insertable);
                     added++;
                 }
             }
-            if (added == 0 && itemHandler.getSlots() >= 2) {
+            if (added == 0 && !hasGuiSlotComponents(def) && itemHandler.getSlots() >= 2) {
                 addCustomSlot(itemHandler, 0, def.inputSlot.x, def.inputSlot.y, true);
                 addCustomSlot(itemHandler, 1, def.outputSlot.x, def.outputSlot.y, false);
                 added = 2;
@@ -69,6 +72,9 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
     @Override
     public ItemStack transferStackInSlot(@Nonnull EntityPlayer playerIn, int index) {
         ItemStack itemstack = ItemStack.EMPTY;
+        if (index < 0 || index >= this.inventorySlots.size()) {
+            return itemstack;
+        }
         Slot slot = this.inventorySlots.get(index);
 
         if (slot != null && slot.getHasStack()) {
@@ -110,6 +116,22 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
         }
 
         return itemstack;
+    }
+
+    private static boolean hasGuiSlotComponents(CustomHatchRegistry.CustomHatchDef def) {
+        if (def == null || def.gui == null || def.gui.components == null) {
+            return false;
+        }
+        for (CustomHatchRegistry.ComponentDef component : def.gui.components) {
+            if (component != null && "slot".equalsIgnoreCase(component.type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isRuntimeSlotRole(String role) {
+        return "input".equalsIgnoreCase(role) || "output".equalsIgnoreCase(role);
     }
 
     private void addCustomSlot(IItemHandlerModifiable itemHandler, int slotIndex, int x, int y, boolean insertable) {

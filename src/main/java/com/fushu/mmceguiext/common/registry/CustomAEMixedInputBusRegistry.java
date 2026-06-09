@@ -2,6 +2,8 @@ package com.fushu.mmceguiext.common.registry;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.config.TextureLayerDef;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
@@ -102,22 +104,22 @@ public final class CustomAEMixedInputBusRegistry {
             def.guiHeight = clamp(getInt(root, "guiHeight", 235), 1, 4096);
             def.backgroundTextureWidth = clamp(getInt(root, "backgroundTextureWidth", def.guiWidth), 1, 4096);
             def.backgroundTextureHeight = clamp(getInt(root, "backgroundTextureHeight", def.guiHeight), 1, 4096);
-            def.textureLayers = parseTextureLayers(root.getAsJsonArray("textureLayers"));
+            def.textureLayers = parseTextureLayers(getArray(root, "textureLayers"));
             def.playerInventoryX = getInt(root, "playerInventoryX", 8);
             def.playerInventoryY = getInt(root, "playerInventoryY", 141);
             def.playerHotbarY = getInt(root, "playerHotbarY", 199);
-            def.configSlots = new ArrayList<SlotPoint>(parseSlotPoints(root.getAsJsonArray("configSlots")));
-            def.storageSlots = new ArrayList<SlotPoint>(parseSlotPoints(root.getAsJsonArray("storageSlots")));
-            def.fluidConfigSlot = parseSlotPoint(root.getAsJsonObject("fluidConfigSlot"));
-            def.fluidStorageTank = parseTankRect(root.getAsJsonObject("fluidStorageTank"));
-            def.gasConfigSlot = parseSlotPoint(root.getAsJsonObject("gasConfigSlot"));
-            def.gasStorageTank = parseTankRect(root.getAsJsonObject("gasStorageTank"));
-            def.fluidConfigTanks = new ArrayList<TankRect>(parseTankRects(root.getAsJsonArray("fluidConfigTanks")));
-            def.gasConfigTanks = new ArrayList<TankRect>(parseTankRects(root.getAsJsonArray("gasConfigTanks")));
-            def.fluidConfigTank = parseTankRect(root.getAsJsonObject("fluidConfigTank"));
-            def.gasConfigTank = parseTankRect(root.getAsJsonObject("gasConfigTank"));
-            def.fluidStorageTanks = new ArrayList<TankRect>(parseTankRects(root.getAsJsonArray("fluidStorageTanks")));
-            def.gasStorageTanks = new ArrayList<TankRect>(parseTankRects(root.getAsJsonArray("gasStorageTanks")));
+            def.configSlots = new ArrayList<SlotPoint>(parseSlotPoints(getArray(root, "configSlots")));
+            def.storageSlots = new ArrayList<SlotPoint>(parseSlotPoints(getArray(root, "storageSlots")));
+            def.fluidConfigSlot = parseSlotPoint(getObject(root, "fluidConfigSlot"));
+            def.fluidStorageTank = parseTankRect(getObject(root, "fluidStorageTank"));
+            def.gasConfigSlot = parseSlotPoint(getObject(root, "gasConfigSlot"));
+            def.gasStorageTank = parseTankRect(getObject(root, "gasStorageTank"));
+            def.fluidConfigTanks = new ArrayList<TankRect>(parseTankRects(getArray(root, "fluidConfigTanks")));
+            def.gasConfigTanks = new ArrayList<TankRect>(parseTankRects(getArray(root, "gasConfigTanks")));
+            def.fluidConfigTank = parseTankRect(getObject(root, "fluidConfigTank"));
+            def.gasConfigTank = parseTankRect(getObject(root, "gasConfigTank"));
+            def.fluidStorageTanks = new ArrayList<TankRect>(parseTankRects(getArray(root, "fluidStorageTanks")));
+            def.gasStorageTanks = new ArrayList<TankRect>(parseTankRects(getArray(root, "gasStorageTanks")));
             if (def.fluidConfigTank != null && def.fluidConfigTanks.isEmpty()) {
                 def.fluidConfigTanks.add(def.fluidConfigTank);
             }
@@ -132,7 +134,7 @@ public final class CustomAEMixedInputBusRegistry {
             }
             def.blockTexture = getString(root, "blockTexture");
             def.blockModel = getBlockModel(root);
-            def.gui = parseGui(root.getAsJsonObject("gui"));
+            def.gui = parseGui(getObject(root, "gui"));
             if (def.gui != null && def.gui.components != null && !def.gui.components.isEmpty()) {
                 applyGuiComponents(def);
             } else {
@@ -152,7 +154,7 @@ public final class CustomAEMixedInputBusRegistry {
         }
         gui.width = clamp(getInt(obj, "width", 176), 1, 4096);
         gui.height = clamp(getInt(obj, "height", 235), 1, 4096);
-        gui.components = parseComponents(obj.getAsJsonArray("components"));
+        gui.components = parseComponents(getArray(obj, "components"));
         return gui;
     }
 
@@ -610,9 +612,21 @@ public final class CustomAEMixedInputBusRegistry {
 
     @Nullable
     private static String getBlockModel(JsonObject root) {
-        JsonObject block = root == null ? null : root.getAsJsonObject("block");
+        JsonObject block = getObject(root, "block");
         String nested = getString(block, "model");
         return nested == null || nested.trim().isEmpty() ? getString(root, "blockModel") : nested;
+    }
+
+    @Nullable
+    private static JsonObject getObject(@Nullable JsonObject obj, String key) {
+        JsonElement e = obj == null ? null : obj.get(key);
+        return e != null && e.isJsonObject() ? e.getAsJsonObject() : null;
+    }
+
+    @Nullable
+    private static JsonArray getArray(@Nullable JsonObject obj, String key) {
+        JsonElement e = obj == null ? null : obj.get(key);
+        return e != null && e.isJsonArray() ? e.getAsJsonArray() : null;
     }
 
     private static int getInt(@Nullable JsonObject obj, String key, int fallback) {
