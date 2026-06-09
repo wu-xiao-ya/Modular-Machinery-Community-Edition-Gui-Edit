@@ -170,7 +170,7 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
     }
 
     private static boolean isPlayerEditingThisController(EntityPlayerMP player, BlockPos controllerPos) {
-        if (player.getDistanceSqToCenter(controllerPos) > 64D * 64D) {
+        if (player.getDistanceSqToCenter(controllerPos) > 64D) {
             return false;
         }
 
