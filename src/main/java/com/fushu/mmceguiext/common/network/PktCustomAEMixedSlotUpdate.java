@@ -55,17 +55,25 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
     @Override
     public IMessage onMessage(PktCustomAEMixedSlotUpdate message, MessageContext ctx) {
         EntityPlayerMP player = ctx.getServerHandler().player;
-        if (player == null || player.world == null || !player.world.isBlockLoaded(message.pos)) {
+        if (player == null) {
             return null;
+        }
+        player.getServerWorld().addScheduledTask(() -> handle(message, player));
+        return null;
+    }
+
+    private static void handle(PktCustomAEMixedSlotUpdate message, EntityPlayerMP player) {
+        if (player == null || player.world == null || !player.world.isBlockLoaded(message.pos)) {
+            return;
         }
         TileEntity tile = player.world.getTileEntity(message.pos);
         if (!(tile instanceof TileCustomAEMixedInputBus)) {
-            return null;
+            return;
         }
         TileCustomAEMixedInputBus bus = (TileCustomAEMixedInputBus) tile;
         if (!(player.openContainer instanceof ContainerCustomAEMixedInputBus)
             || ((ContainerCustomAEMixedInputBus) player.openContainer).getOwner() != bus) {
-            return null;
+            return;
         }
         ItemStack held = player.inventory.getItemStack();
         if (held.isEmpty()) {
@@ -77,7 +85,7 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
 
         if (message.target == TARGET_FLUID) {
             if (message.slotIndex < 0 || message.slotIndex >= bus.getFluidConfig().getSlots()) {
-                return null;
+                return;
             }
             int slot = message.slotIndex;
             if (held.isEmpty()) {
@@ -87,12 +95,12 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
                 bus.getFluidConfig().setFluidInSlot(slot, fluid == null ? null : AEFluidStack.fromFluidStack(fluid));
             }
             bus.markForUpdateSync();
-            return null;
+            return;
         }
 
         if (message.target == TARGET_GAS) {
             if (message.slotIndex < 0 || message.slotIndex >= bus.getGasConfig().size()) {
-                return null;
+                return;
             }
             int slot = message.slotIndex;
             if (held.isEmpty()) {
@@ -103,7 +111,5 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
             }
             bus.markForUpdateSync();
         }
-
-        return null;
     }
 }

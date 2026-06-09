@@ -1,7 +1,7 @@
 package com.fushu.mmceguiext.common.registry;
 
-import com.fushu.mmceguiext.client.gui.GlobalTextureLayerConfig;
 import com.fushu.mmceguiext.MMCEGuiExt;
+import com.fushu.mmceguiext.common.config.TextureLayerDef;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
@@ -172,21 +172,21 @@ public final class CustomAEMixedInputBusRegistry {
         return out;
     }
 
-    private static List<GlobalTextureLayerConfig.LayerDef> parseTextureLayers(@Nullable com.google.gson.JsonArray array) {
+    private static List<TextureLayerDef> parseTextureLayers(@Nullable com.google.gson.JsonArray array) {
         if (array == null || array.size() == 0) {
             return Collections.emptyList();
         }
-        List<GlobalTextureLayerConfig.LayerDef> out = new ArrayList<GlobalTextureLayerConfig.LayerDef>();
+        List<TextureLayerDef> out = new ArrayList<TextureLayerDef>();
         for (int i = 0; i < array.size(); i++) {
             if (!array.get(i).isJsonObject()) {
                 continue;
             }
             JsonObject obj = array.get(i).getAsJsonObject();
-            ResourceLocation texture = com.fushu.mmceguiext.client.gui.GuiRenderUtils.parseOptionalTexture(getString(obj, "texture"));
+            ResourceLocation texture = parseOptionalTexture(getString(obj, "texture"));
             if (texture == null) {
                 continue;
             }
-            GlobalTextureLayerConfig.LayerDef def = new GlobalTextureLayerConfig.LayerDef();
+            TextureLayerDef def = new TextureLayerDef();
             def.foreground = obj.has("foreground") && !obj.get("foreground").isJsonNull() && obj.get("foreground").getAsBoolean();
             def.texture = texture;
             def.x = getInt(obj, "x", 0);
@@ -201,6 +201,41 @@ public final class CustomAEMixedInputBusRegistry {
             out.add(def);
         }
         return out;
+    }
+
+    @Nullable
+    private static ResourceLocation parseOptionalTexture(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String raw = value.trim().replace('\\', '/');
+        if (raw.isEmpty()) {
+            return null;
+        }
+        if (raw.endsWith(".png")) {
+            raw = raw.substring(0, raw.length() - 4);
+        }
+        if (raw.startsWith("assets/")) {
+            String rest = raw.substring("assets/".length());
+            int slash = rest.indexOf('/');
+            if (slash > 0) {
+                String namespace = rest.substring(0, slash);
+                String path = rest.substring(slash + 1);
+                while (path.startsWith("textures/")) {
+                    path = path.substring("textures/".length());
+                }
+                return new ResourceLocation(namespace, "textures/" + path + ".png");
+            }
+        }
+        if (raw.contains(":")) {
+            String[] split = raw.split(":", 2);
+            String path = split[1];
+            if (path.startsWith("textures/")) {
+                return new ResourceLocation(split[0], path + ".png");
+            }
+            return new ResourceLocation(split[0], "textures/" + path + ".png");
+        }
+        return new ResourceLocation(MMCEGuiExt.MODID, "textures/" + raw + ".png");
     }
 
     private static void applyGuiComponents(Def def) {
@@ -497,7 +532,7 @@ public final class CustomAEMixedInputBusRegistry {
         public int guiHeight = 235;
         public int backgroundTextureWidth = 176;
         public int backgroundTextureHeight = 235;
-        public List<GlobalTextureLayerConfig.LayerDef> textureLayers = Collections.emptyList();
+        public List<TextureLayerDef> textureLayers = Collections.emptyList();
         public int playerInventoryX = 8;
         public int playerInventoryY = 141;
         public int playerHotbarY = 199;

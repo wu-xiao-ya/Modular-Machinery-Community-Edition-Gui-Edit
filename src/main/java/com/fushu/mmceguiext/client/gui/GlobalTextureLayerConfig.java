@@ -1,5 +1,6 @@
 package com.fushu.mmceguiext.client.gui;
 
+import com.fushu.mmceguiext.common.config.TextureLayerDef;
 import net.minecraft.util.ResourceLocation;
 
 import javax.annotation.Nullable;
@@ -65,12 +66,12 @@ public final class GlobalTextureLayerConfig {
         }
     }
 
-    public static void drawLayers(List<LayerDef> layers, boolean foreground, int guiLeft, int guiTop, int originOffsetX, int originOffsetY) {
+    public static void drawLayers(List<? extends TextureLayerDef> layers, boolean foreground, int guiLeft, int guiTop, int originOffsetX, int originOffsetY) {
         drawLayers(layers, foreground, guiLeft, guiTop, originOffsetX, originOffsetY, null);
     }
 
     public static void drawLayers(
-        List<LayerDef> layers,
+        List<? extends TextureLayerDef> layers,
         boolean foreground,
         int guiLeft,
         int guiTop,
@@ -78,7 +79,7 @@ public final class GlobalTextureLayerConfig {
         int originOffsetY,
         @Nullable Integer priorityFilter
     ) {
-        for (LayerDef layer : layers) {
+        for (TextureLayerDef layer : layers) {
             if (layer.foreground != foreground) {
                 continue;
             }
@@ -98,10 +99,10 @@ public final class GlobalTextureLayerConfig {
         }
     }
 
-    public static SortedSet<Integer> collectPriorities(List<LayerDef> layers, boolean foreground, int basePriority) {
+    public static SortedSet<Integer> collectPriorities(List<? extends TextureLayerDef> layers, boolean foreground, int basePriority) {
         SortedSet<Integer> priorities = new TreeSet<Integer>();
         priorities.add(Integer.valueOf(basePriority));
-        for (LayerDef layer : layers) {
+        for (TextureLayerDef layer : layers) {
             if (layer != null && layer.foreground == foreground) {
                 priorities.add(Integer.valueOf(layer.priority));
             }
@@ -109,17 +110,6 @@ public final class GlobalTextureLayerConfig {
         return priorities;
     }
 
-    public static class LayerDef {
-        public boolean foreground;
-        public ResourceLocation texture;
-        public int x;
-        public int y;
-        public int width;
-        public int height;
-        public int textureWidth;
-        public int textureHeight;
-        public int corner;
-        public boolean useNineSlice;
-        public int priority;
+    public static class LayerDef extends TextureLayerDef {
     }
 }

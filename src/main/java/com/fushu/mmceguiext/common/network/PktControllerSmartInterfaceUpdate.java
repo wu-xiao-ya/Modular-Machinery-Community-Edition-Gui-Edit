@@ -48,34 +48,48 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
 
     @Override
     public IMessage onMessage(PktControllerSmartInterfaceUpdate message, MessageContext ctx) {
-        if (message == null || message.interfaceType == null || message.interfaceType.trim().isEmpty()) {
+        EntityPlayerMP player = ctx.getServerHandler().player;
+        if (player == null) {
             return null;
+        }
+        player.getServerWorld().addScheduledTask(() -> handle(message, player));
+        return null;
+    }
+
+    private static void handle(PktControllerSmartInterfaceUpdate message, EntityPlayerMP player) {
+        if (message == null || message.interfaceType == null || message.interfaceType.trim().isEmpty()) {
+            return;
         }
         if (!Float.isFinite(message.value)) {
-            return null;
+            return;
         }
 
-        EntityPlayerMP player = ctx.getServerHandler().player;
         if (player == null || player.world == null || !player.world.isBlockLoaded(message.controllerPos)) {
-            return null;
+            return;
         }
         if (!isPlayerEditingThisController(player, message.controllerPos)) {
-            return null;
+            return;
         }
 
         TileEntity tile = player.world.getTileEntity(message.controllerPos);
         if (!(tile instanceof TileMultiblockMachineController)) {
-            return null;
+            return;
         }
         TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
+        applySmartInterfaceUpdate(controller, message.controllerPos, message.interfaceType, message.value);
+    }
 
-        if (tryInvokeControllerSmartUpdate(controller, message.interfaceType, message.value)) {
-            return null;
+    static boolean applySmartInterfaceUpdate(TileMultiblockMachineController controller, BlockPos controllerPos, String interfaceType, float value) {
+        if (controller == null || controllerPos == null || interfaceType == null || interfaceType.trim().isEmpty() || !Float.isFinite(value)) {
+            return false;
+        }
+        if (tryInvokeControllerSmartUpdate(controller, interfaceType, value)) {
+            return true;
         }
 
         boolean updated = false;
         for (Map.Entry<TileSmartInterface.SmartInterfaceProvider, String> entry : controller.getFoundSmartInterfaces().entrySet()) {
-            if (!message.interfaceType.equals(entry.getValue())) {
+            if (!interfaceType.equals(entry.getValue())) {
                 continue;
             }
             TileSmartInterface.SmartInterfaceProvider provider = entry.getKey();
@@ -83,23 +97,22 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
                 continue;
             }
 
-            SmartInterfaceData current = provider.getMachineData(message.controllerPos);
+            SmartInterfaceData current = provider.getMachineData(controllerPos);
             if (current == null) {
                 continue;
             }
 
-            provider.addMachineData(message.controllerPos, current.getParent(), current.getType(), message.value, true);
+            provider.addMachineData(controllerPos, current.getParent(), current.getType(), value, true);
             updated = true;
             break;
         }
         if (!updated) {
-            updated = tryWriteControllerCustomData(controller, message.interfaceType, message.value);
+            updated = tryWriteControllerCustomData(controller, interfaceType, value);
         }
         if (updated) {
             controller.markForUpdateSync();
         }
-
-        return null;
+        return updated;
     }
 
     private static boolean tryInvokeControllerSmartUpdate(TileMultiblockMachineController controller, String interfaceType, float value) {

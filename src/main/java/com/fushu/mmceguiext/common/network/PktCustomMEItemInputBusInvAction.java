@@ -37,26 +37,33 @@ public class PktCustomMEItemInputBusInvAction implements IMessage, IMessageHandl
     @Override
     public IMessage onMessage(final PktCustomMEItemInputBusInvAction message, final MessageContext ctx) {
         EntityPlayerMP player = ctx.getServerHandler().player;
-        if (!(player.openContainer instanceof ContainerCustomMEItemInputBus)) {
+        if (player == null) {
             return null;
         }
+        player.getServerWorld().addScheduledTask(() -> handle(message, player));
+        return null;
+    }
+
+    private static void handle(final PktCustomMEItemInputBusInvAction message, final EntityPlayerMP player) {
+        if (!(player.openContainer instanceof ContainerCustomMEItemInputBus)) {
+            return;
+        }
         if (message.slotID < 0 || message.slotID >= player.openContainer.inventorySlots.size()) {
-            return null;
+            return;
         }
 
         Slot slot = player.openContainer.getSlot(message.slotID);
         if (!(slot instanceof SlotFake)) {
-            return null;
+            return;
         }
 
         ItemStack stack = slot.getStack();
-        if (stack.isEmpty() || message.newAmount == 0) {
-            return null;
+        if (stack.isEmpty() || message.newAmount <= 0) {
+            return;
         }
 
         ItemStack newStack = stack.copy();
         newStack.setCount(message.newAmount);
         slot.putStack(newStack);
-        return null;
     }
 }

@@ -2251,19 +2251,6 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             }
             button.button.enabled = !"page".equals(button.action) || !button.targetPage.equals(this.activePageId);
             if (button.button.mousePressed(this.mc, mouseX, mouseY)) {
-                ModularMachinery.log.info(
-                    "[MMCEGE] Machine GUI button hit id={} action={} key={} value={} mouse=({}, {}) rect=({}, {}, {}, {})",
-                    button.id,
-                    button.action,
-                    button.key,
-                    button.value,
-                    mouseX,
-                    mouseY,
-                    button.button.x,
-                    button.button.y,
-                    button.button.width,
-                    button.button.height
-                );
                 button.button.playPressSound(this.mc.getSoundHandler());
                 activateCustomButton(button);
                 return true;
@@ -2291,15 +2278,6 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         if (button.key == null || button.key.trim().isEmpty() || !Float.isFinite(button.value)) {
             return;
         }
-        ModularMachinery.log.info(
-            "[MMCEGE] Machine GUI send smart button id={} key={} additive={} value={} min={} max={}",
-            button.id,
-            button.key,
-            "smart_add".equals(button.action),
-            button.value,
-            button.min,
-            button.max
-        );
         MMCEGuiExt.NET_CHANNEL.sendToServer(PktControllerButtonAction.smart(
             this.controller.getPos(),
             button.key,

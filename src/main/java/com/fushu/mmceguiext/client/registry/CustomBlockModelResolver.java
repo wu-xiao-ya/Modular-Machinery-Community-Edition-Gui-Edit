@@ -1,4 +1,4 @@
-package com.fushu.mmceguiext.common.registry;
+package com.fushu.mmceguiext.client.registry;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
 import net.minecraft.client.renderer.block.model.ModelResourceLocation;
@@ -6,11 +6,11 @@ import net.minecraft.util.ResourceLocation;
 
 import javax.annotation.Nullable;
 
-final class CustomBlockModelResolver {
+public final class CustomBlockModelResolver {
     private CustomBlockModelResolver() {
     }
 
-    static ModelResourceLocation resolve(@Nullable String rawModel, ResourceLocation fallbackLocation, String fallbackVariant) {
+    public static ModelResourceLocation resolve(@Nullable String rawModel, ResourceLocation fallbackLocation, String fallbackVariant) {
         ModelBinding parsed = parseModelBinding(rawModel);
         if (parsed != null) {
             return new ModelResourceLocation(parsed.location, parsed.variant);

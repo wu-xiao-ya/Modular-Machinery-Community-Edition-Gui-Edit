@@ -91,40 +91,37 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
     @Override
     public IMessage onMessage(PktControllerButtonAction message, MessageContext ctx) {
         EntityPlayerMP player = ctx.getServerHandler().player;
-        if (player == null || player.world == null || !player.world.isBlockLoaded(message.controllerPos)) {
+        if (player == null) {
             return null;
         }
-        ModularMachinery.log.info(
-            "[MMCEGE] Server received button packet pos={} kind={} key={} buttonId={} value={} player={}",
-            message.controllerPos,
-            message.kind,
-            message.key,
-            message.buttonId,
-            message.value,
-            player.getName()
-        );
+        player.getServerWorld().addScheduledTask(() -> handle(message, player));
+        return null;
+    }
+
+    private static void handle(PktControllerButtonAction message, EntityPlayerMP player) {
+        if (player == null || player.world == null || !player.world.isBlockLoaded(message.controllerPos)) {
+            return;
+        }
         if (!isPlayerEditingThisController(player, message.controllerPos)) {
-            ModularMachinery.log.warn("[MMCEGE] Reject button packet: player is not editing controller at {}", message.controllerPos);
-            return null;
+            return;
         }
 
         TileEntity tile = player.world.getTileEntity(message.controllerPos);
         if (!(tile instanceof TileMultiblockMachineController)) {
-            return null;
+            return;
         }
         TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
 
         if (message.kind == KIND_EVENT) {
             if (message.buttonId == null || message.buttonId.trim().isEmpty()) {
-                return null;
+                return;
             }
-            ModularMachinery.log.info("[MMCEGE] Handling event button {}", message.buttonId);
             postControllerButtonClickEvent(controller, message.buttonId);
-            return null;
+            return;
         }
 
         if (message.key == null || message.key.trim().isEmpty() || !Float.isFinite(message.value)) {
-            return null;
+            return;
         }
 
         float resolved = message.value;
@@ -137,7 +134,7 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
             resolved = base + message.value;
         }
         if (!Float.isFinite(resolved)) {
-            return null;
+            return;
         }
         if (message.hasMin && message.hasMax && message.min > message.max) {
             float swap = message.min;
@@ -151,39 +148,9 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
             resolved = Math.min(message.max, resolved);
         }
         if (!Float.isFinite(resolved)) {
-            return null;
+            return;
         }
-        ModularMachinery.log.info(
-            "[MMCEGE] Applying smart button key={} resolved={} hasMin={} min={} hasMax={} max={}",
-            message.key,
-            resolved,
-            message.hasMin,
-            message.min,
-            message.hasMax,
-            message.max
-        );
-
-        writeControllerCustomData(controller, message.key, resolved);
-        PktControllerSmartInterfaceUpdate delegate = new PktControllerSmartInterfaceUpdate(message.controllerPos, message.key, resolved);
-        return delegate.onMessage(delegate, ctx);
-    }
-
-    private static void writeControllerCustomData(TileMultiblockMachineController controller, String key, float value) {
-        try {
-            java.lang.reflect.Method getTagMethod = controller.getClass().getMethod("getCustomDataTag");
-            java.lang.reflect.Method setTagMethod = controller.getClass().getMethod("setCustomDataTag", NBTTagCompound.class);
-            java.lang.reflect.Method markMethod = controller.getClass().getMethod("markForUpdateSync");
-
-            NBTTagCompound tag = new NBTTagCompound();
-            Object existing = getTagMethod.invoke(controller);
-            if (existing instanceof NBTTagCompound) {
-                tag = ((NBTTagCompound) existing).copy();
-            }
-            tag.setFloat(key, value);
-            setTagMethod.invoke(controller, tag);
-            markMethod.invoke(controller);
-        } catch (Exception ignored) {
-        }
+        PktControllerSmartInterfaceUpdate.applySmartInterfaceUpdate(controller, message.controllerPos, message.key, resolved);
     }
 
     private static Float readControllerCustomData(TileMultiblockMachineController controller, String key) {
