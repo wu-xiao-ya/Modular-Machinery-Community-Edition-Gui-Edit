@@ -25,6 +25,9 @@ import java.util.stream.Stream;
 public final class CustomHatchRegistry {
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private static final Path HATCH_DIR = resolveHatchDir();
+    private static final int MAX_GRID_ROWS = 256;
+    private static final int MAX_GRID_COLUMNS = 256;
+    private static final int MAX_GRID_SLOTS = 4096;
     private static final List<CustomHatchDef> CACHE = new ArrayList<CustomHatchDef>();
     private static final Map<String, CustomHatchDef> REGISTERED = new LinkedHashMap<String, CustomHatchDef>();
 
@@ -280,9 +283,13 @@ public final class CustomHatchRegistry {
     private static void expandSlotGrid(JsonObject obj, ComponentDef grid, List<ComponentDef> out) {
         int rows = Math.max(1, getFirstInt(obj, 1, "rows", "rowCount", "yCount"));
         int columns = Math.max(1, getFirstInt(obj, 1, "columns", "cols", "columnCount", "xCount"));
+        if (rows > MAX_GRID_ROWS || columns > MAX_GRID_COLUMNS || (long) rows * (long) columns > MAX_GRID_SLOTS) {
+            LOGGER.warn("Skipping slot grid with size {}x{}; max cells is {}", rows, columns, MAX_GRID_SLOTS);
+            return;
+        }
         int spacingX = getFirstInt(obj, 2, "spacingX", "xSpacing", "gapX");
         int spacingY = getFirstInt(obj, 2, "spacingY", "ySpacing", "gapY");
-        int slotSize = Math.max(1, getFirstInt(obj, 16, "slotSize", "size"));
+        int slotSize = clamp(getFirstInt(obj, 16, "slotSize", "size"), 1, 256);
         int visibleRows = getFirstInt(obj, 0, "visibleRows", "visible_rows");
         int visibleColumns = getFirstInt(obj, 0, "visibleColumns", "visible_columns");
         int scrollbarX = getFirstInt(obj, 0, "scrollbarX", "scrollbar_x");
@@ -313,6 +320,10 @@ public final class CustomHatchRegistry {
         String scrollMode = lower(getString(obj, "scrollMode"));
         Boolean scrollbar = getBoolean(obj, "scrollbar");
         int baseIndex = grid.index;
+        if (baseIndex > Integer.MAX_VALUE - (rows * columns)) {
+            LOGGER.warn("Skipping slot grid with overflowing base index {}", baseIndex);
+            return;
+        }
         int ordinal = 0;
         for (int row = 0; row < rows; row++) {
             for (int column = 0; column < columns; column++) {
@@ -488,6 +499,10 @@ public final class CustomHatchRegistry {
             }
         }
         return fallback;
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     @Nullable

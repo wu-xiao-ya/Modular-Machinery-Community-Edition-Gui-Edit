@@ -489,7 +489,11 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         rwLock.writeLock().lock();
         try {
             IMEMonitor<IAEItemStack> inv = proxy.getStorage().getInventory(itemChannel);
+            int slotBound = Math.min(inventory.getSlots(), changedItemSlots.length);
             for (int slot : slots) {
+                if (slot < 0 || slot >= slotBound) {
+                    continue;
+                }
                 changedItemSlots[slot] = false;
                 ItemStack stack = inventory.getStackInSlot(slot);
                 if (stack.isEmpty()) {
@@ -524,7 +528,11 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         rwLock.writeLock().lock();
         try {
             IMEMonitor<IAEFluidStack> inv = proxy.getStorage().getInventory(fluidChannel);
+            int slotBound = Math.min(fluidTanks.getSlots(), changedFluidSlots.length);
             for (int slot : slots) {
+                if (slot < 0 || slot >= slotBound) {
+                    continue;
+                }
                 changedFluidSlots[slot] = false;
                 IAEFluidStack fluid = fluidTanks.getFluidInSlot(slot);
                 if (fluid == null) {
@@ -553,7 +561,11 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         boolean success = false;
         IMEMonitor<IAEGasStack> inv = proxy.getStorage().getInventory(gasChannel);
         synchronized (gasTanks) {
+            int slotBound = Math.min(gasTanks.size(), changedGasSlots.length);
             for (int slot : slots) {
+                if (slot < 0 || slot >= slotBound) {
+                    continue;
+                }
                 changedGasSlots[slot] = false;
                 GasStack gas = gasTanks.getGasStack(slot);
                 if (gas == null) {

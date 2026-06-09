@@ -49,4 +49,13 @@ public class ContainerCustomMEItemInputBus extends AEBaseContainer {
     public boolean isConfigSlotNumber(int slotNumber) {
         return this.configSlotNumbers.contains(slotNumber);
     }
+
+    @Override
+    public boolean canInteractWith(EntityPlayer playerIn) {
+        return this.owner != null
+            && !this.owner.isInvalid()
+            && this.owner.getWorld() == playerIn.world
+            && this.owner.getWorld().getTileEntity(this.owner.getPos()) == this.owner
+            && playerIn.getDistanceSqToCenter(this.owner.getPos()) <= 64D;
+    }
 }

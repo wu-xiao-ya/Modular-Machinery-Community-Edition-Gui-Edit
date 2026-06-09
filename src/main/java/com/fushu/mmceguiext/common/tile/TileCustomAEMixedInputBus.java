@@ -303,6 +303,16 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         this.changedGasSlots = new boolean[this.gasTanks.size()];
     }
 
+    private void markAllSlotsChanged() {
+        ensureItemTrackingCapacity(this.inventory.getSlots());
+        Arrays.fill(this.changedItemSlots, 0, this.inventory.getSlots(), true);
+        Arrays.fill(this.itemFailureCounter, 0, this.itemFailureCounter.length, 0);
+        this.changedFluidSlots = new boolean[this.fluidTanks.getSlots()];
+        Arrays.fill(this.changedFluidSlots, true);
+        this.changedGasSlots = new boolean[this.gasTanks.size()];
+        Arrays.fill(this.changedGasSlots, true);
+    }
+
     private void configureLayout() {
         int itemSlots = resolveItemSlotCount();
         int fluidSlots = resolveFluidSlotCount();
@@ -753,7 +763,11 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         try {
             IMEMonitor<IAEFluidStack> inv = this.proxy.getStorage().getInventory(this.fluidChannel);
             int capacity = this.fluidTanks.getCapacity();
+            int slotBound = Math.min(this.fluidTanks.getSlots(), Math.min(this.fluidConfig.getSlots(), this.changedFluidSlots.length));
             for (int slot : slots) {
+                if (slot < 0 || slot >= slotBound) {
+                    continue;
+                }
                 this.changedFluidSlots[slot] = false;
                 IAEFluidStack cfgStack = this.fluidConfig.getFluidInSlot(slot);
                 IAEFluidStack invStack = this.fluidTanks.getFluidInSlot(slot);
@@ -817,7 +831,11 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         boolean success = false;
         synchronized (this.gasTanks) {
             IMEMonitor<IAEGasStack> inv = this.proxy.getStorage().getInventory(this.gasChannel);
+            int slotBound = Math.min(this.gasTanks.size(), Math.min(this.gasConfig.size(), this.changedGasSlots.length));
             for (int slot : slots) {
+                if (slot < 0 || slot >= slotBound) {
+                    continue;
+                }
                 int capacity = getGasTankCapacity(slot);
                 this.changedGasSlots[slot] = false;
                 GasStack cfgStack = this.gasConfig.getGasStack(slot);
@@ -1001,11 +1019,14 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
     @Override
     public void uploadSettings(NBTTagCompound settings) {
+        configureLayout();
         if (settings.hasKey(ITEM_CONFIG_TAG)) {
             this.configInventory = IOInventory.deserialize(this, settings.getCompoundTag(ITEM_CONFIG_TAG));
         }
         this.fluidConfig.readFromNBT(settings, FLUID_CONFIG_TAG);
         this.gasConfig.load(settings.getCompoundTag(GAS_CONFIG_TAG));
+        configureLayout();
+        markAllSlotsChanged();
         bindInventoryListeners();
         markForUpdateSync();
         try {

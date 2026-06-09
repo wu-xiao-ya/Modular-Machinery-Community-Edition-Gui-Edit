@@ -11,6 +11,8 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
 public class PktCustomMEItemInputBusInvAction implements IMessage, IMessageHandler<PktCustomMEItemInputBusInvAction, IMessage> {
+    private static final int MAX_REQUEST_AMOUNT = 1_000_000_000;
+
     private int newAmount;
     private int slotID;
 
@@ -49,6 +51,9 @@ public class PktCustomMEItemInputBusInvAction implements IMessage, IMessageHandl
             return;
         }
         ContainerCustomMEItemInputBus container = (ContainerCustomMEItemInputBus) player.openContainer;
+        if (!container.canInteractWith(player)) {
+            return;
+        }
         if (message.slotID < 0 || message.slotID >= container.inventorySlots.size()) {
             return;
         }
@@ -63,6 +68,9 @@ public class PktCustomMEItemInputBusInvAction implements IMessage, IMessageHandl
 
         ItemStack stack = slot.getStack();
         if (stack.isEmpty() || message.newAmount <= 0) {
+            return;
+        }
+        if (message.newAmount > MAX_REQUEST_AMOUNT) {
             return;
         }
 

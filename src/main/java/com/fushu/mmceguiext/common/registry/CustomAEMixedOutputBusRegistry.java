@@ -25,6 +25,8 @@ import java.util.stream.Stream;
 public final class CustomAEMixedOutputBusRegistry {
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private static final Path BUS_DIR = resolveBusDir();
+    private static final int MAX_GUI_COMPONENTS = 2048;
+    private static final int MAX_COMPONENT_INDEX = 4095;
     private static final List<Def> CACHE = new ArrayList<Def>();
     private static final Map<String, Def> REGISTERED = new LinkedHashMap<String, Def>();
 
@@ -134,6 +136,9 @@ public final class CustomAEMixedOutputBusRegistry {
                     if (component.index < 0) {
                         component.index = itemIndex;
                     }
+                    if (!isValidComponentIndex(component, def)) {
+                        continue;
+                    }
                     itemIndex = Math.max(itemIndex, component.index + 1);
                 }
             } else if ("tank".equals(component.type)) {
@@ -141,10 +146,16 @@ public final class CustomAEMixedOutputBusRegistry {
                     if (component.index < 0) {
                         component.index = fluidIndex;
                     }
+                    if (!isValidComponentIndex(component, def)) {
+                        continue;
+                    }
                     fluidIndex = Math.max(fluidIndex, component.index + 1);
                 } else if ("gas_storage".equals(component.role)) {
                     if (component.index < 0) {
                         component.index = gasIndex;
+                    }
+                    if (!isValidComponentIndex(component, def)) {
+                        continue;
                     }
                     gasIndex = Math.max(gasIndex, component.index + 1);
                 }
@@ -152,12 +163,24 @@ public final class CustomAEMixedOutputBusRegistry {
         }
     }
 
+    private static boolean isValidComponentIndex(ComponentDef component, Def def) {
+        if (component.index >= 0 && component.index <= MAX_COMPONENT_INDEX) {
+            return true;
+        }
+        LOGGER.warn("Skipping AE mixed output component with invalid index {} in {}", component.index, def == null ? "<unknown>" : def.id);
+        return false;
+    }
+
     private static List<ComponentDef> parseComponents(@Nullable com.google.gson.JsonArray array) {
         if (array == null || array.size() == 0) {
             return Collections.emptyList();
         }
         List<ComponentDef> out = new ArrayList<ComponentDef>();
-        for (int i = 0; i < array.size(); i++) {
+        int limit = Math.min(array.size(), MAX_GUI_COMPONENTS);
+        if (array.size() > MAX_GUI_COMPONENTS) {
+            LOGGER.warn("Skipping {} extra AE mixed output GUI components; max is {}", array.size() - MAX_GUI_COMPONENTS, MAX_GUI_COMPONENTS);
+        }
+        for (int i = 0; i < limit; i++) {
             if (!array.get(i).isJsonObject()) {
                 continue;
             }
@@ -214,7 +237,7 @@ public final class CustomAEMixedOutputBusRegistry {
             return null;
         }
         String raw = value.trim().replace('\\', '/');
-        if (raw.isEmpty()) {
+        if (raw.isEmpty() || raw.contains("..") || raw.startsWith("/")) {
             return null;
         }
         if (raw.endsWith(".png")) {
@@ -229,18 +252,35 @@ public final class CustomAEMixedOutputBusRegistry {
                 while (path.startsWith("textures/")) {
                     path = path.substring("textures/".length());
                 }
-                return new ResourceLocation(namespace, "textures/" + path + ".png");
+                return createTextureLocation(namespace, "textures/" + path + ".png");
             }
         }
         if (raw.contains(":")) {
             String[] split = raw.split(":", 2);
+            if (split[0].trim().isEmpty() || split[1].trim().isEmpty()) {
+                return null;
+            }
             String path = split[1];
             if (path.startsWith("textures/")) {
-                return new ResourceLocation(split[0], path + ".png");
+                return createTextureLocation(split[0], path + ".png");
             }
-            return new ResourceLocation(split[0], "textures/" + path + ".png");
+            return createTextureLocation(split[0], "textures/" + path + ".png");
         }
-        return new ResourceLocation(MMCEGuiExt.MODID, "textures/" + raw + ".png");
+        return createTextureLocation(MMCEGuiExt.MODID, "textures/" + raw + ".png");
+    }
+
+    @Nullable
+    private static ResourceLocation createTextureLocation(String namespace, String path) {
+        if (namespace == null || namespace.trim().isEmpty() || path == null || path.trim().isEmpty()
+            || path.contains("..") || path.startsWith("/")) {
+            return null;
+        }
+        try {
+            return new ResourceLocation(namespace, path);
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Ignoring invalid texture location {}:{}", namespace, path);
+            return null;
+        }
     }
 
     @Nullable
