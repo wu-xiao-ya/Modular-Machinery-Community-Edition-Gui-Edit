@@ -7,6 +7,7 @@ import hellfirepvp.modularmachinery.common.crafting.helper.RecipeCraftingContext
 import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementFluid;
 import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementFluidPerTick;
 import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementGas;
+import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementGasPerTick;
 import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementItem;
 import hellfirepvp.modularmachinery.common.lib.ComponentTypesMM;
 import hellfirepvp.modularmachinery.common.machine.IOType;
@@ -74,7 +75,8 @@ public abstract class MixinRecipeCraftingContext {
     private void mmceguiext$restoreCustomMixedInputGasCandidates(final ComponentRequirement<?, ?> requirement,
                                                                  @Nullable final ComponentSelectorTag tag,
                                                                  final CallbackInfoReturnable<Map<Long, List<ProcessingComponent<?>>>> cir) {
-        if (!(requirement instanceof RequirementGas) || requirement.getActionType() != IOType.INPUT) {
+        boolean gasRequirement = requirement instanceof RequirementGas || requirement instanceof RequirementGasPerTick;
+        if (!gasRequirement || requirement.getActionType() != IOType.INPUT) {
             return;
         }
 

@@ -2,6 +2,7 @@ package com.fushu.mmceguiext.common.block;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.tile.TileCustomHatch;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import net.minecraft.block.Block;
 import hellfirepvp.modularmachinery.common.CommonProxy;
 import hellfirepvp.modularmachinery.common.block.BlockMachineComponent;
@@ -38,7 +39,7 @@ public class BlockCustomHatch extends BlockMachineComponent {
         setCreativeTabSafe(this, CommonProxy.creativeTabModularMachinery);
         String path = definition == null || definition.id == null || definition.id.trim().isEmpty()
             ? "custom_hatch"
-            : normalizePath(definition.id);
+            : CustomIdValidator.normalizePath(definition.id, "custom_hatch");
         setRegistryNameSafe(this, new ResourceLocation(MMCEGuiExt.MODID, path));
         setTranslationKeySafe(this, MMCEGuiExt.MODID + "." + path);
         setDefaultState(this.blockState.getBaseState().withProperty(FACING, EnumFacing.NORTH));
@@ -120,14 +121,6 @@ public class BlockCustomHatch extends BlockMachineComponent {
     @Override
     public TileEntity createTileEntity(World world, IBlockState state) {
         return new TileCustomHatch();
-    }
-
-    private static String normalizePath(String id) {
-        String value = id == null ? "" : id.trim().toLowerCase();
-        if (value.contains(":")) {
-            value = value.substring(value.indexOf(':') + 1);
-        }
-        return value.isEmpty() ? "custom_hatch" : value;
     }
 
     private static void applyBlockProperties(BlockCustomHatch block, com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef definition) {

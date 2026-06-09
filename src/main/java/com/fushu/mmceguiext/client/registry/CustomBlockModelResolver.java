@@ -1,6 +1,7 @@
 package com.fushu.mmceguiext.client.registry;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import net.minecraft.client.renderer.block.model.ModelResourceLocation;
 import net.minecraft.util.ResourceLocation;
 
@@ -61,12 +62,14 @@ public final class CustomBlockModelResolver {
 
     @Nullable
     private static ModelBinding createModelBinding(String namespace, String path, @Nullable String variant) {
-        if (namespace == null || namespace.trim().isEmpty() || path == null || path.trim().isEmpty()
-            || path.contains("..") || path.startsWith("/")) {
+        String normalizedVariant = normalizeVariant(variant);
+        if (!CustomIdValidator.isValidNamespace(namespace)
+            || !CustomIdValidator.isValidPath(path)
+            || !CustomIdValidator.isValidVariant(normalizedVariant)) {
             return null;
         }
         try {
-            return new ModelBinding(new ResourceLocation(namespace, path), normalizeVariant(variant));
+            return new ModelBinding(new ResourceLocation(namespace, path), normalizedVariant);
         } catch (RuntimeException ex) {
             return null;
         }
@@ -84,7 +87,8 @@ public final class CustomBlockModelResolver {
     }
 
     private static String normalizeVariant(@Nullable String raw) {
-        return raw == null || raw.trim().isEmpty() ? "normal" : raw.trim();
+        String value = raw == null || raw.trim().isEmpty() ? "normal" : raw.trim().toLowerCase();
+        return CustomIdValidator.isValidVariant(value) ? value : "normal";
     }
 
     private static final class ModelBinding {

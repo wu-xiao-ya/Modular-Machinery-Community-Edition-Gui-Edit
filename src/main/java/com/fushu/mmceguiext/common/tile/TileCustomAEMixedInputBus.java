@@ -24,6 +24,7 @@ import appeng.me.helpers.IGridProxyable;
 import appeng.me.helpers.MachineSource;
 import appeng.util.Platform;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import com.mekeng.github.common.me.data.IAEGasStack;
 import com.mekeng.github.common.me.data.impl.AEGasStack;
 import com.mekeng.github.common.me.inventory.IGasInventoryHost;
@@ -273,7 +274,8 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
             this.configInventory = buildConfigInventory(resolveItemSlotCount());
         }
 
-        this.definitionId = compound.hasKey("definitionId") ? compound.getString("definitionId") : "";
+        String id = CustomIdValidator.readSanitizedString(compound, "definitionId");
+        this.definitionId = id == null ? "" : id;
         configureLayout();
         this.fluidTanks.readFromNBT(compound, "tanks");
         this.fluidConfig.readFromNBT(compound, FLUID_CONFIG_TAG);
@@ -489,7 +491,8 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     }
 
     public void setDefinitionId(@Nullable String id) {
-        this.definitionId = id == null ? "" : id.trim();
+        String sanitized = CustomIdValidator.sanitizeResourceLocation(id);
+        this.definitionId = sanitized == null ? "" : sanitized;
         configureLayout();
         markDirty();
     }

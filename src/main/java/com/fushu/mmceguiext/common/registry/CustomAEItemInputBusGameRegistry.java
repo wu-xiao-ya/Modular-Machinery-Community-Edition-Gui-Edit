@@ -4,6 +4,7 @@ import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.block.BlockCustomMEItemInputBus;
 import com.fushu.mmceguiext.common.item.ItemBlockCustomMEItemInputBus;
 import com.fushu.mmceguiext.common.tile.TileCustomMEItemInputBus;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraftforge.event.RegistryEvent;
@@ -37,13 +38,16 @@ public final class CustomAEItemInputBusGameRegistry {
             if (def == null || def.id == null || def.id.trim().isEmpty()) {
                 continue;
             }
-            String path = normalizePath(def.id);
-            if (!isValidRegistryPath(path)) {
+            String path = CustomIdValidator.normalizePath(def.id, "");
+            if (!CustomIdValidator.isValidPath(path)) {
                 LOGGER.warn("Skipping custom AE item input bus with invalid id '{}'.", def.id);
                 continue;
             }
             if (BLOCKS.containsKey(path)) {
                 LOGGER.warn("Skipping duplicate custom AE item input bus id '{}'.", def.id);
+                continue;
+            }
+            if (!CustomBlockIdRegistry.claim(path, "custom AE item input bus", def.id)) {
                 continue;
             }
             BlockCustomMEItemInputBus block = new BlockCustomMEItemInputBus(def);
@@ -61,21 +65,6 @@ public final class CustomAEItemInputBusGameRegistry {
                 event.getRegistry().register(new ItemBlockCustomMEItemInputBus(block, def));
             }
         }
-    }
-
-    private static String normalizePath(String id) {
-        String value = id == null ? "" : id.trim().toLowerCase();
-        if (value.contains(":")) {
-            value = value.substring(value.indexOf(':') + 1);
-        }
-        return value;
-    }
-
-    private static boolean isValidRegistryPath(String path) {
-        return path != null
-            && !path.trim().isEmpty()
-            && !path.contains("..")
-            && path.matches("[a-z0-9_./-]+");
     }
 
     public static Map<String, BlockCustomMEItemInputBus> getRegisteredBlocks() {

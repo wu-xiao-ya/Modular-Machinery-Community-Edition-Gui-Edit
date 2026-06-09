@@ -3,6 +3,7 @@ package com.fushu.mmceguiext.common.block;
 import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedOutputBus;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import github.kasuminova.mmce.common.block.appeng.BlockMEMachineComponent;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
@@ -24,7 +25,7 @@ public class BlockCustomAEMixedOutputBus extends BlockMEMachineComponent {
 
     public BlockCustomAEMixedOutputBus(CustomAEMixedOutputBusRegistry.Def definition) {
         this.definition = definition;
-        String path = normalizePath(definition == null ? null : definition.id);
+        String path = CustomIdValidator.normalizePath(definition == null ? null : definition.id, "custom_ae_mixed_output_bus");
         setRegistryNameSafe(this, new ResourceLocation("mmceguiext", path));
         setTranslationKeySafe(this, "mmceguiext." + path);
     }
@@ -69,14 +70,6 @@ public class BlockCustomAEMixedOutputBus extends BlockMEMachineComponent {
         if (tileEntity instanceof TileCustomAEMixedOutputBus) {
             ((TileCustomAEMixedOutputBus) tileEntity).setDefinitionId(getRegistryName() == null ? null : getRegistryName().toString());
         }
-    }
-
-    private static String normalizePath(@Nullable String id) {
-        String value = id == null ? "" : id.trim().toLowerCase();
-        if (value.contains(":")) {
-            value = value.substring(value.indexOf(':') + 1);
-        }
-        return value.isEmpty() ? "custom_ae_mixed_output_bus" : value;
     }
 
     private static void setRegistryNameSafe(final Block block, final ResourceLocation name) {

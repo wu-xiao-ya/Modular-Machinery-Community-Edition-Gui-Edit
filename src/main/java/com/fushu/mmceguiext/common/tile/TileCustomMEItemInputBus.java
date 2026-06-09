@@ -1,6 +1,7 @@
 package com.fushu.mmceguiext.common.tile;
 
 import com.fushu.mmceguiext.common.registry.CustomAEItemInputBusRegistry;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import github.kasuminova.mmce.common.tile.MEItemInputBus;
 import hellfirepvp.modularmachinery.common.util.IOInventory;
 import net.minecraft.item.Item;
@@ -14,7 +15,8 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
     private String definitionId = "";
 
     public void setDefinitionId(@Nullable String id) {
-        this.definitionId = id == null ? "" : id.trim();
+        String sanitized = CustomIdValidator.sanitizeResourceLocation(id);
+        this.definitionId = sanitized == null ? "" : sanitized;
         configureSlotLayout();
     }
 
@@ -73,7 +75,8 @@ public class TileCustomMEItemInputBus extends MEItemInputBus {
     @Override
     public void readCustomNBT(final NBTTagCompound compound) {
         super.readCustomNBT(compound);
-        this.definitionId = compound.hasKey("definitionId") ? compound.getString("definitionId") : "";
+        String id = CustomIdValidator.readSanitizedString(compound, "definitionId");
+        this.definitionId = id == null ? "" : id;
         configureSlotLayout();
     }
 

@@ -1,6 +1,7 @@
 package com.fushu.mmceguiext.common.tile;
 
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import github.kasuminova.mmce.common.util.InfItemFluidHandler;
 import github.kasuminova.mmce.common.util.IExtendedGasHandler;
 import github.kasuminova.mmce.common.util.MultiGasTank;
@@ -77,7 +78,8 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     }
 
     public void setDefinitionId(@Nullable String id) {
-        this.hatchId = id == null ? "" : id.trim();
+        String sanitized = CustomIdValidator.sanitizeResourceLocation(id);
+        this.hatchId = sanitized == null ? "" : sanitized;
         syncDefinition();
     }
 
@@ -655,7 +657,8 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     @Override
     public void readCustomNBT(NBTTagCompound compound) {
         super.readCustomNBT(compound);
-        this.hatchId = compound.hasKey("hatchId") ? compound.getString("hatchId") : "";
+        String id = CustomIdValidator.readSanitizedString(compound, "hatchId");
+        this.hatchId = id == null ? "" : id;
         if (compound.hasKey("inv", Constants.NBT.TAG_COMPOUND)) {
             this.inventory.readNBT(compound.getCompoundTag("inv"));
             this.inventory.setListener(this::onInventoryChanged);

@@ -4,6 +4,7 @@ import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.block.BlockCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.item.ItemBlockCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedOutputBus;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraftforge.event.RegistryEvent;
@@ -37,13 +38,16 @@ public final class CustomAEMixedOutputBusGameRegistry {
             if (def == null || def.id == null || def.id.trim().isEmpty()) {
                 continue;
             }
-            String path = normalizePath(def.id);
-            if (!isValidRegistryPath(path)) {
+            String path = CustomIdValidator.normalizePath(def.id, "");
+            if (!CustomIdValidator.isValidPath(path)) {
                 LOGGER.warn("Skipping custom AE mixed output bus with invalid id '{}'.", def.id);
                 continue;
             }
             if (BLOCKS.containsKey(path)) {
                 LOGGER.warn("Skipping duplicate custom AE mixed output bus id '{}'.", def.id);
+                continue;
+            }
+            if (!CustomBlockIdRegistry.claim(path, "custom AE mixed output bus", def.id)) {
                 continue;
             }
             BlockCustomAEMixedOutputBus block = new BlockCustomAEMixedOutputBus(def);
@@ -61,21 +65,6 @@ public final class CustomAEMixedOutputBusGameRegistry {
                 event.getRegistry().register(new ItemBlockCustomAEMixedOutputBus(block, def));
             }
         }
-    }
-
-    private static String normalizePath(String id) {
-        String value = id == null ? "" : id.trim().toLowerCase();
-        if (value.contains(":")) {
-            value = value.substring(value.indexOf(':') + 1);
-        }
-        return value;
-    }
-
-    private static boolean isValidRegistryPath(String path) {
-        return path != null
-            && !path.trim().isEmpty()
-            && !path.contains("..")
-            && path.matches("[a-z0-9_./-]+");
     }
 
     public static Map<String, BlockCustomAEMixedOutputBus> getRegisteredBlocks() {

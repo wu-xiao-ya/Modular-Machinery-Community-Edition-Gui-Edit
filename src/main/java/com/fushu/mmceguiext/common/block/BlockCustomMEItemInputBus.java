@@ -5,6 +5,7 @@ import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.item.ItemBlockCustomMEItemInputBus;
 import com.fushu.mmceguiext.common.registry.CustomAEItemInputBusRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomMEItemInputBus;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import github.kasuminova.mmce.common.block.appeng.BlockMEItemInputBus;
 import github.kasuminova.mmce.common.tile.MEItemInputBus;
 import hellfirepvp.modularmachinery.ModularMachinery;
@@ -32,7 +33,7 @@ public class BlockCustomMEItemInputBus extends BlockMEItemInputBus {
 
     public BlockCustomMEItemInputBus(CustomAEItemInputBusRegistry.Def definition) {
         this.definition = definition;
-        String path = normalizePath(definition == null ? null : definition.id);
+        String path = CustomIdValidator.normalizePath(definition == null ? null : definition.id, "custom_me_item_input_bus");
         setRegistryNameSafe(this, new ResourceLocation("mmceguiext", path));
         setTranslationKeySafe(this, "mmceguiext." + path);
     }
@@ -132,20 +133,14 @@ public class BlockCustomMEItemInputBus extends BlockMEItemInputBus {
         TileEntity te = worldIn.getTileEntity(pos);
         if (te instanceof TileCustomMEItemInputBus) {
             TileCustomMEItemInputBus custom = (TileCustomMEItemInputBus) te;
-            custom.setDefinitionId(getRegistryName() == null ? null : getRegistryName().toString());
+            String registryId = getRegistryName() == null ? null : getRegistryName().toString();
+            custom.setDefinitionId(registryId);
             NBTTagCompound tag = stack.getTagCompound();
-            if (tag != null && tag.hasKey("definitionId")) {
-                custom.setDefinitionId(tag.getString("definitionId"));
+            String nbtDefinition = CustomIdValidator.readSanitizedString(tag, "definitionId");
+            if (registryId != null && registryId.equals(nbtDefinition)) {
+                custom.setDefinitionId(nbtDefinition);
             }
         }
-    }
-
-    private static String normalizePath(@Nullable String id) {
-        String value = id == null ? "" : id.trim().toLowerCase();
-        if (value.contains(":")) {
-            value = value.substring(value.indexOf(':') + 1);
-        }
-        return value.isEmpty() ? "custom_me_item_input_bus" : value;
     }
 
     private static void setRegistryNameSafe(final Block block, final ResourceLocation name) {

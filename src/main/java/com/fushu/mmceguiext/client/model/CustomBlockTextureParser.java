@@ -1,6 +1,7 @@
 package com.fushu.mmceguiext.client.model;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import net.minecraft.util.ResourceLocation;
 
 import javax.annotation.Nullable;
@@ -39,15 +40,7 @@ public final class CustomBlockTextureParser {
 
     @Nullable
     private static ResourceLocation createTextureLocation(String namespace, String path) {
-        if (namespace == null || namespace.trim().isEmpty() || path == null || path.trim().isEmpty()
-            || path.contains("..") || path.startsWith("/")) {
-            return null;
-        }
-        try {
-            return new ResourceLocation(namespace, path);
-        } catch (RuntimeException ex) {
-            return null;
-        }
+        return CustomIdValidator.createResourceLocation(namespace, path);
     }
 
     private static String normalizeTexturePath(String raw) {

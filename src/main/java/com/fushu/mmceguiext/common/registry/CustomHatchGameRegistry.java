@@ -4,6 +4,7 @@ import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.block.BlockCustomHatch;
 import com.fushu.mmceguiext.common.item.ItemBlockCustomHatch;
 import com.fushu.mmceguiext.common.tile.TileCustomHatch;
+import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.util.ResourceLocation;
@@ -41,13 +42,16 @@ public final class CustomHatchGameRegistry {
             if (def == null || def.id == null || def.id.trim().isEmpty()) {
                 continue;
             }
-            String path = normalizePath(def.id);
-            if (!isValidRegistryPath(path)) {
+            String path = CustomIdValidator.normalizePath(def.id, "");
+            if (!CustomIdValidator.isValidPath(path)) {
                 LOGGER.warn("Skipping custom hatch with invalid id '{}'.", def.id);
                 continue;
             }
             if (BLOCKS.containsKey(path)) {
                 LOGGER.warn("Skipping duplicate custom hatch id '{}'.", def.id);
+                continue;
+            }
+            if (!CustomBlockIdRegistry.claim(path, "custom hatch", def.id)) {
                 continue;
             }
             BlockCustomHatch block = new BlockCustomHatch(def);
@@ -71,7 +75,7 @@ public final class CustomHatchGameRegistry {
     }
 
     public static BlockCustomHatch getBlock(@SuppressWarnings("SameParameterValue") String id) {
-        return BLOCKS.get(normalizePath(id));
+        return BLOCKS.get(CustomIdValidator.normalizePath(id, ""));
     }
 
     public static Map<String, BlockCustomHatch> getRegisteredBlocks() {
@@ -79,22 +83,7 @@ public final class CustomHatchGameRegistry {
     }
 
     public static ModelBinding getModelBinding(String id) {
-        return MODEL_BINDINGS.get(normalizePath(id));
-    }
-
-    private static String normalizePath(String id) {
-        String value = id == null ? "" : id.trim().toLowerCase();
-        if (value.contains(":")) {
-            value = value.substring(value.indexOf(':') + 1);
-        }
-        return value;
-    }
-
-    private static boolean isValidRegistryPath(String path) {
-        return path != null
-            && !path.trim().isEmpty()
-            && !path.contains("..")
-            && path.matches("[a-z0-9_./-]+");
+        return MODEL_BINDINGS.get(CustomIdValidator.normalizePath(id, ""));
     }
 
     private static ModelBinding resolveModelBinding(CustomHatchRegistry.CustomHatchDef def) {
@@ -104,11 +93,44 @@ public final class CustomHatchGameRegistry {
         } else if (def != null && def.blockModel != null && !def.blockModel.trim().isEmpty()) {
             model = def.blockModel.trim();
         }
+        if (isDirectHatchModelPath(model) && def != null && def.id != null) {
+            String path = CustomIdValidator.normalizePath(def.id, "");
+            if (CustomIdValidator.isValidPath(path)) {
+                return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, path), "facing=north");
+            }
+        }
         ModelBinding location = parseModelBinding(model);
         if (location == null) {
             location = new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "facing=north");
         }
         return location;
+    }
+
+    private static boolean isDirectHatchModelPath(@Nullable String raw) {
+        if (raw == null) {
+            return false;
+        }
+        String value = raw.trim().replace('\\', '/').toLowerCase();
+        if (value.endsWith(".json")) {
+            value = value.substring(0, value.length() - 5);
+        }
+        if (value.contains(":")) {
+            value = value.substring(value.indexOf(':') + 1);
+        }
+        while (value.startsWith("assets/")) {
+            int models = value.indexOf("/models/");
+            if (models < 0) {
+                break;
+            }
+            value = value.substring(models + "/models/".length());
+        }
+        while (value.startsWith("models/")) {
+            value = value.substring("models/".length());
+        }
+        while (value.startsWith("block/")) {
+            value = value.substring("block/".length());
+        }
+        return value.startsWith("hatch/");
     }
 
     @Nullable
@@ -156,8 +178,8 @@ public final class CustomHatchGameRegistry {
 
     @Nullable
     private static ModelBinding createModelBinding(String namespace, String path, @Nullable String variant) {
-        if (namespace == null || namespace.trim().isEmpty() || path == null || path.trim().isEmpty()
-            || path.contains("..") || path.startsWith("/")) {
+        if (!CustomIdValidator.isValidNamespace(namespace) || !CustomIdValidator.isValidPath(path)
+            || !CustomIdValidator.isValidVariant(normalizeVariant(variant))) {
             return null;
         }
         try {
@@ -172,7 +194,8 @@ public final class CustomHatchGameRegistry {
         if (raw == null || raw.trim().isEmpty()) {
             return "normal";
         }
-        return raw.trim();
+        String trimmed = raw.trim().toLowerCase();
+        return CustomIdValidator.isValidVariant(trimmed) ? trimmed : "normal";
     }
 
     private static String normalizeModelPath(String raw) {

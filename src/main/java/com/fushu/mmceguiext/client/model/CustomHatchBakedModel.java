@@ -57,9 +57,15 @@ public class CustomHatchBakedModel extends BakedModelWrapper<IBakedModel> {
             return cachedModel;
         }
         try {
+            String texturePath = texture.toString();
             IBakedModel baked = ModelLoaderRegistry
                 .getModel(this.sourceModel)
-                .retexture(com.google.common.collect.ImmutableMap.of("all", texture.toString()))
+                .retexture(com.google.common.collect.ImmutableMap.of(
+                    "all", texturePath,
+                    "top", texturePath,
+                    "side", texturePath,
+                    "bottom", texturePath
+                ))
                 .bake(net.minecraftforge.common.model.TRSRTransformation.identity(), net.minecraft.client.renderer.vertex.DefaultVertexFormats.ITEM, location ->
                     net.minecraft.client.Minecraft.getMinecraft().getTextureMapBlocks().getAtlasSprite(location.toString())
                 );
