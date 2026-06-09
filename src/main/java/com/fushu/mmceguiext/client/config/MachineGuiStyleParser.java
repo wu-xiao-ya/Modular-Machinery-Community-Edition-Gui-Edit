@@ -14,6 +14,8 @@ final class MachineGuiStyleParser {
     private static final int MAX_ARRAY_ENTRIES = 512;
     private static final int MAX_TEXTURE_LAYERS = 256;
     private static final int MAX_WARNINGS = 256;
+    private static final float MIN_TEXT_SCALE = 0.05F;
+    private static final float MAX_TEXT_SCALE = 8.0F;
 
     private MachineGuiStyleParser() {
     }
@@ -400,7 +402,7 @@ final class MachineGuiStyleParser {
             text.y = y.intValue();
             text.value = value;
             text.color = getColor(obj, result, itemScope, "color", "textColor", "text_color");
-            text.scale = getFloat(obj, result, itemScope, "scale");
+            text.scale = normalizeScale(getFloat(obj, result, itemScope, "scale"));
             text.priority = getInt(obj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
             text.shadow = getBoolean(obj, result, itemScope, "shadow", "withShadow", "with_shadow");
             text.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
@@ -817,11 +819,24 @@ final class MachineGuiStyleParser {
             return null;
         }
         try {
-            return Float.valueOf(match.element.getAsFloat());
+            float value = match.element.getAsFloat();
+            if (!Float.isFinite(value)) {
+                result.warn(field(scope, match.key) + " must be a finite number.");
+                return null;
+            }
+            return Float.valueOf(value);
         } catch (Exception ex) {
             result.warn(field(scope, match.key) + " must be a valid number.");
             return null;
         }
+    }
+
+    @Nullable
+    private static Float normalizeScale(@Nullable Float value) {
+        if (value == null) {
+            return null;
+        }
+        return Float.valueOf(Math.max(MIN_TEXT_SCALE, Math.min(MAX_TEXT_SCALE, value.floatValue())));
     }
 
     @Nullable

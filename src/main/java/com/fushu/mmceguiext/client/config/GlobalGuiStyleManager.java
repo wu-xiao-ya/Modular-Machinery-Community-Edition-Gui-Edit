@@ -28,6 +28,11 @@ public final class GlobalGuiStyleManager {
     private static final long MAX_STYLE_FILE_BYTES = 1024L * 1024L;
     private static final int MAX_TEXTS = 512;
     private static final int MAX_LAYERS = 256;
+    private static final int MAX_OFFSET = 1024;
+    private static final int MAX_TEXTURE_SIZE = 4096;
+    private static final int MAX_CORNER = 128;
+    private static final float MIN_TEXT_SCALE = 0.05F;
+    private static final float MAX_TEXT_SCALE = 8.0F;
 
     private GlobalGuiStyleManager() {
     }
@@ -71,11 +76,11 @@ public final class GlobalGuiStyleManager {
         }
         Background bg = new Background();
         bg.texture = getString(obj, "texture");
-        bg.textureWidth = getInt(obj, "textureWidth");
-        bg.textureHeight = getInt(obj, "textureHeight");
-        bg.offsetX = getInt(obj, "offsetX");
-        bg.offsetY = getInt(obj, "offsetY");
-        bg.corner = getInt(obj, "corner");
+        bg.textureWidth = clampNullable(getInt(obj, "textureWidth"), 16, MAX_TEXTURE_SIZE);
+        bg.textureHeight = clampNullable(getInt(obj, "textureHeight"), 16, MAX_TEXTURE_SIZE);
+        bg.offsetX = clampNullable(getInt(obj, "offsetX"), 0, MAX_OFFSET);
+        bg.offsetY = clampNullable(getInt(obj, "offsetY"), 0, MAX_OFFSET);
+        bg.corner = clampNullable(getInt(obj, "corner"), 0, MAX_CORNER);
         bg.useNineSlice = getBoolean(obj, "useNineSlice");
         return bg;
     }
@@ -88,8 +93,8 @@ public final class GlobalGuiStyleManager {
         Rect rect = new Rect();
         rect.x = getInt(obj, "x");
         rect.y = getInt(obj, "y");
-        rect.width = getInt(obj, "width");
-        rect.height = getInt(obj, "height");
+        rect.width = clampNullable(getInt(obj, "width"), 1, MAX_TEXTURE_SIZE);
+        rect.height = clampNullable(getInt(obj, "height"), 1, MAX_TEXTURE_SIZE);
         rect.renderMode = normalizeRenderMode(
             getString(obj, "renderMode"),
             getString(obj, "render_mode"),
@@ -124,7 +129,7 @@ public final class GlobalGuiStyleManager {
             def.y = orZero(getInt(obj, "y"));
             def.value = getString(obj, "value");
             def.color = getString(obj, "color");
-            def.scale = getFloat(obj, "scale");
+            def.scale = normalizeScale(getFloat(obj, "scale"));
             def.align = normalizeTextAlign(getString(obj, "align"), getString(obj, "alignment"), getString(obj, "textAlign"), getString(obj, "text_align"));
             def.priority = getInt(obj, "priority");
             if (def.priority == null) def.priority = getInt(obj, "zIndex");
@@ -167,7 +172,7 @@ public final class GlobalGuiStyleManager {
             layer.height = clamp(orZero(getInt(obj, "height")), 1, 4096);
             layer.textureWidth = clamp(orZero(getInt(obj, "textureWidth")), 1, 4096);
             layer.textureHeight = clamp(orZero(getInt(obj, "textureHeight")), 1, 4096);
-            layer.corner = clamp(getInt(obj, "corner") == null ? 8 : getInt(obj, "corner").intValue(), 0, 1024);
+            layer.corner = clamp(getInt(obj, "corner") == null ? 8 : getInt(obj, "corner").intValue(), 0, MAX_CORNER);
             layer.useNineSlice = getBoolean(obj, "useNineSlice") != null && getBoolean(obj, "useNineSlice").booleanValue();
             layer.priority = getInt(obj, "priority") == null ? 0 : getInt(obj, "priority").intValue();
             out.add(layer);
@@ -182,6 +187,11 @@ public final class GlobalGuiStyleManager {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    @Nullable
+    private static Integer clampNullable(@Nullable Integer value, int min, int max) {
+        return value == null ? null : Integer.valueOf(clamp(value.intValue(), min, max));
     }
 
     @Nullable
@@ -313,6 +323,14 @@ public final class GlobalGuiStyleManager {
             return Float.valueOf(alpha);
         }
         return null;
+    }
+
+    @Nullable
+    private static Float normalizeScale(@Nullable Float value) {
+        if (value == null || !Float.isFinite(value.floatValue())) {
+            return null;
+        }
+        return Float.valueOf(Math.max(MIN_TEXT_SCALE, Math.min(MAX_TEXT_SCALE, value.floatValue())));
     }
 
     private static Path resolveStyleDir() {
