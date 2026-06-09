@@ -239,24 +239,35 @@ public final class CustomAEMixedInputBusRegistry {
     }
 
     private static void applyGuiComponents(Def def) {
+        int itemConfigIndex = 0;
+        int itemStorageIndex = 0;
+        int fluidConfigIndex = 0;
+        int fluidStorageIndex = 0;
+        int gasConfigIndex = 0;
+        int gasStorageIndex = 0;
         for (ComponentDef component : def.gui.components) {
             if (component == null || component.type == null) {
                 continue;
             }
             if ("slot".equals(component.type)) {
                 if ("item_config".equals(component.role)) {
-                    if (component.index >= 0) {
-                        ensureListSize(def.configSlots, component.index + 1);
-                        def.configSlots.set(component.index, toSlotPoint(component));
+                    if (component.index < 0) {
+                        component.index = itemConfigIndex;
                     }
+                    itemConfigIndex = Math.max(itemConfigIndex, component.index + 1);
+                    ensureListSize(def.configSlots, component.index + 1);
+                    def.configSlots.set(component.index, toSlotPoint(component));
                 } else if ("item_output".equals(component.role) || "item_storage".equals(component.role)) {
-                    if (component.index >= 0) {
-                        ensureListSize(def.storageSlots, component.index + 1);
-                        def.storageSlots.set(component.index, toSlotPoint(component));
+                    if (component.index < 0) {
+                        component.index = itemStorageIndex;
                     }
+                    itemStorageIndex = Math.max(itemStorageIndex, component.index + 1);
+                    ensureListSize(def.storageSlots, component.index + 1);
+                    def.storageSlots.set(component.index, toSlotPoint(component));
                 } else if ("fluid_config".equals(component.role)) {
-                    int index = component.index >= 0 ? component.index : def.fluidConfigTanks.size();
+                    int index = component.index >= 0 ? component.index : fluidConfigIndex;
                     component.index = index;
+                    fluidConfigIndex = Math.max(fluidConfigIndex, index + 1);
                     ensureTankListSize(def.fluidConfigTanks, index + 1);
                     def.fluidConfigTanks.set(index, toTankRect(component));
                     if (def.fluidConfigTank == null || index == 0) {
@@ -264,8 +275,9 @@ public final class CustomAEMixedInputBusRegistry {
                         def.fluidConfigTank = toTankRect(component);
                     }
                 } else if ("gas_config".equals(component.role)) {
-                    int index = component.index >= 0 ? component.index : def.gasConfigTanks.size();
+                    int index = component.index >= 0 ? component.index : gasConfigIndex;
                     component.index = index;
+                    gasConfigIndex = Math.max(gasConfigIndex, index + 1);
                     ensureTankListSize(def.gasConfigTanks, index + 1);
                     def.gasConfigTanks.set(index, toTankRect(component));
                     if (def.gasConfigTank == null || index == 0) {
@@ -275,16 +287,18 @@ public final class CustomAEMixedInputBusRegistry {
                 }
             } else if ("tank".equals(component.type)) {
                 if ("fluid_storage".equals(component.role)) {
-                    int index = component.index >= 0 ? component.index : def.fluidStorageTanks.size();
+                    int index = component.index >= 0 ? component.index : fluidStorageIndex;
                     component.index = index;
+                    fluidStorageIndex = Math.max(fluidStorageIndex, index + 1);
                     ensureTankListSize(def.fluidStorageTanks, index + 1);
                     def.fluidStorageTanks.set(index, toTankRect(component));
                     if (def.fluidStorageTank == null || index == 0) {
                         def.fluidStorageTank = toTankRect(component);
                     }
                 } else if ("gas_storage".equals(component.role)) {
-                    int index = component.index >= 0 ? component.index : def.gasStorageTanks.size();
+                    int index = component.index >= 0 ? component.index : gasStorageIndex;
                     component.index = index;
+                    gasStorageIndex = Math.max(gasStorageIndex, index + 1);
                     ensureTankListSize(def.gasStorageTanks, index + 1);
                     def.gasStorageTanks.set(index, toTankRect(component));
                     if (def.gasStorageTank == null || index == 0) {

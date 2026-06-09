@@ -63,9 +63,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Arrays;
-import java.util.WeakHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 
 public class TileCustomAEMixedInputBus extends TileColorableMachineComponent implements
@@ -86,8 +84,6 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     private static final int DEFAULT_TANK_SLOT_COUNT = 1;
     private static final int FLUID_TANK_CAPACITY = 8000;
     private static final int GAS_TANK_CAPACITY = 8000;
-
-    private static final Map<ItemStack, IAEItemStack> AE_STACK_CACHE = new WeakHashMap<ItemStack, IAEItemStack>();
 
     protected final AENetworkProxy proxy;
     protected final IActionSource source;
@@ -963,7 +959,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     }
 
     private IAEItemStack createItemStack(final ItemStack stack) {
-        return AE_STACK_CACHE.computeIfAbsent(stack, v -> this.itemChannel.createStack(stack));
+        return this.itemChannel.createStack(stack);
     }
 
     private IAEFluidStack extractFluidFromAE(final IMEMonitor<IAEFluidStack> inv, final IAEFluidStack stack) throws GridAccessException {

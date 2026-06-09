@@ -1,15 +1,8 @@
 package com.fushu.mmceguiext;
 
-import com.fushu.mmceguiext.client.ClientGuiEventHandler;
-import com.fushu.mmceguiext.client.config.MachineGuiStyleManager;
-import com.fushu.mmceguiext.client.gui.GuiFluidProcessorHatchCustom;
-import com.fushu.mmceguiext.client.gui.GuiMEItemInputBusCustom;
-import com.fushu.mmceguiext.client.gui.GuiCustomAEMixedInputBus;
-import com.fushu.mmceguiext.client.gui.GuiCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.block.BlockCustomAEMixedInputBus;
 import com.fushu.mmceguiext.common.block.BlockCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.block.BlockCustomMEItemInputBus;
-import com.fushu.mmceguiext.common.integration.theoneprobe.CustomHatchInfoProvider;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry;
 import com.fushu.mmceguiext.common.registry.CustomAEItemInputBusRegistry;
@@ -27,17 +20,12 @@ import com.fushu.mmceguiext.common.tile.TileCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.tile.TileCustomHatch;
 import com.fushu.mmceguiext.common.network.PktControllerSmartInterfaceUpdate;
 import hellfirepvp.modularmachinery.common.base.Mods;
-import mcjty.theoneprobe.TheOneProbe;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.common.config.Config;
-import net.minecraftforge.common.config.ConfigManager;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.client.event.ConfigChangedEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.network.IGuiHandler;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
@@ -88,15 +76,13 @@ public class MMCEGuiExt {
             nextPacketId++,
             Side.SERVER
         );
-        if (event.getSide().isClient() && MMCEGuiExtConfig.novaEngCoreCompatibilityMode) {
-            MachineGuiStyleManager.preloadAndPinCache();
-        }
         CustomHatchRegistry.loadAll();
         CustomAEItemInputBusRegistry.loadAll();
         CustomAEMixedInputBusRegistry.loadAll();
         CustomAEMixedOutputBusRegistry.loadAll();
         if (event.getSide().isClient()) {
-            MinecraftForge.EVENT_BUS.register(new ClientGuiEventHandler());
+            preloadClientStyleCache();
+            registerClientGuiEventHandler();
         }
         NetworkRegistry.INSTANCE.registerGuiHandler(this, new GuiHandler());
     }
@@ -104,17 +90,7 @@ public class MMCEGuiExt {
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         if (Mods.TOP.isPresent()) {
-            TheOneProbe.theOneProbeImp.registerProvider(new CustomHatchInfoProvider());
-        }
-    }
-
-    @Mod.EventBusSubscriber(modid = MODID)
-    public static class ConfigSyncHandler {
-        @SubscribeEvent
-        public static void onConfigChanged(ConfigChangedEvent.OnConfigChangedEvent event) {
-            if (MODID.equals(event.getModID())) {
-                ConfigManager.sync(MODID, Config.Type.INSTANCE);
-            }
+            registerTopProvider();
         }
     }
 
@@ -164,7 +140,12 @@ public class MMCEGuiExt {
                 }
                 TileCustomMEItemInputBus tile = (TileCustomMEItemInputBus) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
                 resolveCustomItemInputBusDef(world, new net.minecraft.util.math.BlockPos(x, y, z), tile);
-                return new GuiMEItemInputBusCustom(tile, player);
+                return createClientGui(
+                    "com.fushu.mmceguiext.client.gui.GuiMEItemInputBusCustom",
+                    new Class<?>[]{TileCustomMEItemInputBus.class, EntityPlayer.class},
+                    tile,
+                    player
+                );
             }
             if (id == GUI_CUSTOM_AE_MIXED_INPUT) {
                 if (!(world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z)) instanceof TileCustomAEMixedInputBus)) {
@@ -172,7 +153,13 @@ public class MMCEGuiExt {
                 }
                 TileCustomAEMixedInputBus tile = (TileCustomAEMixedInputBus) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
                 com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def def = resolveMixedInputBusDef(world, new net.minecraft.util.math.BlockPos(x, y, z), tile);
-                return def == null ? null : new GuiCustomAEMixedInputBus(tile, player, def);
+                return def == null ? null : createClientGui(
+                    "com.fushu.mmceguiext.client.gui.GuiCustomAEMixedInputBus",
+                    new Class<?>[]{TileCustomAEMixedInputBus.class, EntityPlayer.class, com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def.class},
+                    tile,
+                    player,
+                    def
+                );
             }
             if (id == GUI_CUSTOM_AE_MIXED_OUTPUT) {
                 if (!(world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z)) instanceof TileCustomAEMixedOutputBus)) {
@@ -180,7 +167,13 @@ public class MMCEGuiExt {
                 }
                 TileCustomAEMixedOutputBus tile = (TileCustomAEMixedOutputBus) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
                 com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry.Def def = resolveMixedOutputBusDef(world, new net.minecraft.util.math.BlockPos(x, y, z), tile);
-                return def == null ? null : new GuiCustomAEMixedOutputBus(tile, player, def);
+                return def == null ? null : createClientGui(
+                    "com.fushu.mmceguiext.client.gui.GuiCustomAEMixedOutputBus",
+                    new Class<?>[]{TileCustomAEMixedOutputBus.class, EntityPlayer.class, com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry.Def.class},
+                    tile,
+                    player,
+                    def
+                );
             }
             if (id != GUI_CUSTOM_HATCH) {
                 return null;
@@ -190,7 +183,22 @@ public class MMCEGuiExt {
             }
             TileCustomHatch tile = (TileCustomHatch) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
             com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef def = tile.getDefinition();
-            return def == null ? null : new GuiFluidProcessorHatchCustom(tile, player, def);
+            return def == null ? null : createClientGui(
+                "com.fushu.mmceguiext.client.gui.GuiFluidProcessorHatchCustom",
+                new Class<?>[]{TileCustomHatch.class, EntityPlayer.class, com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef.class},
+                tile,
+                player,
+                def
+            );
+        }
+
+        @Nullable
+        private Object createClientGui(String className, Class<?>[] signature, Object... args) {
+            try {
+                return Class.forName(className).getConstructor(signature).newInstance(args);
+            } catch (Exception e) {
+                return null;
+            }
         }
 
         @Nullable
@@ -233,6 +241,35 @@ public class MMCEGuiExt {
                 return block.getDefinition();
             }
             return null;
+        }
+    }
+
+    private static void preloadClientStyleCache() {
+        if (!MMCEGuiExtConfig.novaEngCoreCompatibilityMode) {
+            return;
+        }
+        try {
+            Class.forName("com.fushu.mmceguiext.client.config.MachineGuiStyleManager")
+                .getMethod("preloadAndPinCache")
+                .invoke(null);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void registerClientGuiEventHandler() {
+        try {
+            MinecraftForge.EVENT_BUS.register(Class.forName("com.fushu.mmceguiext.client.ClientGuiEventHandler").newInstance());
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void registerTopProvider() {
+        try {
+            Object top = Class.forName("mcjty.theoneprobe.TheOneProbe").getField("theOneProbeImp").get(null);
+            top.getClass()
+                .getMethod("registerProvider", Class.forName("mcjty.theoneprobe.api.IProbeInfoProvider"))
+                .invoke(top, Class.forName("com.fushu.mmceguiext.common.integration.theoneprobe.CustomHatchInfoProvider").newInstance());
+        } catch (Exception ignored) {
         }
     }
 }

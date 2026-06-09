@@ -30,9 +30,9 @@ public final class CustomHatchGameRegistry {
     public static void onRegisterBlocks(RegistryEvent.Register<Block> event) {
         BLOCKS.clear();
         MODEL_BINDINGS.clear();
-        List<CustomHatchRegistry.CustomHatchDef> defs = CustomHatchRegistry.getRegistered();
+        List<CustomHatchRegistry.CustomHatchDef> defs = CustomHatchRegistry.getCached();
         if (defs.isEmpty()) {
-            defs = CustomHatchRegistry.getCached();
+            defs = CustomHatchRegistry.loadAll();
         }
         for (CustomHatchRegistry.CustomHatchDef def : defs) {
             if (def == null || def.id == null || def.id.trim().isEmpty()) {

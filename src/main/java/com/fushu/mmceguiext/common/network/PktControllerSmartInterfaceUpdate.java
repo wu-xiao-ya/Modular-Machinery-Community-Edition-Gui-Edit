@@ -106,7 +106,7 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
             updated = true;
             break;
         }
-        if (!updated) {
+        if (!updated && hasControllerCustomData(controller, interfaceType)) {
             updated = tryWriteControllerCustomData(controller, interfaceType, value);
         }
         if (updated) {
@@ -139,6 +139,16 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
             tag.setFloat(key, value);
             setTagMethod.invoke(controller, tag);
             return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    static boolean hasControllerCustomData(TileMultiblockMachineController controller, String key) {
+        try {
+            Method getTagMethod = controller.getClass().getMethod("getCustomDataTag");
+            Object existing = getTagMethod.invoke(controller);
+            return existing instanceof NBTTagCompound && ((NBTTagCompound) existing).hasKey(key);
         } catch (Exception ignored) {
             return false;
         }

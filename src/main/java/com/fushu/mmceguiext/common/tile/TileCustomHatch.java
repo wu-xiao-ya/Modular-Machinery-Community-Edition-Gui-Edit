@@ -276,7 +276,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return false;
         }
 
-        IFluidHandlerItem handler = FluidUtil.getFluidHandler(input.copy());
+        ItemStack singleInput = input.copy();
+        singleInput.setCount(1);
+        IFluidHandlerItem handler = FluidUtil.getFluidHandler(singleInput);
         if (handler == null) {
             return false;
         }
@@ -300,7 +302,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         }
 
         this.tank.fill(actuallyDrained.copy(), true);
-        return moveProcessedContainer(inputSlot, outputSlot, emptiedContainer);
+        return moveOneProcessedContainer(inputSlot, input, outputSlot, emptiedContainer);
     }
 
     private boolean tryProcessFluidOutputSlot(int inputSlot, int[] outputSlots) {
@@ -333,6 +335,8 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return false;
         }
         ItemStack container = input.copy();
+        container.setCount(1);
+        container.setCount(1);
         GasStack gas = getGasFromItem(container);
         if (gas == null || gas.amount <= 0) {
             return false;
@@ -350,7 +354,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return false;
         }
         this.gasTank.receiveGas(null, removed.copy(), true);
-        return moveProcessedContainer(inputSlot, outputSlot, container);
+        return moveOneProcessedContainer(inputSlot, input, outputSlot, container);
     }
 
     @Optional.Method(modid = "mekanism")
@@ -376,21 +380,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         if (drained == null || drained.amount <= 0) {
             return false;
         }
-        return moveProcessedContainer(inputSlot, outputSlot, container);
-    }
-
-    private boolean moveProcessedContainer(int inputSlot, int outputSlot, ItemStack producedContainer) {
-        this.inventory.setStackInSlot(inputSlot, ItemStack.EMPTY);
-        ItemStack output = this.inventory.getStackInSlot(outputSlot);
-        if (output.isEmpty()) {
-            this.inventory.setStackInSlot(outputSlot, producedContainer.copy());
-        } else {
-            ItemStack grown = output.copy();
-            grown.grow(producedContainer.getCount());
-            this.inventory.setStackInSlot(outputSlot, grown);
-        }
-        markNoUpdateSync();
-        return true;
+        return moveOneProcessedContainer(inputSlot, input, outputSlot, container);
     }
 
     private boolean moveOneProcessedContainer(int inputSlot, ItemStack originalInput, int outputSlot, ItemStack producedContainer) {

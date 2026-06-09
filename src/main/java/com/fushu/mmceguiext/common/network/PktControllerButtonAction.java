@@ -128,10 +128,16 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         if (message.kind == KIND_SMART_ADD) {
             SmartInterfaceData current = controller.getSmartInterfaceData(message.key);
             Float customValue = readControllerCustomData(controller, message.key);
+            if (current == null && customValue == null) {
+                return;
+            }
             float base = current != null
                 ? current.getValue()
                 : customValue != null && Float.isFinite(customValue.floatValue()) ? customValue.floatValue() : 0.0F;
             resolved = base + message.value;
+        } else if (controller.getSmartInterfaceData(message.key) == null
+            && !PktControllerSmartInterfaceUpdate.hasControllerCustomData(controller, message.key)) {
+            return;
         }
         if (!Float.isFinite(resolved)) {
             return;
