@@ -63,6 +63,7 @@ import net.minecraftforge.items.IItemHandlerModifiable;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Arrays;
@@ -564,7 +565,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
     public boolean configInvHasItem() {
         for (int i = 0; i < getActiveItemSlotBound(); i++) {
-            if (!this.configInventory.getStackInSlot(i).isEmpty()) {
+            if (isItemSlotDefined(i) && !this.configInventory.getStackInSlot(i).isEmpty()) {
                 return true;
             }
         }
@@ -600,7 +601,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
     public boolean hasItems() {
         for (int i = 0; i < getActiveItemSlotBound(); i++) {
-            if (!this.inventory.getStackInSlot(i).isEmpty()) {
+            if (isItemSlotDefined(i) && !this.inventory.getStackInSlot(i).isEmpty()) {
                 return true;
             }
         }
@@ -609,7 +610,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
     public boolean hasFluid() {
         for (int i = 0; i < getActiveFluidSlotBound(); i++) {
-            if (this.fluidTanks.getFluidInSlot(i) != null) {
+            if (isFluidSlotDefined(i) && this.fluidTanks.getFluidInSlot(i) != null) {
                 return true;
             }
         }
@@ -618,7 +619,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
     public boolean hasGas() {
         for (int i = 0; i < getActiveGasSlotBound(); i++) {
-            if (this.gasTanks.getGasStack(i) != null) {
+            if (isGasSlotDefined(i) && this.gasTanks.getGasStack(i) != null) {
                 return true;
             }
         }
@@ -1444,17 +1445,31 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     }
 
     private IFluidTankProperties[] limitedTankProperties(IFluidTankProperties[] properties, int limit) {
-        if (properties == null || properties.length <= limit) {
-            return properties == null ? new IFluidTankProperties[0] : properties;
+        if (properties == null || properties.length == 0 || limit <= 0) {
+            return new IFluidTankProperties[0];
         }
-        return Arrays.copyOf(properties, Math.max(0, limit));
+        List<IFluidTankProperties> defined = new ArrayList<IFluidTankProperties>();
+        int bound = Math.min(properties.length, limit);
+        for (int slot = 0; slot < bound; slot++) {
+            if (isFluidSlotDefined(slot)) {
+                defined.add(properties[slot]);
+            }
+        }
+        return defined.toArray(new IFluidTankProperties[defined.size()]);
     }
 
     private mekanism.api.gas.GasTankInfo[] limitedGasTankInfo(mekanism.api.gas.GasTankInfo[] info, int limit) {
-        if (info == null || info.length <= limit) {
-            return info == null ? new mekanism.api.gas.GasTankInfo[0] : info;
+        if (info == null || info.length == 0 || limit <= 0) {
+            return new mekanism.api.gas.GasTankInfo[0];
         }
-        return Arrays.copyOf(info, Math.max(0, limit));
+        List<mekanism.api.gas.GasTankInfo> defined = new ArrayList<mekanism.api.gas.GasTankInfo>();
+        int bound = Math.min(info.length, limit);
+        for (int slot = 0; slot < bound; slot++) {
+            if (isGasSlotDefined(slot)) {
+                defined.add(info[slot]);
+            }
+        }
+        return defined.toArray(new mekanism.api.gas.GasTankInfo[defined.size()]);
     }
 
     private int fillActiveFluid(net.minecraftforge.fluids.FluidStack resource, boolean doFill) {

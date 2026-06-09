@@ -27,6 +27,9 @@ public class ContainerCustomAEMixedInputBus extends AEBaseContainer {
         IItemHandlerModifiable internal = this.owner.getInternalInventory().asGUIAccess();
         int activeItemSlots = Math.min(internal.getSlots(), this.owner.getActiveItemSlots());
         for (int i = 0; i < activeItemSlots; i++) {
+            if (def != null && !isItemSlotDefined(def, i)) {
+                continue;
+            }
             int x = -10000;
             int y = -10000;
             CustomAEMixedInputBusRegistry.ComponentDef component = findIndexedComponent(def, "slot", "item_storage", i);
@@ -49,6 +52,9 @@ public class ContainerCustomAEMixedInputBus extends AEBaseContainer {
         IItemHandlerModifiable config = this.owner.getConfigInventory().asGUIAccess();
         int activeConfigSlots = Math.min(config.getSlots(), this.owner.getActiveItemSlots());
         for (int i = 0; i < activeConfigSlots; i++) {
+            if (def != null && !isItemSlotDefined(def, i)) {
+                continue;
+            }
             int x = -10000;
             int y = -10000;
             CustomAEMixedInputBusRegistry.ComponentDef component = findIndexedComponent(def, "slot", "item_config", i);
@@ -104,6 +110,12 @@ public class ContainerCustomAEMixedInputBus extends AEBaseContainer {
             }
         }
         return null;
+    }
+
+    private static boolean isItemSlotDefined(CustomAEMixedInputBusRegistry.Def def, int index) {
+        return index >= 0
+            && index < def.configSlots.size() && def.configSlots.get(index) != null
+            && index < def.storageSlots.size() && def.storageSlots.get(index) != null;
     }
 
     private static CustomAEMixedInputBusRegistry.ComponentDef findComponent(CustomAEMixedInputBusRegistry.Def def, String type, String role) {

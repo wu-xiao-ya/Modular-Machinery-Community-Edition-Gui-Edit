@@ -26,6 +26,10 @@ public class ContainerCustomAEMixedOutputBus extends AEBaseContainer {
         IItemHandlerModifiable internal = this.owner.getInventory().asGUIAccess();
         int activeItemSlots = Math.min(internal.getSlots(), this.owner.getActiveItemSlots());
         for (int i = 0; i < activeItemSlots; i++) {
+            if (def != null && findIndexedComponent(def, "slot", "item_storage", i) == null
+                && findIndexedComponent(def, "slot", "item_output", i) == null) {
+                continue;
+            }
             int x = -10000;
             int y = -10000;
             CustomAEMixedOutputBusRegistry.ComponentDef component = findIndexedComponent(def, "slot", "item_storage", i);

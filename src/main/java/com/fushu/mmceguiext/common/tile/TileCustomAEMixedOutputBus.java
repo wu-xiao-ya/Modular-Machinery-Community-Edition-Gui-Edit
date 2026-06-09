@@ -987,17 +987,32 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         net.minecraftforge.fluids.capability.IFluidTankProperties[] properties,
         int limit
     ) {
-        if (properties == null || properties.length <= limit) {
-            return properties == null ? new net.minecraftforge.fluids.capability.IFluidTankProperties[0] : properties;
+        if (properties == null || properties.length == 0 || limit <= 0) {
+            return new net.minecraftforge.fluids.capability.IFluidTankProperties[0];
         }
-        return Arrays.copyOf(properties, Math.max(0, limit));
+        List<net.minecraftforge.fluids.capability.IFluidTankProperties> defined =
+            new ArrayList<net.minecraftforge.fluids.capability.IFluidTankProperties>();
+        int bound = Math.min(properties.length, limit);
+        for (int slot = 0; slot < bound; slot++) {
+            if (isFluidSlotDefined(slot)) {
+                defined.add(properties[slot]);
+            }
+        }
+        return defined.toArray(new net.minecraftforge.fluids.capability.IFluidTankProperties[defined.size()]);
     }
 
     private mekanism.api.gas.GasTankInfo[] limitedGasTankInfo(mekanism.api.gas.GasTankInfo[] info, int limit) {
-        if (info == null || info.length <= limit) {
-            return info == null ? new mekanism.api.gas.GasTankInfo[0] : info;
+        if (info == null || info.length == 0 || limit <= 0) {
+            return new mekanism.api.gas.GasTankInfo[0];
         }
-        return Arrays.copyOf(info, Math.max(0, limit));
+        List<mekanism.api.gas.GasTankInfo> defined = new ArrayList<mekanism.api.gas.GasTankInfo>();
+        int bound = Math.min(info.length, limit);
+        for (int slot = 0; slot < bound; slot++) {
+            if (isGasSlotDefined(slot)) {
+                defined.add(info[slot]);
+            }
+        }
+        return defined.toArray(new mekanism.api.gas.GasTankInfo[defined.size()]);
     }
 
     private int fillActiveFluid(net.minecraftforge.fluids.FluidStack resource, boolean doFill) {

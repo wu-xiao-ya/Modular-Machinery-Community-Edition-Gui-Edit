@@ -618,6 +618,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
                     continue;
                 }
                 index = component.index;
+                nextIndex = Math.max(nextIndex, index + 1);
             } else {
                 if (nextIndex > MAX_DYNAMIC_SLOT_INDEX) {
                     continue;

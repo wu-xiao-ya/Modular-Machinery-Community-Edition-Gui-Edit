@@ -29,7 +29,13 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
                     if (component == null || !"slot".equalsIgnoreCase(component.type)) {
                         continue;
                     }
-                    int slotIndex = component.index >= 0 ? component.index : nextIndex++;
+                    int slotIndex;
+                    if (component.index >= 0) {
+                        slotIndex = component.index;
+                        nextIndex = Math.max(nextIndex, slotIndex + 1);
+                    } else {
+                        slotIndex = nextIndex++;
+                    }
                     if (slotIndex < 0 || slotIndex >= itemHandler.getSlots()) {
                         continue;
                     }
