@@ -7,13 +7,13 @@ import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.fml.common.Loader;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -221,6 +221,7 @@ public final class CustomAEMixedInputBusRegistry {
                     }
                 } else if ("fluid_config".equals(component.role)) {
                     int index = component.index >= 0 ? component.index : def.fluidConfigTanks.size();
+                    component.index = index;
                     ensureTankListSize(def.fluidConfigTanks, index + 1);
                     def.fluidConfigTanks.set(index, toTankRect(component));
                     if (def.fluidConfigTank == null || index == 0) {
@@ -229,6 +230,7 @@ public final class CustomAEMixedInputBusRegistry {
                     }
                 } else if ("gas_config".equals(component.role)) {
                     int index = component.index >= 0 ? component.index : def.gasConfigTanks.size();
+                    component.index = index;
                     ensureTankListSize(def.gasConfigTanks, index + 1);
                     def.gasConfigTanks.set(index, toTankRect(component));
                     if (def.gasConfigTank == null || index == 0) {
@@ -239,6 +241,7 @@ public final class CustomAEMixedInputBusRegistry {
             } else if ("tank".equals(component.type)) {
                 if ("fluid_storage".equals(component.role)) {
                     int index = component.index >= 0 ? component.index : def.fluidStorageTanks.size();
+                    component.index = index;
                     ensureTankListSize(def.fluidStorageTanks, index + 1);
                     def.fluidStorageTanks.set(index, toTankRect(component));
                     if (def.fluidStorageTank == null || index == 0) {
@@ -246,6 +249,7 @@ public final class CustomAEMixedInputBusRegistry {
                     }
                 } else if ("gas_storage".equals(component.role)) {
                     int index = component.index >= 0 ? component.index : def.gasStorageTanks.size();
+                    component.index = index;
                     ensureTankListSize(def.gasStorageTanks, index + 1);
                     def.gasStorageTanks.set(index, toTankRect(component));
                     if (def.gasStorageTank == null || index == 0) {
@@ -473,7 +477,7 @@ public final class CustomAEMixedInputBusRegistry {
     }
 
     private static Path resolveBusDir() {
-        Path dir = Paths.get("config").resolve("mmceguiext").resolve("custom_ae_mixed_input_buses");
+        Path dir = Loader.instance().getConfigDir().toPath().resolve("mmceguiext").resolve("custom_ae_mixed_input_buses");
         try {
             Files.createDirectories(dir);
         } catch (IOException ignored) {

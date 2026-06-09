@@ -151,11 +151,11 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
                     return;
                 }
             }
-            if (findComponents("slot", "fluid_config").isEmpty() && this.definition.fluidConfigTank != null && isMouseOverTank(mouseX, mouseY, this.definition.fluidConfigTank)) {
+            if (findComponents("slot", "fluid_config").isEmpty() && getLegacyFluidConfigRect() != null && isMouseOverTank(mouseX, mouseY, getLegacyFluidConfigRect())) {
                 MMCEGuiExt.NET_CHANNEL.sendToServer(new PktCustomAEMixedSlotUpdate(this.owner.getPos(), PktCustomAEMixedSlotUpdate.TARGET_FLUID, 0));
                 return;
             }
-            if (findComponents("slot", "gas_config").isEmpty() && this.definition.gasConfigTank != null && isMouseOverTank(mouseX, mouseY, this.definition.gasConfigTank)) {
+            if (findComponents("slot", "gas_config").isEmpty() && getLegacyGasConfigRect() != null && isMouseOverTank(mouseX, mouseY, getLegacyGasConfigRect())) {
                 MMCEGuiExt.NET_CHANNEL.sendToServer(new PktCustomAEMixedSlotUpdate(this.owner.getPos(), PktCustomAEMixedSlotUpdate.TARGET_GAS, 0));
                 return;
             }
@@ -174,7 +174,7 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
             drawFluidConfig(guiLeft, guiTop, toTankRect(component), resolveComponentIndex(component));
         }
         if (findComponents("slot", "fluid_config").isEmpty()) {
-            drawFluidConfig(guiLeft, guiTop, this.definition.fluidConfigTank, 0);
+            drawFluidConfig(guiLeft, guiTop, getLegacyFluidConfigRect(), 0);
         }
     }
 
@@ -248,7 +248,7 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
             drawGasConfig(guiLeft, guiTop, toTankRect(component), resolveComponentIndex(component));
         }
         if (findComponents("slot", "gas_config").isEmpty()) {
-            drawGasConfig(guiLeft, guiTop, this.definition.gasConfigTank, 0);
+            drawGasConfig(guiLeft, guiTop, getLegacyGasConfigRect(), 0);
         }
     }
 
@@ -339,6 +339,22 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
         return component == null || component.index < 0 ? 0 : component.index;
     }
 
+    @Nullable
+    private CustomAEMixedInputBusRegistry.TankRect getLegacyFluidConfigRect() {
+        if (this.definition.fluidConfigTank != null) {
+            return this.definition.fluidConfigTank;
+        }
+        return toTankRect(this.definition.fluidConfigSlot);
+    }
+
+    @Nullable
+    private CustomAEMixedInputBusRegistry.TankRect getLegacyGasConfigRect() {
+        if (this.definition.gasConfigTank != null) {
+            return this.definition.gasConfigTank;
+        }
+        return toTankRect(this.definition.gasConfigSlot);
+    }
+
     private void drawTiledSprite(int x, int y, int width, int height, TextureAtlasSprite sprite) {
         int remainingHeight = height;
         int drawY = y;
@@ -398,6 +414,19 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
         rect.y = component.y;
         rect.width = component.width;
         rect.height = component.height;
+        return rect;
+    }
+
+    @Nullable
+    private CustomAEMixedInputBusRegistry.TankRect toTankRect(@Nullable CustomAEMixedInputBusRegistry.SlotPoint point) {
+        if (point == null) {
+            return null;
+        }
+        CustomAEMixedInputBusRegistry.TankRect rect = new CustomAEMixedInputBusRegistry.TankRect();
+        rect.x = point.x;
+        rect.y = point.y;
+        rect.width = 16;
+        rect.height = 16;
         return rect;
     }
 

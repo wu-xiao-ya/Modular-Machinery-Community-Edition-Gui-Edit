@@ -628,8 +628,8 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     }
 
     private boolean needsGasUpdate() {
-        int capacity = this.gasTanks.getTanks()[0].getMaxGas();
         for (int slot = 0; slot < this.gasConfig.size(); slot++) {
+            int capacity = getGasTankCapacity(slot);
             GasStack cfgStack = this.gasConfig.getGasStack(slot);
             GasStack invStack = this.gasTanks.getGasStack(slot);
             if (cfgStack == null) {
@@ -646,6 +646,13 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
             }
         }
         return false;
+    }
+
+    private int getGasTankCapacity(int slot) {
+        if (slot >= 0 && slot < this.gasTanks.getTanks().length) {
+            return Math.max(1, this.gasTanks.getTanks()[slot].getMaxGas());
+        }
+        return GAS_TANK_CAPACITY;
     }
 
     @Nonnull
@@ -814,8 +821,8 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         boolean success = false;
         synchronized (this.gasTanks) {
             IMEMonitor<IAEGasStack> inv = this.proxy.getStorage().getInventory(this.gasChannel);
-            int capacity = this.gasTanks.getTanks()[0].getMaxGas();
             for (int slot : slots) {
+                int capacity = getGasTankCapacity(slot);
                 this.changedGasSlots[slot] = false;
                 GasStack cfgStack = this.gasConfig.getGasStack(slot);
                 GasStack invStack = this.gasTanks.getGasStack(slot);

@@ -3,8 +3,6 @@ package com.fushu.mmceguiext.common.block;
 import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedInputBus;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import github.kasuminova.mmce.common.block.appeng.BlockMEMachineComponent;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
@@ -22,7 +20,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class BlockCustomAEMixedInputBus extends BlockMEMachineComponent {
-    private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private final CustomAEMixedInputBusRegistry.Def definition;
 
     public BlockCustomAEMixedInputBus(CustomAEMixedInputBusRegistry.Def definition) {
@@ -54,7 +51,6 @@ public class BlockCustomAEMixedInputBus extends BlockMEMachineComponent {
             if (tileEntity instanceof TileCustomAEMixedInputBus) {
                 ensureDefinitionId((TileCustomAEMixedInputBus) tileEntity);
             }
-            LOGGER.info("Custom AE mixed input bus activated at {} with tile {}", pos, tileEntity == null ? "null" : tileEntity.getClass().getName());
             playerIn.openGui(MMCEGuiExt.MODID, MMCEGuiExt.GUI_CUSTOM_AE_MIXED_INPUT, worldIn, pos.getX(), pos.getY(), pos.getZ());
         }
         return true;

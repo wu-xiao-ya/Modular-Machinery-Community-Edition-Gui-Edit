@@ -82,16 +82,20 @@ public final class CustomHatchModelRegistry {
             int slash = rest.indexOf('/');
             if (slash > 0) {
                 String namespace = rest.substring(0, slash);
-                String path = rest.substring(slash + 1);
-                if (path.startsWith("textures/")) {
-                    path = path.substring("textures/".length());
-                }
-                if (path.endsWith(".png")) {
-                    path = path.substring(0, path.length() - 4);
-                }
-                return new ResourceLocation(namespace, path);
+                return new ResourceLocation(namespace, normalizeTexturePath(rest.substring(slash + 1)));
             }
         }
-        return new ResourceLocation(MMCEGuiExt.MODID, value);
+        return new ResourceLocation(MMCEGuiExt.MODID, normalizeTexturePath(value));
+    }
+
+    private static String normalizeTexturePath(String raw) {
+        String path = raw == null ? "" : raw.trim().replace('\\', '/');
+        while (path.startsWith("textures/")) {
+            path = path.substring("textures/".length());
+        }
+        if (path.endsWith(".png")) {
+            path = path.substring(0, path.length() - 4);
+        }
+        return path;
     }
 }

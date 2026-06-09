@@ -6,6 +6,7 @@ import com.fushu.mmceguiext.client.gui.GuiRenderUtils;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.fml.common.Loader;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -14,7 +15,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -96,6 +96,7 @@ public final class CustomAEMixedOutputBusRegistry {
             def.backgroundTextureHeight = getInt(root, "backgroundTextureHeight", def.guiHeight);
             def.textureLayers = parseTextureLayers(root.getAsJsonArray("textureLayers"));
             def.gui = parseGui(root.getAsJsonObject("gui"));
+            applyGuiComponents(def);
             return def.id == null || def.id.trim().isEmpty() ? null : def;
         } catch (Exception ex) {
             LOGGER.warn("[MMCEGE-NEW] Failed to parse custom AE mixed output bus {}", path, ex);
@@ -112,6 +113,41 @@ public final class CustomAEMixedOutputBusRegistry {
         gui.height = getInt(obj, "height", 235);
         gui.components = parseComponents(obj.getAsJsonArray("components"));
         return gui;
+    }
+
+    private static void applyGuiComponents(Def def) {
+        if (def == null || def.gui == null || def.gui.components == null || def.gui.components.isEmpty()) {
+            return;
+        }
+        int itemIndex = 0;
+        int fluidIndex = 0;
+        int gasIndex = 0;
+        for (ComponentDef component : def.gui.components) {
+            if (component == null) {
+                continue;
+            }
+            if ("slot".equals(component.type)) {
+                String role = component.role == null ? "" : component.role;
+                if ("item_storage".equals(role) || "item_output".equals(role)) {
+                    if (component.index < 0) {
+                        component.index = itemIndex;
+                    }
+                    itemIndex = Math.max(itemIndex, component.index + 1);
+                }
+            } else if ("tank".equals(component.type)) {
+                if ("fluid_storage".equals(component.role)) {
+                    if (component.index < 0) {
+                        component.index = fluidIndex;
+                    }
+                    fluidIndex = Math.max(fluidIndex, component.index + 1);
+                } else if ("gas_storage".equals(component.role)) {
+                    if (component.index < 0) {
+                        component.index = gasIndex;
+                    }
+                    gasIndex = Math.max(gasIndex, component.index + 1);
+                }
+            }
+        }
     }
 
     private static List<ComponentDef> parseComponents(@Nullable com.google.gson.JsonArray array) {
@@ -191,7 +227,7 @@ public final class CustomAEMixedOutputBusRegistry {
     }
 
     private static Path resolveBusDir() {
-        Path dir = Paths.get("config").resolve("mmceguiext").resolve("custom_ae_mixed_output_buses");
+        Path dir = Loader.instance().getConfigDir().toPath().resolve("mmceguiext").resolve("custom_ae_mixed_output_buses");
         try {
             Files.createDirectories(dir);
         } catch (IOException ignored) {

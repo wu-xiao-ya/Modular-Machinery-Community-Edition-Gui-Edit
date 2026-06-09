@@ -68,7 +68,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     appeng.fluids.util.IAEFluidInventory,
     IGasInventoryHost {
 
-    private static final int ITEM_SLOT_COUNT = 25;
+    private static final int DEFAULT_ITEM_SLOT_COUNT = 25;
     private static final int DEFAULT_TANK_SLOT_COUNT = 1;
     private static final int FLUID_TANK_CAPACITY = 8000;
     private static final int GAS_TANK_CAPACITY = 8000;
@@ -85,7 +85,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     private GasInventory gasTanks = createGasTanks(DEFAULT_TANK_SLOT_COUNT);
     private GasInventoryHandler gasHandler = new GasInventoryHandler(gasTanks);
 
-    private boolean[] changedItemSlots = new boolean[ITEM_SLOT_COUNT];
+    private boolean[] changedItemSlots = new boolean[DEFAULT_ITEM_SLOT_COUNT];
     private boolean[] changedFluidSlots = new boolean[DEFAULT_TANK_SLOT_COUNT];
     private boolean[] changedGasSlots = new boolean[DEFAULT_TANK_SLOT_COUNT];
     private long lastFullItemCheckTick = 0;
@@ -102,13 +102,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         this.proxy = new AENetworkProxy(this, "aeProxy", getVisualItemStack(), true);
         this.proxy.setIdlePowerUsage(1.0D);
         this.proxy.setFlags(GridFlags.REQUIRE_CHANNEL);
-        this.inventory.setListener(slot -> {
-            synchronized (this) {
-                if (slot >= 0 && slot < this.changedItemSlots.length) {
-                    this.changedItemSlots[slot] = true;
-                }
-            }
-        });
+        bindInventoryListener();
         this.combinedComponent = new MachineComponent<InfItemFluidHandler>(IOType.OUTPUT) {
             @Override
             public ComponentType getComponentType() {
@@ -123,8 +117,12 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     }
 
     private IOInventory buildInventory() {
-        int[] outputSlots = new int[ITEM_SLOT_COUNT];
-        for (int i = 0; i < ITEM_SLOT_COUNT; i++) {
+        return buildInventory(DEFAULT_ITEM_SLOT_COUNT);
+    }
+
+    private IOInventory buildInventory(final int slotCount) {
+        int[] outputSlots = new int[Math.max(1, slotCount)];
+        for (int i = 0; i < outputSlots.length; i++) {
             outputSlots[i] = i;
         }
         return new IOInventory(this, new int[0], outputSlots);
@@ -138,25 +136,78 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         return new GasInventory(Math.max(1, slotCount), GAS_TANK_CAPACITY, this);
     }
 
-    private void configureTankLayout() {
-        final int fluidSlots = resolveTankComponentCount("fluid_storage");
-        final int gasSlots = resolveTankComponentCount("gas_storage");
-        if (this.fluidTanks.getSlots() == fluidSlots && this.gasTanks.size() == gasSlots) {
+    private void bindInventoryListener() {
+        this.inventory.setListener(slot -> {
+            synchronized (this) {
+                if (slot >= 0 && slot < this.changedItemSlots.length) {
+                    this.changedItemSlots[slot] = true;
+                }
+            }
+        });
+    }
+
+    private void configureStorageLayout() {
+        final int itemSlots = Math.max(this.inventory.getSlots(), resolveItemComponentCount());
+        final int fluidSlots = Math.max(this.fluidTanks.getSlots(), resolveTankComponentCount("fluid_storage"));
+        final int gasSlots = Math.max(this.gasTanks.size(), resolveTankComponentCount("gas_storage"));
+        if (this.inventory.getSlots() == itemSlots && this.fluidTanks.getSlots() == fluidSlots && this.gasTanks.size() == gasSlots) {
             return;
         }
 
+        IOInventory oldInventory = this.inventory;
         NBTTagCompound fluidData = new NBTTagCompound();
         this.fluidTanks.writeToNBT(fluidData, "tanks");
         NBTTagCompound gasData = this.gasTanks.save();
 
+        this.inventory = buildInventory(itemSlots);
+        copyInventory(oldInventory, this.inventory);
         this.fluidTanks = createFluidTanks(fluidSlots);
         this.gasTanks = createGasTanks(gasSlots);
         this.gasHandler = new GasInventoryHandler(this.gasTanks);
 
         this.fluidTanks.readFromNBT(fluidData, "tanks");
         this.gasTanks.load(gasData);
+        bindInventoryListener();
+        this.changedItemSlots = new boolean[this.inventory.getSlots()];
         this.changedFluidSlots = new boolean[this.fluidTanks.getSlots()];
         this.changedGasSlots = new boolean[this.gasTanks.size()];
+    }
+
+    private int resolveItemComponentCount() {
+        CustomAEMixedOutputBusRegistry.Def def = getDefinition();
+        if (def == null || def.gui == null || def.gui.components == null || def.gui.components.isEmpty()) {
+            return DEFAULT_ITEM_SLOT_COUNT;
+        }
+        int count = 0;
+        int maxIndexed = 0;
+        for (CustomAEMixedOutputBusRegistry.ComponentDef component : def.gui.components) {
+            if (component == null) {
+                continue;
+            }
+            if (!"slot".equalsIgnoreCase(component.type == null ? "" : component.type)) {
+                continue;
+            }
+            String role = component.role == null ? "" : component.role;
+            if (!"item_storage".equalsIgnoreCase(role) && !"item_output".equalsIgnoreCase(role)) {
+                continue;
+            }
+            count++;
+            if (component.index >= 0) {
+                maxIndexed = Math.max(maxIndexed, component.index + 1);
+            }
+        }
+        return Math.max(DEFAULT_ITEM_SLOT_COUNT, Math.max(count, maxIndexed));
+    }
+
+    private static void copyInventory(@Nullable IOInventory oldInv, IOInventory next) {
+        if (oldInv == null || next == null) {
+            return;
+        }
+        int copySlots = Math.min(oldInv.getSlots(), next.getSlots());
+        for (int i = 0; i < copySlots; i++) {
+            ItemStack stack = oldInv.getStackInSlot(i);
+            next.setStackInSlot(i, stack.isEmpty() ? ItemStack.EMPTY : stack.copy());
+        }
     }
 
     private int resolveTankComponentCount(final String role) {
@@ -238,18 +289,12 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
 
         if (compound.hasKey("inventory")) {
             this.inventory = IOInventory.deserialize(this, compound.getCompoundTag("inventory"));
-            this.inventory.setListener(slot -> {
-                synchronized (this) {
-                    if (slot >= 0 && slot < this.changedItemSlots.length) {
-                        this.changedItemSlots[slot] = true;
-                    }
-                }
-            });
+            bindInventoryListener();
         } else {
             this.inventory = buildInventory();
         }
         this.definitionId = compound.hasKey("definitionId") ? compound.getString("definitionId") : "";
-        configureTankLayout();
+        configureStorageLayout();
         this.fluidTanks.readFromNBT(compound, "tanks");
         this.gasTanks.load(compound.getCompoundTag("gasTanks"));
         this.changedItemSlots = new boolean[this.inventory.getSlots()];
@@ -281,7 +326,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
 
     public void setDefinitionId(@Nullable String id) {
         this.definitionId = id == null ? "" : id.trim();
-        configureTankLayout();
+        configureStorageLayout();
         markDirty();
     }
 

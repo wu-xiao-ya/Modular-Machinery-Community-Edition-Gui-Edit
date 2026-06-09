@@ -83,7 +83,7 @@ public final class CustomHatchGameRegistry {
             }
             ModelBinding binding = MODEL_BINDINGS.get(entry.getKey());
             if (binding == null) {
-                binding = new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "normal");
+                binding = new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "facing=north");
             }
             final ModelBinding modelBinding = binding;
             ModelLoader.setCustomStateMapper(block, new StateMapperBase() {
@@ -104,14 +104,22 @@ public final class CustomHatchGameRegistry {
             if (binding == null) {
                 continue;
             }
-            ModelResourceLocation location = binding.toModelResourceLocation();
-            IBakedModel baked = event.getModelRegistry().getObject(location);
-            if (baked != null) {
-                ResourceLocation model = binding.location;
-                if (MMCEGuiExt.MODID.equals(model.getNamespace()) && "custom_hatch".equals(model.getPath())) {
-                    event.getModelRegistry().putObject(location, new CustomHatchBakedModel(baked));
-                }
+            ResourceLocation model = binding.location;
+            if (MMCEGuiExt.MODID.equals(model.getNamespace()) && "custom_hatch".equals(model.getPath())) {
+                wrapCustomHatchModel(event, new ModelResourceLocation(model, "facing=north"));
+                wrapCustomHatchModel(event, new ModelResourceLocation(model, "facing=south"));
+                wrapCustomHatchModel(event, new ModelResourceLocation(model, "facing=west"));
+                wrapCustomHatchModel(event, new ModelResourceLocation(model, "facing=east"));
+                wrapCustomHatchModel(event, new ModelResourceLocation(model, "inventory"));
             }
+        }
+    }
+
+    @SideOnly(Side.CLIENT)
+    private static void wrapCustomHatchModel(ModelBakeEvent event, ModelResourceLocation location) {
+        IBakedModel baked = event.getModelRegistry().getObject(location);
+        if (baked != null && !(baked instanceof CustomHatchBakedModel)) {
+            event.getModelRegistry().putObject(location, new CustomHatchBakedModel(baked));
         }
     }
 
@@ -136,7 +144,7 @@ public final class CustomHatchGameRegistry {
         }
         ModelBinding location = parseModelBinding(model);
         if (location == null) {
-            location = new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "normal");
+            location = new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "facing=north");
         }
         return location;
     }
@@ -204,7 +212,7 @@ public final class CustomHatchGameRegistry {
 
     private static ModelResourceLocation resolveStateModelLocation(ModelBinding binding, IBlockState state) {
         if (binding == null) {
-            return new ModelResourceLocation(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "normal");
+            return new ModelResourceLocation(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "facing=north");
         }
         if (usesFacingVariants(binding.location)) {
             if (state != null && state.getPropertyKeys().contains(BlockCustomHatch.FACING)) {

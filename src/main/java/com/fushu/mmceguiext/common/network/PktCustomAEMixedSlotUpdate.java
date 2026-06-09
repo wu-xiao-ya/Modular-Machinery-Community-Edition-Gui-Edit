@@ -1,6 +1,7 @@
 package com.fushu.mmceguiext.common.network;
 
 import appeng.fluids.util.AEFluidStack;
+import com.fushu.mmceguiext.common.container.ContainerCustomAEMixedInputBus;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedInputBus;
 import com.mekeng.github.common.me.data.impl.AEGasStack;
 import com.mekeng.github.util.Utils;
@@ -62,6 +63,10 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
             return null;
         }
         TileCustomAEMixedInputBus bus = (TileCustomAEMixedInputBus) tile;
+        if (!(player.openContainer instanceof ContainerCustomAEMixedInputBus)
+            || ((ContainerCustomAEMixedInputBus) player.openContainer).getOwner() != bus) {
+            return null;
+        }
         ItemStack held = player.inventory.getItemStack();
         if (held.isEmpty()) {
             held = player.getHeldItemMainhand();
@@ -71,7 +76,10 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
         }
 
         if (message.target == TARGET_FLUID) {
-            int slot = Math.max(0, Math.min(message.slotIndex, bus.getFluidConfig().getSlots() - 1));
+            if (message.slotIndex < 0 || message.slotIndex >= bus.getFluidConfig().getSlots()) {
+                return null;
+            }
+            int slot = message.slotIndex;
             if (held.isEmpty()) {
                 bus.getFluidConfig().setFluidInSlot(slot, null);
             } else {
@@ -83,7 +91,10 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
         }
 
         if (message.target == TARGET_GAS) {
-            int slot = Math.max(0, Math.min(message.slotIndex, bus.getGasConfig().size() - 1));
+            if (message.slotIndex < 0 || message.slotIndex >= bus.getGasConfig().size()) {
+                return null;
+            }
+            int slot = message.slotIndex;
             if (held.isEmpty()) {
                 bus.getGasConfig().setGas(slot, null);
             } else {

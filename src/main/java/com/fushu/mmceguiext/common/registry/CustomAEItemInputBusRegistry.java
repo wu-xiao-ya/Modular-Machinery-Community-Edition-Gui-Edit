@@ -3,6 +3,7 @@ package com.fushu.mmceguiext.common.registry;
 import com.fushu.mmceguiext.MMCEGuiExt;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import net.minecraftforge.fml.common.Loader;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -11,7 +12,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -200,7 +200,7 @@ public final class CustomAEItemInputBusRegistry {
     }
 
     private static Path resolveBusDir() {
-        Path dir = Paths.get("config").resolve("mmceguiext").resolve("custom_ae_item_input_buses");
+        Path dir = Loader.instance().getConfigDir().toPath().resolve("mmceguiext").resolve("custom_ae_item_input_buses");
         try {
             Files.createDirectories(dir);
         } catch (IOException ignored) {
