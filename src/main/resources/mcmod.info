@@ -11,6 +11,11 @@
     "credits": "",
     "logoFile": "assets/mmceguiext/textures/logo.png",
     "screenshots": [],
-    "dependencies": ["modularmachinery"]
+    "dependencies": [
+      "modularmachinery",
+      "appliedenergistics2",
+      "mekanism",
+      "mekeng"
+    ]
   }
 ]

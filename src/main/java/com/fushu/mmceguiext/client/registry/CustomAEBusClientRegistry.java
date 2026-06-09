@@ -92,8 +92,12 @@ public final class CustomAEBusClientRegistry {
             }
         });
         ModelLoader.setCustomModelResourceLocation(item, 0, location);
-        WRAP_TARGETS.put(location, bakedModel);
-        WRAP_TARGETS.put(new ModelResourceLocation(location.getNamespace() + ":" + location.getPath(), "inventory"), bakedModel);
+        ResourceLocation sourceModel = resolveBakedModelLocation(location);
+        if (location.getNamespace().equals(fallbackBlockstate.getNamespace()) && location.getPath().equals(fallbackBlockstate.getPath())) {
+            sourceModel = bakedModel;
+        }
+        WRAP_TARGETS.put(location, sourceModel);
+        WRAP_TARGETS.put(new ModelResourceLocation(location.getNamespace() + ":" + location.getPath(), "inventory"), sourceModel);
     }
 
     private static void wrapModel(ModelBakeEvent event, ModelResourceLocation location, ResourceLocation bakedModel) {
@@ -101,5 +105,10 @@ public final class CustomAEBusClientRegistry {
         if (baked != null && !(baked instanceof CustomAEBusBakedModel)) {
             event.getModelRegistry().putObject(location, new CustomAEBusBakedModel(baked, bakedModel));
         }
+    }
+
+    private static ResourceLocation resolveBakedModelLocation(ModelResourceLocation location) {
+        String path = location.getPath();
+        return new ResourceLocation(location.getNamespace(), path.startsWith("block/") ? path : "block/" + path);
     }
 }

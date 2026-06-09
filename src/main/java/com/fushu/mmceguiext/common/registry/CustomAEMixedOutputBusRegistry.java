@@ -95,7 +95,7 @@ public final class CustomAEMixedOutputBusRegistry {
             def.backgroundTextureHeight = getInt(root, "backgroundTextureHeight", def.guiHeight);
             def.textureLayers = parseTextureLayers(root.getAsJsonArray("textureLayers"));
             def.blockTexture = getString(root, "blockTexture");
-            def.blockModel = getString(root, "blockModel");
+            def.blockModel = getBlockModel(root);
             def.gui = parseGui(root.getAsJsonObject("gui"));
             applyGuiComponents(def);
             return def.id == null || def.id.trim().isEmpty() ? null : def;
@@ -248,6 +248,13 @@ public final class CustomAEMixedOutputBusRegistry {
             return null;
         }
         return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsString() : null;
+    }
+
+    @Nullable
+    private static String getBlockModel(JsonObject root) {
+        JsonObject block = root == null ? null : root.getAsJsonObject("block");
+        String nested = getString(block, "model");
+        return nested == null || nested.trim().isEmpty() ? getString(root, "blockModel") : nested;
     }
 
     private static int getInt(@Nullable JsonObject obj, String key, int fallback) {

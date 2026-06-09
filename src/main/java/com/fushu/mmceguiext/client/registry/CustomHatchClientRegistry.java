@@ -79,8 +79,16 @@ public final class CustomHatchClientRegistry {
     private static void wrapCustomHatchModel(ModelBakeEvent event, ModelResourceLocation location) {
         IBakedModel baked = event.getModelRegistry().getObject(location);
         if (baked != null && !(baked instanceof CustomHatchBakedModel)) {
-            event.getModelRegistry().putObject(location, new CustomHatchBakedModel(baked));
+            event.getModelRegistry().putObject(location, new CustomHatchBakedModel(baked, resolveBakedModelLocation(location)));
         }
+    }
+
+    private static ResourceLocation resolveBakedModelLocation(ModelResourceLocation location) {
+        if (location == null) {
+            return new ResourceLocation(MMCEGuiExt.MODID, "block/custom_hatch");
+        }
+        String path = location.getPath();
+        return new ResourceLocation(location.getNamespace(), path.startsWith("block/") ? path : "block/" + path);
     }
 
     private static ModelResourceLocation resolveStateModelLocation(CustomHatchGameRegistry.ModelBinding binding, IBlockState state) {

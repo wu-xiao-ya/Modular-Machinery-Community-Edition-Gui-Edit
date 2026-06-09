@@ -37,7 +37,7 @@ import javax.annotation.Nullable;
     modid = MMCEGuiExt.MODID,
     name = MMCEGuiExt.NAME,
     version = MMCEGuiExt.VERSION,
-    dependencies = "required-after:modularmachinery"
+    dependencies = "required-after:modularmachinery;required-after:appliedenergistics2;required-after:mekanism;required-after:mekeng"
 )
 public class MMCEGuiExt {
     public static final String MODID = "mmceguiext";

@@ -122,7 +122,7 @@ public final class CustomAEMixedInputBusRegistry {
                 def.gasStorageTanks.add(def.gasStorageTank);
             }
             def.blockTexture = getString(root, "blockTexture");
-            def.blockModel = getString(root, "blockModel");
+            def.blockModel = getBlockModel(root);
             def.gui = parseGui(root.getAsJsonObject("gui"));
             if (def.gui != null && def.gui.components != null && !def.gui.components.isEmpty()) {
                 applyGuiComponents(def);
@@ -511,6 +511,13 @@ public final class CustomAEMixedInputBusRegistry {
     @Nullable
     private static String getString(JsonObject obj, String key) {
         return obj != null && obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsString() : null;
+    }
+
+    @Nullable
+    private static String getBlockModel(JsonObject root) {
+        JsonObject block = root == null ? null : root.getAsJsonObject("block");
+        String nested = getString(block, "model");
+        return nested == null || nested.trim().isEmpty() ? getString(root, "blockModel") : nested;
     }
 
     private static int getInt(@Nullable JsonObject obj, String key, int fallback) {

@@ -18,11 +18,13 @@ import java.util.List;
 import java.util.Map;
 
 public class CustomHatchBakedModel extends BakedModelWrapper<IBakedModel> {
+    private final ResourceLocation sourceModel;
     private final Map<String, IBakedModel> cache = new HashMap<String, IBakedModel>();
     private final ItemOverrideList overrides = new CustomHatchItemOverrides();
 
-    public CustomHatchBakedModel(IBakedModel originalModel) {
+    public CustomHatchBakedModel(IBakedModel originalModel, ResourceLocation sourceModel) {
         super(originalModel);
+        this.sourceModel = sourceModel;
     }
 
     @Override
@@ -56,7 +58,7 @@ public class CustomHatchBakedModel extends BakedModelWrapper<IBakedModel> {
         }
         try {
             IBakedModel baked = ModelLoaderRegistry
-                .getModel(new ResourceLocation("mmceguiext", "block/custom_hatch"))
+                .getModel(this.sourceModel)
                 .retexture(com.google.common.collect.ImmutableMap.of("all", texture.toString()))
                 .bake(net.minecraftforge.common.model.TRSRTransformation.identity(), net.minecraft.client.renderer.vertex.DefaultVertexFormats.ITEM, location ->
                     net.minecraft.client.Minecraft.getMinecraft().getTextureMapBlocks().getAtlasSprite(location.toString())
