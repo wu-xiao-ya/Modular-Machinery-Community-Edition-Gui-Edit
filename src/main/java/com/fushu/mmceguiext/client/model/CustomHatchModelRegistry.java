@@ -26,7 +26,7 @@ public final class CustomHatchModelRegistry {
             if (def == null || def.id == null || def.id.trim().isEmpty()) {
                 continue;
             }
-            ResourceLocation texture = parseBlockTexture(def.blockTexture);
+            ResourceLocation texture = CustomBlockTextureParser.parse(def.blockTexture);
             if (texture == null) {
                 continue;
             }
@@ -52,50 +52,4 @@ public final class CustomHatchModelRegistry {
         return id.trim().toLowerCase(Locale.ROOT);
     }
 
-    @Nullable
-    private static ResourceLocation parseBlockTexture(@Nullable String raw) {
-        if (raw == null) {
-            return null;
-        }
-        String value = raw.trim().replace('\\', '/');
-        if (value.isEmpty()) {
-            return null;
-        }
-        String lower = value.toLowerCase(Locale.ROOT);
-        if (lower.contains("暂时保留字段") || lower.contains("currently unused") || lower.contains("not yet wired")) {
-            return null;
-        }
-        if (value.contains(":")) {
-            String[] split = value.split(":", 2);
-            String namespace = split[0];
-            String path = split[1];
-            if (path.startsWith("textures/")) {
-                path = path.substring("textures/".length());
-            }
-            if (path.endsWith(".png")) {
-                path = path.substring(0, path.length() - 4);
-            }
-            return new ResourceLocation(namespace, path);
-        }
-        if (value.startsWith("assets/")) {
-            String rest = value.substring("assets/".length());
-            int slash = rest.indexOf('/');
-            if (slash > 0) {
-                String namespace = rest.substring(0, slash);
-                return new ResourceLocation(namespace, normalizeTexturePath(rest.substring(slash + 1)));
-            }
-        }
-        return new ResourceLocation(MMCEGuiExt.MODID, normalizeTexturePath(value));
-    }
-
-    private static String normalizeTexturePath(String raw) {
-        String path = raw == null ? "" : raw.trim().replace('\\', '/');
-        while (path.startsWith("textures/")) {
-            path = path.substring("textures/".length());
-        }
-        if (path.endsWith(".png")) {
-            path = path.substring(0, path.length() - 4);
-        }
-        return path;
-    }
 }

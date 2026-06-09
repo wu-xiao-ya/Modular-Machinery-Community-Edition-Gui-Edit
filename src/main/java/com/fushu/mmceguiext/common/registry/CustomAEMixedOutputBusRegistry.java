@@ -95,6 +95,8 @@ public final class CustomAEMixedOutputBusRegistry {
             def.backgroundTextureWidth = getInt(root, "backgroundTextureWidth", def.guiWidth);
             def.backgroundTextureHeight = getInt(root, "backgroundTextureHeight", def.guiHeight);
             def.textureLayers = parseTextureLayers(root.getAsJsonArray("textureLayers"));
+            def.blockTexture = getString(root, "blockTexture");
+            def.blockModel = getString(root, "blockModel");
             def.gui = parseGui(root.getAsJsonObject("gui"));
             applyGuiComponents(def);
             return def.id == null || def.id.trim().isEmpty() ? null : def;
@@ -247,6 +249,8 @@ public final class CustomAEMixedOutputBusRegistry {
         public int guiHeight = 235;
         public int backgroundTextureWidth = 176;
         public int backgroundTextureHeight = 235;
+        public String blockTexture;
+        public String blockModel;
         public List<GlobalTextureLayerConfig.LayerDef> textureLayers = Collections.emptyList();
         public GuiDef gui = new GuiDef();
     }
