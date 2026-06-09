@@ -43,9 +43,12 @@ import net.minecraftforge.fml.common.Optional;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -631,7 +634,21 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         if (maxIndex < 0) {
             return new InventoryLayout(new int[]{INPUT_SLOT}, new int[]{OUTPUT_SLOT}, 2);
         }
-        return new InventoryLayout(toIntArray(inputs), toIntArray(outputs), maxIndex + 1);
+        return new InventoryLayout(toSortedUniqueIntArray(inputs), toSortedUniqueIntArray(outputs), maxIndex + 1);
+    }
+
+    private static int[] toSortedUniqueIntArray(List<Integer> values) {
+        if (values == null || values.isEmpty()) {
+            return new int[0];
+        }
+        Set<Integer> unique = new LinkedHashSet<Integer>(values);
+        int[] out = new int[unique.size()];
+        int i = 0;
+        for (Integer value : unique) {
+            out[i++] = value == null ? 0 : value.intValue();
+        }
+        Arrays.sort(out);
+        return out;
     }
 
     private static IOType parseIOType(@Nullable String value) {
@@ -1229,14 +1246,6 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             int realSlot = translateSlot(slot);
             return realSlot >= 0 ? this.delegate.getSlotLimit(realSlot) : 0;
         }
-    }
-
-    private static int[] toIntArray(List<Integer> values) {
-        int[] out = new int[values.size()];
-        for (int i = 0; i < values.size(); i++) {
-            out[i] = values.get(i).intValue();
-        }
-        return out;
     }
 
     public static class InventoryLayout {

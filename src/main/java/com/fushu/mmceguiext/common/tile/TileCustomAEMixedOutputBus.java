@@ -151,9 +151,9 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     }
 
     private void configureStorageLayout() {
-        final int itemSlots = Math.max(this.inventory.getSlots(), resolveItemComponentCount());
-        final int fluidSlots = Math.max(this.fluidTanks.getSlots(), resolveTankComponentCount("fluid_storage"));
-        final int gasSlots = Math.max(this.gasTanks.size(), resolveTankComponentCount("gas_storage"));
+        final int itemSlots = resolveItemComponentCount();
+        final int fluidSlots = resolveTankComponentCount("fluid_storage");
+        final int gasSlots = resolveTankComponentCount("gas_storage");
         if (this.inventory.getSlots() == itemSlots && this.fluidTanks.getSlots() == fluidSlots && this.gasTanks.size() == gasSlots) {
             return;
         }

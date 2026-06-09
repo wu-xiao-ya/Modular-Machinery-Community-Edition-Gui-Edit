@@ -332,7 +332,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     }
 
     private void resizeInventory(int size) {
-        if (this.inventory != null && this.inventory.getSlots() >= size) {
+        if (this.inventory != null && this.inventory.getSlots() == size) {
             return;
         }
         IOInventory next = buildInventory(size);
@@ -341,7 +341,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     }
 
     private void resizeConfigInventory(int size) {
-        if (this.configInventory != null && this.configInventory.getSlots() >= size) {
+        if (this.configInventory != null && this.configInventory.getSlots() == size) {
             return;
         }
         IOInventory next = buildConfigInventory(size);
@@ -350,7 +350,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     }
 
     private void resizeFluidInventories(int size) {
-        if (this.fluidTanks.getSlots() >= size && this.fluidConfig.getSlots() >= size) {
+        if (this.fluidTanks.getSlots() == size && this.fluidConfig.getSlots() == size) {
             return;
         }
         NBTTagCompound tankData = new NBTTagCompound();
@@ -365,7 +365,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     }
 
     private void resizeGasInventories(int size) {
-        if (this.gasTanks.size() >= size && this.gasConfig.size() >= size) {
+        if (this.gasTanks.size() == size && this.gasConfig.size() == size) {
             return;
         }
         NBTTagCompound tankData = this.gasTanks.save();
@@ -624,7 +624,8 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
     private boolean needsFluidUpdate() {
         int capacity = this.fluidTanks.getCapacity();
-        for (int slot = 0; slot < this.fluidConfig.getSlots(); slot++) {
+        int slotBound = getFluidSlotBound();
+        for (int slot = 0; slot < slotBound; slot++) {
             IAEFluidStack cfgStack = this.fluidConfig.getFluidInSlot(slot);
             IAEFluidStack invStack = this.fluidTanks.getFluidInSlot(slot);
             if (cfgStack == null) {
@@ -644,7 +645,8 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     }
 
     private boolean needsGasUpdate() {
-        for (int slot = 0; slot < this.gasConfig.size(); slot++) {
+        int slotBound = getGasSlotBound();
+        for (int slot = 0; slot < slotBound; slot++) {
             int capacity = getGasTankCapacity(slot);
             GasStack cfgStack = this.gasConfig.getGasStack(slot);
             GasStack invStack = this.gasTanks.getGasStack(slot);
@@ -662,6 +664,14 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
             }
         }
         return false;
+    }
+
+    private int getFluidSlotBound() {
+        return Math.min(this.fluidConfig.getSlots(), this.fluidTanks.getSlots());
+    }
+
+    private int getGasSlotBound() {
+        return Math.min(this.gasConfig.size(), this.gasTanks.size());
     }
 
     private int getGasTankCapacity(int slot) {
@@ -720,12 +730,16 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
                 }
 
                 if (!ItemUtils.matchStacks(cfgStack, invStack)) {
-                    if (invStack.isEmpty() || insertItemToAE(inv, invStack).isEmpty()) {
+                    ItemStack left = invStack.isEmpty() ? ItemStack.EMPTY : insertItemToAE(inv, invStack);
+                    if (left.isEmpty()) {
                         ItemStack stack = extractItemFromAE(inv, cfgStack);
                         this.inventory.setStackInSlot(slot, stack);
                         if (!stack.isEmpty()) {
                             success = true;
                         }
+                    } else {
+                        this.inventory.setStackInSlot(slot, left);
+                        success |= left.getCount() != invStack.getCount();
                     }
                     continue;
                 }
