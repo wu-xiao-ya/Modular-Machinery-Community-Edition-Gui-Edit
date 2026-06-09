@@ -524,6 +524,27 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         return def == null || slot >= 0 && slot < def.gasConfigTanks.size() && def.gasConfigTanks.get(slot) != null;
     }
 
+    private boolean isFluidSlotDefined(int slot) {
+        CustomAEMixedInputBusRegistry.Def def = getDefinition();
+        return def == null || slot >= 0
+            && slot < def.fluidConfigTanks.size() && def.fluidConfigTanks.get(slot) != null
+            && slot < def.fluidStorageTanks.size() && def.fluidStorageTanks.get(slot) != null;
+    }
+
+    private boolean isGasSlotDefined(int slot) {
+        CustomAEMixedInputBusRegistry.Def def = getDefinition();
+        return def == null || slot >= 0
+            && slot < def.gasConfigTanks.size() && def.gasConfigTanks.get(slot) != null
+            && slot < def.gasStorageTanks.size() && def.gasStorageTanks.get(slot) != null;
+    }
+
+    private boolean isItemSlotDefined(int slot) {
+        CustomAEMixedInputBusRegistry.Def def = getDefinition();
+        return def == null || slot >= 0
+            && slot < def.configSlots.size() && def.configSlots.get(slot) != null
+            && slot < def.storageSlots.size() && def.storageSlots.get(slot) != null;
+    }
+
     public void setDefinitionId(@Nullable String id) {
         String sanitized = CustomIdValidator.sanitizeResourceLocation(id);
         this.definitionId = sanitized == null ? "" : sanitized;
@@ -631,6 +652,13 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
             ItemStack cfgStack = this.configInventory.getStackInSlot(slot);
             ItemStack invStack = this.inventory.getStackInSlot(slot);
 
+            if (!isItemSlotDefined(slot)) {
+                if (!invStack.isEmpty()) {
+                    return true;
+                }
+                continue;
+            }
+
             if (cfgStack.isEmpty()) {
                 if (!invStack.isEmpty()) {
                     return true;
@@ -655,6 +683,12 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         for (int slot = 0; slot < slotBound; slot++) {
             IAEFluidStack cfgStack = this.fluidConfig.getFluidInSlot(slot);
             IAEFluidStack invStack = this.fluidTanks.getFluidInSlot(slot);
+            if (!isFluidSlotDefined(slot)) {
+                if (invStack != null) {
+                    return true;
+                }
+                continue;
+            }
             if (cfgStack == null) {
                 if (invStack != null) {
                     return true;
@@ -677,6 +711,12 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
             int capacity = getGasTankCapacity(slot);
             GasStack cfgStack = this.gasConfig.getGasStack(slot);
             GasStack invStack = this.gasTanks.getGasStack(slot);
+            if (!isGasSlotDefined(slot)) {
+                if (invStack != null) {
+                    return true;
+                }
+                continue;
+            }
             if (cfgStack == null) {
                 if (invStack != null) {
                     return true;
@@ -752,9 +792,9 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         rwLock.writeLock().lock();
         try {
             IMEMonitor<IAEItemStack> inv = this.proxy.getStorage().getInventory(this.itemChannel);
-            int slotBound = Math.min(this.inventory.getSlots(), this.configInventory.getSlots());
+            int slotBound = getActiveItemSlotBound();
             for (int slot : slots) {
-                if (slot < 0 || slot >= slotBound) {
+                if (slot < 0 || slot >= slotBound || !isItemSlotDefined(slot)) {
                     continue;
                 }
                 this.changedItemSlots[slot] = false;
@@ -826,9 +866,9 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         try {
             IMEMonitor<IAEFluidStack> inv = this.proxy.getStorage().getInventory(this.fluidChannel);
             int capacity = this.fluidTanks.getCapacity();
-            int slotBound = Math.min(this.fluidTanks.getSlots(), Math.min(this.fluidConfig.getSlots(), this.changedFluidSlots.length));
+            int slotBound = Math.min(getActiveFluidSlotBound(), this.changedFluidSlots.length);
             for (int slot : slots) {
-                if (slot < 0 || slot >= slotBound) {
+                if (slot < 0 || slot >= slotBound || !isFluidSlotDefined(slot)) {
                     continue;
                 }
                 this.changedFluidSlots[slot] = false;
@@ -894,9 +934,9 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         boolean success = false;
         synchronized (this.gasTanks) {
             IMEMonitor<IAEGasStack> inv = this.proxy.getStorage().getInventory(this.gasChannel);
-            int slotBound = Math.min(this.gasTanks.size(), Math.min(this.gasConfig.size(), this.changedGasSlots.length));
+            int slotBound = Math.min(getActiveGasSlotBound(), this.changedGasSlots.length);
             for (int slot : slots) {
-                if (slot < 0 || slot >= slotBound) {
+                if (slot < 0 || slot >= slotBound || !isGasSlotDefined(slot)) {
                     continue;
                 }
                 int capacity = getGasTankCapacity(slot);
@@ -1168,7 +1208,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
     private class LoggingItemHandler implements IItemHandlerModifiable {
         @Override
         public void setStackInSlot(int slot, @Nonnull ItemStack stack) {
-            if (slot < 0 || slot >= getActiveItemSlotBound()) {
+            if (slot < 0 || slot >= getActiveItemSlotBound() || !isItemSlotDefined(slot)) {
                 return;
             }
             inventory.setStackInSlot(slot, stack);
@@ -1182,7 +1222,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         @Nonnull
         @Override
         public ItemStack getStackInSlot(int slot) {
-            if (slot < 0 || slot >= getActiveItemSlotBound()) {
+            if (slot < 0 || slot >= getActiveItemSlotBound() || !isItemSlotDefined(slot)) {
                 return ItemStack.EMPTY;
             }
             return inventory.getStackInSlot(slot);
@@ -1191,7 +1231,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         @Nonnull
         @Override
         public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate) {
-            if (slot < 0 || slot >= getActiveItemSlotBound()) {
+            if (slot < 0 || slot >= getActiveItemSlotBound() || !isItemSlotDefined(slot)) {
                 return stack;
             }
             return inventory.insertItem(slot, stack, simulate);
@@ -1200,7 +1240,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         @Nonnull
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            if (slot < 0 || slot >= getActiveItemSlotBound()) {
+            if (slot < 0 || slot >= getActiveItemSlotBound() || !isItemSlotDefined(slot)) {
                 return ItemStack.EMPTY;
             }
             return inventory.extractItem(slot, amount, simulate);
@@ -1208,7 +1248,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
         @Override
         public int getSlotLimit(int slot) {
-            if (slot < 0 || slot >= getActiveItemSlotBound()) {
+            if (slot < 0 || slot >= getActiveItemSlotBound() || !isItemSlotDefined(slot)) {
                 return 0;
             }
             return inventory.getSlotLimit(slot);
@@ -1226,7 +1266,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
         @Override
         public void setStackInSlot(int slot, @Nonnull ItemStack stack) {
-            if (!this.allowInsert || slot < 0 || slot >= getActiveItemSlotBound()) {
+            if (!this.allowInsert || slot < 0 || slot >= getActiveItemSlotBound() || !isItemSlotDefined(slot)) {
                 return;
             }
             inventory.setStackInSlot(slot, stack);
@@ -1240,7 +1280,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         @Nonnull
         @Override
         public ItemStack getStackInSlot(int slot) {
-            if (slot < 0 || slot >= getActiveItemSlotBound()) {
+            if (slot < 0 || slot >= getActiveItemSlotBound() || !isItemSlotDefined(slot)) {
                 return ItemStack.EMPTY;
             }
             return inventory.getStackInSlot(slot);
@@ -1249,7 +1289,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         @Nonnull
         @Override
         public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate) {
-            if (!this.allowInsert || slot < 0 || slot >= getActiveItemSlotBound()) {
+            if (!this.allowInsert || slot < 0 || slot >= getActiveItemSlotBound() || !isItemSlotDefined(slot)) {
                 return stack;
             }
             return inventory.insertItem(slot, stack, simulate);
@@ -1258,7 +1298,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
         @Nonnull
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            if (!this.allowExtract || slot < 0 || slot >= getActiveItemSlotBound()) {
+            if (!this.allowExtract || slot < 0 || slot >= getActiveItemSlotBound() || !isItemSlotDefined(slot)) {
                 return ItemStack.EMPTY;
             }
             return inventory.extractItem(slot, amount, simulate);
@@ -1266,7 +1306,7 @@ public class TileCustomAEMixedInputBus extends TileColorableMachineComponent imp
 
         @Override
         public int getSlotLimit(int slot) {
-            if (slot < 0 || slot >= getActiveItemSlotBound()) {
+            if (slot < 0 || slot >= getActiveItemSlotBound() || !isItemSlotDefined(slot)) {
                 return 0;
             }
             return inventory.getSlotLimit(slot);
