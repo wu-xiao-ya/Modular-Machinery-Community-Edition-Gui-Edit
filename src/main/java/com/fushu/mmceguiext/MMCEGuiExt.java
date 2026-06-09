@@ -21,6 +21,8 @@ import com.fushu.mmceguiext.common.tile.TileCustomHatch;
 import com.fushu.mmceguiext.common.network.PktControllerSmartInterfaceUpdate;
 import hellfirepvp.modularmachinery.common.base.Mods;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
@@ -97,49 +99,59 @@ public class MMCEGuiExt {
     private static class GuiHandler implements IGuiHandler {
         @Override
         public Object getServerGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
+            BlockPos pos = new BlockPos(x, y, z);
+            if (!canOpenTileGui(player, world, pos)) {
+                return null;
+            }
+            TileEntity tileEntity = world.getTileEntity(pos);
             if (id == GUI_CUSTOM_AE_ITEM_INPUT) {
-                if (!(world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z)) instanceof TileCustomMEItemInputBus)) {
+                if (!(tileEntity instanceof TileCustomMEItemInputBus)) {
                     return null;
                 }
-                TileCustomMEItemInputBus tile = (TileCustomMEItemInputBus) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
-                resolveCustomItemInputBusDef(world, new net.minecraft.util.math.BlockPos(x, y, z), tile);
+                TileCustomMEItemInputBus tile = (TileCustomMEItemInputBus) tileEntity;
+                resolveCustomItemInputBusDef(world, pos, tile);
                 return new ContainerCustomMEItemInputBus(tile, player);
             }
             if (id == GUI_CUSTOM_AE_MIXED_INPUT) {
-                if (!(world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z)) instanceof TileCustomAEMixedInputBus)) {
+                if (!(tileEntity instanceof TileCustomAEMixedInputBus)) {
                     return null;
                 }
-                TileCustomAEMixedInputBus tile = (TileCustomAEMixedInputBus) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
-                com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def def = resolveMixedInputBusDef(world, new net.minecraft.util.math.BlockPos(x, y, z), tile);
+                TileCustomAEMixedInputBus tile = (TileCustomAEMixedInputBus) tileEntity;
+                com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def def = resolveMixedInputBusDef(world, pos, tile);
                 return def == null ? null : new ContainerCustomAEMixedInputBus(tile, player);
             }
             if (id == GUI_CUSTOM_AE_MIXED_OUTPUT) {
-                if (!(world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z)) instanceof TileCustomAEMixedOutputBus)) {
+                if (!(tileEntity instanceof TileCustomAEMixedOutputBus)) {
                     return null;
                 }
-                TileCustomAEMixedOutputBus tile = (TileCustomAEMixedOutputBus) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
-                com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry.Def def = resolveMixedOutputBusDef(world, new net.minecraft.util.math.BlockPos(x, y, z), tile);
+                TileCustomAEMixedOutputBus tile = (TileCustomAEMixedOutputBus) tileEntity;
+                com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry.Def def = resolveMixedOutputBusDef(world, pos, tile);
                 return def == null ? null : new ContainerCustomAEMixedOutputBus(tile, player);
             }
             if (id != GUI_CUSTOM_HATCH) {
                 return null;
             }
-            if (!(world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z)) instanceof TileCustomHatch)) {
+            if (!(tileEntity instanceof TileCustomHatch)) {
                 return null;
             }
-            TileCustomHatch tile = (TileCustomHatch) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
+            TileCustomHatch tile = (TileCustomHatch) tileEntity;
             com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef def = tile.getDefinition();
             return def == null ? null : new ContainerFluidProcessorHatchCustom(tile, player, def);
         }
 
         @Override
         public Object getClientGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
+            BlockPos pos = new BlockPos(x, y, z);
+            if (!canOpenTileGui(player, world, pos)) {
+                return null;
+            }
+            TileEntity tileEntity = world.getTileEntity(pos);
             if (id == GUI_CUSTOM_AE_ITEM_INPUT) {
-                if (!(world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z)) instanceof TileCustomMEItemInputBus)) {
+                if (!(tileEntity instanceof TileCustomMEItemInputBus)) {
                     return null;
                 }
-                TileCustomMEItemInputBus tile = (TileCustomMEItemInputBus) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
-                resolveCustomItemInputBusDef(world, new net.minecraft.util.math.BlockPos(x, y, z), tile);
+                TileCustomMEItemInputBus tile = (TileCustomMEItemInputBus) tileEntity;
+                resolveCustomItemInputBusDef(world, pos, tile);
                 return createClientGui(
                     "com.fushu.mmceguiext.client.gui.GuiMEItemInputBusCustom",
                     new Class<?>[]{TileCustomMEItemInputBus.class, EntityPlayer.class},
@@ -148,11 +160,11 @@ public class MMCEGuiExt {
                 );
             }
             if (id == GUI_CUSTOM_AE_MIXED_INPUT) {
-                if (!(world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z)) instanceof TileCustomAEMixedInputBus)) {
+                if (!(tileEntity instanceof TileCustomAEMixedInputBus)) {
                     return null;
                 }
-                TileCustomAEMixedInputBus tile = (TileCustomAEMixedInputBus) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
-                com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def def = resolveMixedInputBusDef(world, new net.minecraft.util.math.BlockPos(x, y, z), tile);
+                TileCustomAEMixedInputBus tile = (TileCustomAEMixedInputBus) tileEntity;
+                com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def def = resolveMixedInputBusDef(world, pos, tile);
                 return def == null ? null : createClientGui(
                     "com.fushu.mmceguiext.client.gui.GuiCustomAEMixedInputBus",
                     new Class<?>[]{TileCustomAEMixedInputBus.class, EntityPlayer.class, com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def.class},
@@ -162,11 +174,11 @@ public class MMCEGuiExt {
                 );
             }
             if (id == GUI_CUSTOM_AE_MIXED_OUTPUT) {
-                if (!(world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z)) instanceof TileCustomAEMixedOutputBus)) {
+                if (!(tileEntity instanceof TileCustomAEMixedOutputBus)) {
                     return null;
                 }
-                TileCustomAEMixedOutputBus tile = (TileCustomAEMixedOutputBus) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
-                com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry.Def def = resolveMixedOutputBusDef(world, new net.minecraft.util.math.BlockPos(x, y, z), tile);
+                TileCustomAEMixedOutputBus tile = (TileCustomAEMixedOutputBus) tileEntity;
+                com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry.Def def = resolveMixedOutputBusDef(world, pos, tile);
                 return def == null ? null : createClientGui(
                     "com.fushu.mmceguiext.client.gui.GuiCustomAEMixedOutputBus",
                     new Class<?>[]{TileCustomAEMixedOutputBus.class, EntityPlayer.class, com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry.Def.class},
@@ -178,10 +190,10 @@ public class MMCEGuiExt {
             if (id != GUI_CUSTOM_HATCH) {
                 return null;
             }
-            if (!(world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z)) instanceof TileCustomHatch)) {
+            if (!(tileEntity instanceof TileCustomHatch)) {
                 return null;
             }
-            TileCustomHatch tile = (TileCustomHatch) world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
+            TileCustomHatch tile = (TileCustomHatch) tileEntity;
             com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef def = tile.getDefinition();
             return def == null ? null : createClientGui(
                 "com.fushu.mmceguiext.client.gui.GuiFluidProcessorHatchCustom",
@@ -190,6 +202,15 @@ public class MMCEGuiExt {
                 player,
                 def
             );
+        }
+
+        private boolean canOpenTileGui(EntityPlayer player, World world, BlockPos pos) {
+            return player != null
+                && world != null
+                && pos != null
+                && world.isBlockLoaded(pos)
+                && player.world == world
+                && player.getDistanceSqToCenter(pos) <= 64D;
         }
 
         @Nullable
