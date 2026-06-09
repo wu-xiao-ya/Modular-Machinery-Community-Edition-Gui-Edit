@@ -25,6 +25,7 @@ import java.util.stream.Stream;
 public final class CustomHatchRegistry {
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private static final Path HATCH_DIR = resolveHatchDir();
+    private static final long MAX_CONFIG_BYTES = 1024L * 1024L;
     private static final int MAX_GRID_ROWS = 256;
     private static final int MAX_GRID_COLUMNS = 256;
     private static final int MAX_GRID_SLOTS = 4096;
@@ -102,6 +103,10 @@ public final class CustomHatchRegistry {
     @Nullable
     public static CustomHatchDef load(Path path) {
         try {
+            if (Files.size(path) > MAX_CONFIG_BYTES) {
+                LOGGER.warn("Skipping custom hatch {} because it is larger than {} bytes.", path, MAX_CONFIG_BYTES);
+                return null;
+            }
             String text = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
             JsonObject root = new JsonParser().parse(text).getAsJsonObject();
             CustomHatchDef def = new CustomHatchDef();

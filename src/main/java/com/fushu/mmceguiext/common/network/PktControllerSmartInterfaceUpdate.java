@@ -1,5 +1,6 @@
 package com.fushu.mmceguiext.common.network;
 
+import com.fushu.mmceguiext.common.config.ControllerButtonPolicyManager;
 import hellfirepvp.modularmachinery.common.container.ContainerController;
 import hellfirepvp.modularmachinery.common.container.ContainerFactoryController;
 import hellfirepvp.modularmachinery.common.tiles.TileSmartInterface;
@@ -112,7 +113,8 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
             updated = true;
             break;
         }
-        if (!updated && hasControllerCustomData(controller, interfaceType)) {
+        if (!updated && ControllerButtonPolicyManager.isConfiguredSmartKey(controller, interfaceType)
+            && hasControllerCustomData(controller, interfaceType)) {
             updated = tryWriteControllerCustomData(controller, interfaceType, value);
         }
         if (updated) {

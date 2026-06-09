@@ -24,6 +24,7 @@ import java.util.stream.Stream;
 public final class CustomAEItemInputBusRegistry {
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private static final Path BUS_DIR = resolveBusDir();
+    private static final long MAX_CONFIG_BYTES = 1024L * 1024L;
     private static final int MAX_SLOT_POINTS = 4096;
     private static final List<Def> CACHE = new ArrayList<Def>();
     private static final Map<String, Def> REGISTERED = new LinkedHashMap<String, Def>();
@@ -40,7 +41,7 @@ public final class CustomAEItemInputBusRegistry {
         try (Stream<Path> stream = Files.list(BUS_DIR)) {
             stream.filter(p -> p.toString().endsWith(".json")).forEach(path -> {
                 Def def = load(path);
-                if (def != null) {
+                if (def != null && !REGISTERED.containsKey(normalizeId(def.id))) {
                     CACHE.add(def);
                     REGISTERED.put(normalizeId(def.id), def);
                 }
@@ -88,6 +89,10 @@ public final class CustomAEItemInputBusRegistry {
     @Nullable
     public static Def load(Path path) {
         try {
+            if (Files.size(path) > MAX_CONFIG_BYTES) {
+                LOGGER.warn("Skipping custom AE item input bus {} because it is larger than {} bytes.", path, MAX_CONFIG_BYTES);
+                return null;
+            }
             String text = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
             JsonObject root = new JsonParser().parse(text).getAsJsonObject();
             Def def = new Def();

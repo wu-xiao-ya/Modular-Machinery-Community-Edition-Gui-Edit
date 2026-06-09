@@ -25,6 +25,7 @@ import java.util.stream.Stream;
 public final class CustomAEMixedOutputBusRegistry {
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private static final Path BUS_DIR = resolveBusDir();
+    private static final long MAX_CONFIG_BYTES = 1024L * 1024L;
     private static final int MAX_GUI_COMPONENTS = 2048;
     private static final int MAX_COMPONENT_INDEX = 4095;
     private static final int MAX_TEXTURE_LAYERS = 256;
@@ -87,6 +88,10 @@ public final class CustomAEMixedOutputBusRegistry {
     @Nullable
     public static Def load(Path path) {
         try {
+            if (Files.size(path) > MAX_CONFIG_BYTES) {
+                LOGGER.warn("Skipping custom AE mixed output bus {} because it is larger than {} bytes.", path, MAX_CONFIG_BYTES);
+                return null;
+            }
             String text = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
             JsonObject root = new JsonParser().parse(text).getAsJsonObject();
             Def def = new Def();

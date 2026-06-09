@@ -1,6 +1,7 @@
 package com.fushu.mmceguiext.common.config;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
+import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -26,14 +27,18 @@ import java.util.stream.Stream;
 
 public final class ControllerButtonPolicyManager {
     private static final long RELOAD_INTERVAL_MS = 5000L;
+    private static final long MAX_MACHINE_CONFIG_BYTES = 1024L * 1024L;
     private static final String MACHINERY_DIR = "modularmachinery/machinery";
     private static final int MAX_BUTTONS_PER_CONTROLLER = 256;
+    private static final int MAX_SMART_EDITOR_KEYS_PER_CONTROLLER = 256;
     private static final int MAX_STRING_LENGTH = 128;
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
 
     private static final Object LOCK = new Object();
     private static final Map<String, List<ButtonPolicy>> MACHINE_BUTTONS = new HashMap<String, List<ButtonPolicy>>();
     private static final Map<String, List<ButtonPolicy>> FACTORY_BUTTONS = new HashMap<String, List<ButtonPolicy>>();
+    private static final Map<String, List<String>> MACHINE_EDITOR_KEYS = new HashMap<String, List<String>>();
+    private static final Map<String, List<String>> FACTORY_EDITOR_KEYS = new HashMap<String, List<String>>();
     private static long lastLoadTime = 0L;
 
     private ControllerButtonPolicyManager() {
@@ -71,6 +76,19 @@ public final class ControllerButtonPolicyManager {
         return null;
     }
 
+    public static boolean isConfiguredSmartKey(TileMultiblockMachineController controller, String key) {
+        String normalizedKey = normalize(key);
+        if (normalizedKey == null) {
+            return false;
+        }
+        for (ButtonPolicy policy : resolve(controller)) {
+            if (normalizedKey.equals(policy.key)) {
+                return true;
+            }
+        }
+        return resolveEditorKeys(controller).contains(normalizedKey);
+    }
+
     private static List<ButtonPolicy> resolve(TileMultiblockMachineController controller) {
         ensureLoaded();
         if (controller == null) {
@@ -94,6 +112,29 @@ public final class ControllerButtonPolicyManager {
         return pathMatch == null ? java.util.Collections.emptyList() : pathMatch;
     }
 
+    private static List<String> resolveEditorKeys(TileMultiblockMachineController controller) {
+        ensureLoaded();
+        if (controller == null) {
+            return java.util.Collections.emptyList();
+        }
+        DynamicMachine machine = controller.getFoundMachine();
+        if (machine == null) {
+            machine = controller.getBlueprintMachine();
+        }
+        if (machine == null || machine.getRegistryName() == null) {
+            return configuredFallbackEditorKeys(controller);
+        }
+
+        Map<String, List<String>> source = controller instanceof TileFactoryController ? FACTORY_EDITOR_KEYS : MACHINE_EDITOR_KEYS;
+        String fullKey = machine.getRegistryName().toString().toLowerCase(Locale.ROOT);
+        List<String> fullMatch = source.get(fullKey);
+        if (fullMatch != null) {
+            return fullMatch;
+        }
+        List<String> pathMatch = source.get(machine.getRegistryName().getPath().toLowerCase(Locale.ROOT));
+        return pathMatch == null ? configuredFallbackEditorKeys(controller) : pathMatch;
+    }
+
     private static void ensureLoaded() {
         long now = System.currentTimeMillis();
         if (now - lastLoadTime < RELOAD_INTERVAL_MS) {
@@ -111,6 +152,8 @@ public final class ControllerButtonPolicyManager {
     private static void reload() {
         MACHINE_BUTTONS.clear();
         FACTORY_BUTTONS.clear();
+        MACHINE_EDITOR_KEYS.clear();
+        FACTORY_EDITOR_KEYS.clear();
 
         Path machineryDir = Loader.instance().getConfigDir().toPath().resolve(MACHINERY_DIR);
         if (!Files.exists(machineryDir)) {
@@ -134,6 +177,10 @@ public final class ControllerButtonPolicyManager {
 
     private static void loadMachineJson(Path path) {
         try {
+            if (Files.size(path) > MAX_MACHINE_CONFIG_BYTES) {
+                LOGGER.warn("Skipping MMCE GUI ext button policy {} because it is larger than {} bytes.", path, MAX_MACHINE_CONFIG_BYTES);
+                return;
+            }
             JsonElement rootElement = new JsonParser().parse(new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
             if (rootElement == null || !rootElement.isJsonObject()) {
                 return;
@@ -154,10 +201,12 @@ public final class ControllerButtonPolicyManager {
             if (extNode == null) {
                 return;
             }
-            putButtons(MACHINE_BUTTONS, namespacedKey, pathKey, allowPathFallback,
-                parseButtons(getObject(extNode, "machineController", "machine_controller", "machine")));
-            putButtons(FACTORY_BUTTONS, namespacedKey, pathKey, allowPathFallback,
-                parseButtons(getObject(extNode, "factoryController", "factory_controller", "factory")));
+            JsonObject machineNode = getObject(extNode, "machineController", "machine_controller", "machine");
+            JsonObject factoryNode = getObject(extNode, "factoryController", "factory_controller", "factory");
+            putButtons(MACHINE_BUTTONS, namespacedKey, pathKey, allowPathFallback, parseButtons(machineNode));
+            putButtons(FACTORY_BUTTONS, namespacedKey, pathKey, allowPathFallback, parseButtons(factoryNode));
+            putEditorKeys(MACHINE_EDITOR_KEYS, namespacedKey, pathKey, allowPathFallback, parseEditorKeys(machineNode));
+            putEditorKeys(FACTORY_EDITOR_KEYS, namespacedKey, pathKey, allowPathFallback, parseEditorKeys(factoryNode));
         } catch (Exception ex) {
             LOGGER.warn("Failed to read MMCE GUI ext button policy {}: {}", path, ex.getMessage());
         }
@@ -176,6 +225,22 @@ public final class ControllerButtonPolicyManager {
         target.put(namespacedKey, buttons);
         if (allowPathFallback) {
             target.put(pathKey, buttons);
+        }
+    }
+
+    private static void putEditorKeys(
+        Map<String, List<String>> target,
+        String namespacedKey,
+        String pathKey,
+        boolean allowPathFallback,
+        List<String> keys
+    ) {
+        if (keys.isEmpty()) {
+            return;
+        }
+        target.put(namespacedKey, keys);
+        if (allowPathFallback) {
+            target.put(pathKey, keys);
         }
     }
 
@@ -202,6 +267,62 @@ public final class ControllerButtonPolicyManager {
             }
         }
         return out;
+    }
+
+    private static List<String> parseEditorKeys(@Nullable JsonObject controllerNode) {
+        if (controllerNode == null) {
+            return java.util.Collections.emptyList();
+        }
+        List<String> out = new ArrayList<String>();
+        addVirtualKeys(out, getString(controllerNode,
+            "smartInterfaceEditorVirtualKey",
+            "smart_interface_editor_virtual_key",
+            "dataPortEditorVirtualKey",
+            "data_port_editor_virtual_key",
+            "virtualDataPortKey",
+            "virtual_data_port_key"
+        ));
+
+        JsonElement editorsElement = getElement(controllerNode,
+            "smartInterfaceEditors",
+            "smart_interface_editors",
+            "dataPortEditors",
+            "data_port_editors"
+        );
+        if (editorsElement != null && editorsElement.isJsonArray()) {
+            JsonArray editors = editorsElement.getAsJsonArray();
+            int limit = Math.min(editors.size(), MAX_SMART_EDITOR_KEYS_PER_CONTROLLER);
+            for (int i = 0; i < limit; i++) {
+                JsonElement child = editors.get(i);
+                if (child == null || !child.isJsonObject()) {
+                    continue;
+                }
+                addVirtualKeys(out, getString(child.getAsJsonObject(), "virtualKey", "virtual_key", "key", "type"));
+            }
+        }
+        return out.isEmpty() ? java.util.Collections.emptyList() : out;
+    }
+
+    private static void addVirtualKeys(List<String> out, @Nullable String raw) {
+        if (raw == null) {
+            return;
+        }
+        String[] split = raw.split("[,;]");
+        for (String value : split) {
+            String key = normalize(value);
+            if (key != null && !out.contains(key) && out.size() < MAX_SMART_EDITOR_KEYS_PER_CONTROLLER) {
+                out.add(key);
+            }
+        }
+    }
+
+    private static List<String> configuredFallbackEditorKeys(TileMultiblockMachineController controller) {
+        String raw = controller instanceof TileFactoryController
+            ? MMCEGuiExtConfig.factoryController.smartInterfaceEditorVirtualKey
+            : MMCEGuiExtConfig.machineController.smartInterfaceEditorVirtualKey;
+        List<String> out = new ArrayList<String>();
+        addVirtualKeys(out, raw);
+        return out.isEmpty() ? java.util.Collections.emptyList() : out;
     }
 
     @Nullable
