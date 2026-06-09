@@ -25,7 +25,8 @@ public class ContainerCustomMEItemInputBus extends AEBaseContainer {
         bindPlayerInventory(getInventoryPlayer(), playerInventoryX, playerInventoryY);
 
         IItemHandlerModifiable config = owner.getConfigInventory().asGUIAccess();
-        for (int i = 0; i < config.getSlots(); i++) {
+        int activeConfigSlots = Math.min(config.getSlots(), owner.getActiveSlots());
+        for (int i = 0; i < activeConfigSlots; i++) {
             CustomAEItemInputBusRegistry.SlotPoint point = def != null && i < def.configSlots.size() ? def.configSlots.get(i) : null;
             int x = point == null ? -10000 : point.x;
             int y = point == null ? -10000 : point.y;
@@ -34,7 +35,8 @@ public class ContainerCustomMEItemInputBus extends AEBaseContainer {
         }
 
         IItemHandlerModifiable internal = owner.getInternalInventory().asGUIAccess();
-        for (int i = 0; i < internal.getSlots(); i++) {
+        int activeInternalSlots = Math.min(internal.getSlots(), owner.getActiveSlots());
+        for (int i = 0; i < activeInternalSlots; i++) {
             CustomAEItemInputBusRegistry.SlotPoint point = def != null && i < def.storageSlots.size() ? def.storageSlots.get(i) : null;
             int x = point == null ? -10000 : point.x;
             int y = point == null ? -10000 : point.y;
