@@ -98,10 +98,10 @@ public final class CustomAEMixedInputBusRegistry {
             def.id = getString(root, "id");
             def.displayName = getString(root, "displayName");
             def.guiBackgroundTexture = getString(root, "guiBackgroundTexture");
-            def.guiWidth = getInt(root, "guiWidth", 176);
-            def.guiHeight = getInt(root, "guiHeight", 235);
-            def.backgroundTextureWidth = getInt(root, "backgroundTextureWidth", def.guiWidth);
-            def.backgroundTextureHeight = getInt(root, "backgroundTextureHeight", def.guiHeight);
+            def.guiWidth = clamp(getInt(root, "guiWidth", 176), 1, 4096);
+            def.guiHeight = clamp(getInt(root, "guiHeight", 235), 1, 4096);
+            def.backgroundTextureWidth = clamp(getInt(root, "backgroundTextureWidth", def.guiWidth), 1, 4096);
+            def.backgroundTextureHeight = clamp(getInt(root, "backgroundTextureHeight", def.guiHeight), 1, 4096);
             def.textureLayers = parseTextureLayers(root.getAsJsonArray("textureLayers"));
             def.playerInventoryX = getInt(root, "playerInventoryX", 8);
             def.playerInventoryY = getInt(root, "playerInventoryY", 141);
@@ -150,8 +150,8 @@ public final class CustomAEMixedInputBusRegistry {
         if (obj == null) {
             return gui;
         }
-        gui.width = getInt(obj, "width", 176);
-        gui.height = getInt(obj, "height", 235);
+        gui.width = clamp(getInt(obj, "width", 176), 1, 4096);
+        gui.height = clamp(getInt(obj, "height", 235), 1, 4096);
         gui.components = parseComponents(obj.getAsJsonArray("components"));
         return gui;
     }
@@ -204,7 +204,7 @@ public final class CustomAEMixedInputBusRegistry {
                 continue;
             }
             TextureLayerDef def = new TextureLayerDef();
-            def.foreground = obj.has("foreground") && !obj.get("foreground").isJsonNull() && obj.get("foreground").getAsBoolean();
+            def.foreground = getBoolean(obj, "foreground", false);
             def.texture = texture;
             def.x = getInt(obj, "x", 0);
             def.y = getInt(obj, "y", 0);
@@ -213,7 +213,7 @@ public final class CustomAEMixedInputBusRegistry {
             def.textureWidth = clamp(getInt(obj, "textureWidth", def.width), 1, 4096);
             def.textureHeight = clamp(getInt(obj, "textureHeight", def.height), 1, 4096);
             def.corner = clamp(getInt(obj, "corner", 0), 0, 1024);
-            def.useNineSlice = obj.has("useNineSlice") && !obj.get("useNineSlice").isJsonNull() && obj.get("useNineSlice").getAsBoolean();
+            def.useNineSlice = getBoolean(obj, "useNineSlice", false);
             def.priority = getInt(obj, "priority", 0);
             out.add(def);
         }
@@ -598,7 +598,14 @@ public final class CustomAEMixedInputBusRegistry {
 
     @Nullable
     private static String getString(JsonObject obj, String key) {
-        return obj != null && obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsString() : null;
+        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return obj.get(key).getAsString();
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
     @Nullable
@@ -612,7 +619,22 @@ public final class CustomAEMixedInputBusRegistry {
         if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
             return fallback;
         }
-        return obj.get(key).getAsInt();
+        try {
+            return obj.get(key).getAsInt();
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
+    }
+
+    private static boolean getBoolean(@Nullable JsonObject obj, String key, boolean fallback) {
+        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return obj.get(key).getAsBoolean();
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
     }
 
     private static int clamp(int value, int min, int max) {

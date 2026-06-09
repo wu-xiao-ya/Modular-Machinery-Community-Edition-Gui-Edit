@@ -11,7 +11,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
-import net.minecraftforge.fml.common.network.ByteBufUtils;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
@@ -61,8 +60,8 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
     public void fromBytes(ByteBuf buf) {
         this.controllerPos = BlockPos.fromLong(buf.readLong());
         this.kind = buf.readByte();
-        this.key = ByteBufUtils.readUTF8String(buf);
-        this.buttonId = ByteBufUtils.readUTF8String(buf);
+        this.key = NetworkBufferUtils.readBoundedUtf8(buf, MAX_KEY_LENGTH);
+        this.buttonId = NetworkBufferUtils.readBoundedUtf8(buf, MAX_BUTTON_ID_LENGTH);
         this.value = buf.readFloat();
         this.hasMin = buf.readBoolean();
         if (this.hasMin) {
@@ -78,8 +77,8 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
     public void toBytes(ByteBuf buf) {
         buf.writeLong(this.controllerPos.toLong());
         buf.writeByte(this.kind);
-        ByteBufUtils.writeUTF8String(buf, this.key);
-        ByteBufUtils.writeUTF8String(buf, this.buttonId);
+        NetworkBufferUtils.writeBoundedUtf8(buf, this.key, MAX_KEY_LENGTH);
+        NetworkBufferUtils.writeBoundedUtf8(buf, this.buttonId, MAX_BUTTON_ID_LENGTH);
         buf.writeFloat(this.value);
         buf.writeBoolean(this.hasMin);
         if (this.hasMin) {

@@ -56,6 +56,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class TileCustomHatch extends TileEntityRestrictedTick implements MachineComponentTile, github.kasuminova.mmce.common.tile.base.MachineCombinationComponent, SelectiveUpdateTileEntity, ReadWriteLockProvider, IGasHandler, ITubeConnection {
     public static final int INPUT_SLOT = 0;
     public static final int OUTPUT_SLOT = 1;
+    private static final int MAX_DYNAMIC_SLOT_INDEX = 4095;
 
     private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
     private final long componentGroupId = github.kasuminova.mmce.common.tile.base.MachineCombinationComponent.GROUP_ACQUIRER.incrementAndGet();
@@ -70,6 +71,12 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     private int gasCapacity = 1000;
     private final ProcessorTank tank = new ProcessorTank(this.fluidCapacity);
     private final ProcessorGasTank gasTank = new ProcessorGasTank(this.gasCapacity, 1);
+    private final ExternalFluidHandler inputFluidCapability = new ExternalFluidHandler(true, false);
+    private final ExternalFluidHandler outputFluidCapability = new ExternalFluidHandler(false, true);
+    private final ExternalFluidHandler bidirectionalFluidCapability = new ExternalFluidHandler(true, true);
+    private final ExternalGasHandler inputGasCapability = new ExternalGasHandler(true, false);
+    private final ExternalGasHandler outputGasCapability = new ExternalGasHandler(false, true);
+    private final ExternalGasHandler bidirectionalGasCapability = new ExternalGasHandler(true, true);
     private String hatchId = "";
     private String inventorySignature = "";
 
@@ -602,7 +609,18 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             if (component == null || !"slot".equalsIgnoreCase(component.type)) {
                 continue;
             }
-            int index = component.index >= 0 ? component.index : nextIndex++;
+            int index;
+            if (component.index >= 0) {
+                if (component.index > MAX_DYNAMIC_SLOT_INDEX) {
+                    continue;
+                }
+                index = component.index;
+            } else {
+                if (nextIndex > MAX_DYNAMIC_SLOT_INDEX) {
+                    continue;
+                }
+                index = nextIndex++;
+            }
             maxIndex = Math.max(maxIndex, index);
             if ("output".equalsIgnoreCase(component.role)) {
                 outputs.add(Integer.valueOf(index));
@@ -702,51 +720,111 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return (T) this.inventory;
         }
         if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
-            return (T) this.tank;
+            return (T) getExternalFluidCapability();
         }
-        if (isMekanismGasCapability(capability)) {
+        if (isMekanismGasHandlerCapability(capability)) {
+            return (T) getExternalGasCapability();
+        }
+        if (isMekanismTubeConnectionCapability(capability)) {
             return (T) this;
         }
         return super.getCapability(capability, facing);
     }
 
+    private IFluidHandler getExternalFluidCapability() {
+        DirectionAccess access = resolveExternalAccess(ExternalAccessKind.FLUID);
+        if (access.input && access.output) {
+            return this.bidirectionalFluidCapability;
+        }
+        return access.output ? this.outputFluidCapability : this.inputFluidCapability;
+    }
+
+    private IExtendedGasHandler getExternalGasCapability() {
+        DirectionAccess access = resolveExternalAccess(ExternalAccessKind.GAS);
+        if (access.input && access.output) {
+            return this.bidirectionalGasCapability;
+        }
+        return access.output ? this.outputGasCapability : this.inputGasCapability;
+    }
+
+    private DirectionAccess resolveExternalAccess(ExternalAccessKind kind) {
+        CustomHatchRegistry.CustomHatchDef def = getDefinition();
+        boolean input = false;
+        boolean output = false;
+        boolean matchedComponent = false;
+        if (def != null && def.machineComponents != null && !def.machineComponents.isEmpty()) {
+            for (CustomHatchRegistry.MachineComponentDef component : def.machineComponents) {
+                if (component == null) {
+                    continue;
+                }
+                if (!kind.matches(component.type)) {
+                    continue;
+                }
+                matchedComponent = true;
+                if (parseIOType(component.io) == IOType.OUTPUT) {
+                    output = true;
+                } else {
+                    input = true;
+                }
+            }
+        }
+        if (!matchedComponent) {
+            if (parseIOType(def == null ? null : def.ioType) == IOType.OUTPUT) {
+                output = true;
+            } else {
+                input = true;
+            }
+        }
+        return new DirectionAccess(input, output);
+    }
+
     private static boolean isMekanismGasCapability(@Nullable Capability<?> capability) {
+        return isMekanismGasHandlerCapability(capability) || isMekanismTubeConnectionCapability(capability);
+    }
+
+    private static boolean isMekanismGasHandlerCapability(@Nullable Capability<?> capability) {
         if (capability == null) {
             return false;
         }
-        String gasType = IGasHandler.class.getName();
-        String tubeConnectionName = ITubeConnection.class.getName();
-        return gasType.equals(capability.getName()) || tubeConnectionName.equals(capability.getName());
+        return IGasHandler.class.getName().equals(capability.getName());
+    }
+
+    private static boolean isMekanismTubeConnectionCapability(@Nullable Capability<?> capability) {
+        if (capability == null) {
+            return false;
+        }
+        return ITubeConnection.class.getName().equals(capability.getName());
     }
 
     @Override
     @Optional.Method(modid = "mekanism")
     public boolean canTubeConnect(EnumFacing side) {
-        return true;
+        DirectionAccess access = resolveExternalAccess(ExternalAccessKind.GAS);
+        return access.input || access.output;
     }
 
     @Override
     @Optional.Method(modid = "mekanism")
     public int receiveGas(EnumFacing side, GasStack stack, boolean doTransfer) {
-        return this.gasTank.receiveGas(side, stack, doTransfer);
+        return resolveExternalAccess(ExternalAccessKind.GAS).input ? this.gasTank.receiveGas(side, stack, doTransfer) : 0;
     }
 
     @Override
     @Optional.Method(modid = "mekanism")
     public GasStack drawGas(EnumFacing side, int amount, boolean doTransfer) {
-        return this.gasTank.drawGas(side, amount, doTransfer);
+        return resolveExternalAccess(ExternalAccessKind.GAS).output ? this.gasTank.drawGas(side, amount, doTransfer) : null;
     }
 
     @Override
     @Optional.Method(modid = "mekanism")
     public boolean canReceiveGas(EnumFacing side, Gas type) {
-        return this.gasTank.canReceiveGas(side, type);
+        return resolveExternalAccess(ExternalAccessKind.GAS).input && this.gasTank.canReceiveGas(side, type);
     }
 
     @Override
     @Optional.Method(modid = "mekanism")
     public boolean canDrawGas(EnumFacing side, Gas type) {
-        return this.gasTank.canDrawGas(side, type);
+        return resolveExternalAccess(ExternalAccessKind.GAS).output && this.gasTank.canDrawGas(side, type);
     }
 
     @Nonnull
@@ -788,6 +866,122 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
                 scheduleInventoryProcess();
                 markForUpdateSync();
             });
+        }
+    }
+
+    private static final class DirectionAccess {
+        private final boolean input;
+        private final boolean output;
+
+        private DirectionAccess(boolean input, boolean output) {
+            this.input = input;
+            this.output = output;
+        }
+    }
+
+    private enum ExternalAccessKind {
+        FLUID {
+            @Override
+            boolean matches(@Nullable String componentType) {
+                return "fluid".equalsIgnoreCase(componentType) || isSharedFluidComponent(componentType);
+            }
+        },
+        GAS {
+            @Override
+            boolean matches(@Nullable String componentType) {
+                return "gas".equalsIgnoreCase(componentType)
+                    || "item_fluid_gas".equalsIgnoreCase(componentType)
+                    || "mixed".equalsIgnoreCase(componentType)
+                    || "hybrid".equalsIgnoreCase(componentType);
+            }
+        };
+
+        abstract boolean matches(@Nullable String componentType);
+
+        static boolean isSharedFluidComponent(@Nullable String componentType) {
+            return "item_fluid".equalsIgnoreCase(componentType)
+                || "item_fluid_gas".equalsIgnoreCase(componentType)
+                || "mixed".equalsIgnoreCase(componentType)
+                || "hybrid".equalsIgnoreCase(componentType);
+        }
+    }
+
+    private class ExternalFluidHandler implements IFluidHandler {
+        private final boolean allowFill;
+        private final boolean allowDrain;
+
+        private ExternalFluidHandler(boolean allowFill, boolean allowDrain) {
+            this.allowFill = allowFill;
+            this.allowDrain = allowDrain;
+        }
+
+        @Override
+        public IFluidTankProperties[] getTankProperties() {
+            return tank.getTankProperties();
+        }
+
+        @Override
+        public int fill(FluidStack resource, boolean doFill) {
+            return this.allowFill ? tank.fill(resource, doFill) : 0;
+        }
+
+        @Nullable
+        @Override
+        public FluidStack drain(FluidStack resource, boolean doDrain) {
+            return this.allowDrain ? tank.drain(resource, doDrain) : null;
+        }
+
+        @Nullable
+        @Override
+        public FluidStack drain(int maxDrain, boolean doDrain) {
+            return this.allowDrain ? tank.drain(maxDrain, doDrain) : null;
+        }
+    }
+
+    private class ExternalGasHandler implements IExtendedGasHandler {
+        private final boolean allowReceive;
+        private final boolean allowDraw;
+
+        private ExternalGasHandler(boolean allowReceive, boolean allowDraw) {
+            this.allowReceive = allowReceive;
+            this.allowDraw = allowDraw;
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public int receiveGas(@Nullable EnumFacing side, GasStack stack, boolean doTransfer) {
+            return this.allowReceive ? gasTank.receiveGas(side, stack, doTransfer) : 0;
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public GasStack drawGas(GasStack toDraw, boolean doTransfer) {
+            return this.allowDraw ? gasTank.drawGas(toDraw, doTransfer) : null;
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public GasStack drawGas(@Nullable EnumFacing side, int amount, boolean doTransfer) {
+            return this.allowDraw ? gasTank.drawGas(side, amount, doTransfer) : null;
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public boolean canReceiveGas(@Nullable EnumFacing side, Gas type) {
+            return this.allowReceive && gasTank.canReceiveGas(side, type);
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public boolean canDrawGas(@Nullable EnumFacing side, Gas type) {
+            return this.allowDraw && gasTank.canDrawGas(side, type);
+        }
+
+        @Nonnull
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public GasTankInfo[] getTankInfo() {
+            return gasTank.getTankInfo();
         }
     }
 

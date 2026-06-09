@@ -211,10 +211,10 @@ public final class CustomHatchRegistry {
         if (obj == null) {
             return gui;
         }
-        gui.width = getInt(obj, "width", 176);
-        gui.height = getInt(obj, "height", 166);
-        gui.coordinateWidth = getInt(obj, "coordinateWidth", -1);
-        gui.coordinateHeight = getInt(obj, "coordinateHeight", -1);
+        gui.width = clamp(getInt(obj, "width", 176), 1, 4096);
+        gui.height = clamp(getInt(obj, "height", 166), 1, 4096);
+        gui.coordinateWidth = clampCoordinateSize(getInt(obj, "coordinateWidth", -1));
+        gui.coordinateHeight = clampCoordinateSize(getInt(obj, "coordinateHeight", -1));
         gui.components = parseComponents(obj.getAsJsonArray("components"));
         return gui;
     }
@@ -468,7 +468,7 @@ public final class CustomHatchRegistry {
     @Nullable
     private static String getString(JsonObject obj, String key) {
         JsonElement e = obj.get(key);
-        return e == null || e.isJsonNull() ? null : e.getAsString();
+        return asString(e, null);
     }
 
     private static String getString(@Nullable JsonObject primary, JsonObject fallbackObj, String key, String fallback) {
@@ -476,7 +476,7 @@ public final class CustomHatchRegistry {
         if (e == null || e.isJsonNull()) {
             e = fallbackObj.get(key);
         }
-        return e == null || e.isJsonNull() ? fallback : e.getAsString();
+        return asString(e, fallback);
     }
 
     @Nullable
@@ -507,7 +507,7 @@ public final class CustomHatchRegistry {
 
     private static int getInt(JsonObject obj, String key, int fallback) {
         JsonElement e = obj.get(key);
-        return e == null || e.isJsonNull() ? fallback : e.getAsInt();
+        return asInt(e, fallback);
     }
 
     private static int getInt(@Nullable JsonObject primary, JsonObject fallbackObj, String key, int fallback) {
@@ -515,14 +515,14 @@ public final class CustomHatchRegistry {
         if (e == null || e.isJsonNull()) {
             e = fallbackObj.get(key);
         }
-        return e == null || e.isJsonNull() ? fallback : e.getAsInt();
+        return asInt(e, fallback);
     }
 
     private static int getFirstInt(JsonObject obj, int fallback, String... keys) {
         for (String key : keys) {
             JsonElement e = obj.get(key);
             if (e != null && !e.isJsonNull()) {
-                return e.getAsInt();
+                return asInt(e, fallback);
             }
         }
         return fallback;
@@ -532,12 +532,16 @@ public final class CustomHatchRegistry {
         return Math.max(min, Math.min(max, value));
     }
 
+    private static int clampCoordinateSize(int value) {
+        return value <= 0 ? -1 : clamp(value, 1, 4096);
+    }
+
     @Nullable
     private static String getFirstString(JsonObject obj, String... keys) {
         for (String key : keys) {
             JsonElement e = obj.get(key);
             if (e != null && !e.isJsonNull()) {
-                return e.getAsString();
+                return asString(e, null);
             }
         }
         return null;
@@ -546,7 +550,7 @@ public final class CustomHatchRegistry {
     @Nullable
     private static Boolean getBoolean(JsonObject obj, String key) {
         JsonElement e = obj.get(key);
-        return e == null || e.isJsonNull() ? null : Boolean.valueOf(e.getAsBoolean());
+        return asBoolean(e, null);
     }
 
     private static boolean getBoolean(@Nullable JsonObject primary, JsonObject fallbackObj, String key, boolean fallback) {
@@ -554,13 +558,14 @@ public final class CustomHatchRegistry {
         if (e == null || e.isJsonNull()) {
             e = fallbackObj.get(key);
         }
-        return e == null || e.isJsonNull() ? fallback : e.getAsBoolean();
+        Boolean value = asBoolean(e, null);
+        return value == null ? fallback : value.booleanValue();
     }
 
     @Nullable
     private static Float getFloat(JsonObject obj, String key) {
         JsonElement e = obj.get(key);
-        return e == null || e.isJsonNull() ? null : Float.valueOf(e.getAsFloat());
+        return asFloat(e, null);
     }
 
     @Nullable
@@ -568,7 +573,7 @@ public final class CustomHatchRegistry {
         for (String key : keys) {
             JsonElement e = obj.get(key);
             if (e != null && !e.isJsonNull()) {
-                return Float.valueOf(e.getAsFloat());
+                return asFloat(e, null);
             }
         }
         return null;
@@ -579,7 +584,55 @@ public final class CustomHatchRegistry {
         if (e == null || e.isJsonNull()) {
             e = fallbackObj.get(key);
         }
-        return e == null || e.isJsonNull() ? fallback : e.getAsFloat();
+        Float value = asFloat(e, null);
+        return value == null ? fallback : value.floatValue();
+    }
+
+    private static int asInt(@Nullable JsonElement e, int fallback) {
+        if (e == null || e.isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return e.getAsInt();
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
+    }
+
+    @Nullable
+    private static Float asFloat(@Nullable JsonElement e, @Nullable Float fallback) {
+        if (e == null || e.isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return Float.valueOf(e.getAsFloat());
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
+    }
+
+    @Nullable
+    private static Boolean asBoolean(@Nullable JsonElement e, @Nullable Boolean fallback) {
+        if (e == null || e.isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return Boolean.valueOf(e.getAsBoolean());
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
+    }
+
+    @Nullable
+    private static String asString(@Nullable JsonElement e, @Nullable String fallback) {
+        if (e == null || e.isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return e.getAsString();
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
     }
 
     private static Path resolveHatchDir() {

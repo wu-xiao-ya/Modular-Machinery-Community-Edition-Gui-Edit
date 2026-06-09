@@ -71,6 +71,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
 
     private static final int DEFAULT_ITEM_SLOT_COUNT = 25;
     private static final int DEFAULT_TANK_SLOT_COUNT = 1;
+    private static final int MAX_DYNAMIC_SLOT_COUNT = 4096;
     private static final int FLUID_TANK_CAPACITY = 8000;
     private static final int GAS_TANK_CAPACITY = 8000;
 
@@ -85,6 +86,8 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     private AEFluidInventoryUpgradeable fluidTanks = createFluidTanks(DEFAULT_TANK_SLOT_COUNT);
     private GasInventory gasTanks = createGasTanks(DEFAULT_TANK_SLOT_COUNT);
     private GasInventoryHandler gasHandler = new GasInventoryHandler(gasTanks);
+    private final IFluidHandler externalFluidHandler = new ExternalFluidHandler(false, true);
+    private final IExtendedGasHandler externalGasHandler = new ExternalGasHandler(false, true);
 
     private boolean[] changedItemSlots = new boolean[DEFAULT_ITEM_SLOT_COUNT];
     private boolean[] changedFluidSlots = new boolean[DEFAULT_TANK_SLOT_COUNT];
@@ -193,7 +196,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
                 continue;
             }
             count++;
-            if (component.index >= 0) {
+            if (component.index >= 0 && component.index < MAX_DYNAMIC_SLOT_COUNT) {
                 maxIndexed = Math.max(maxIndexed, component.index + 1);
             }
         }
@@ -229,7 +232,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
                 continue;
             }
             count++;
-            if (component.index >= 0) {
+            if (component.index >= 0 && component.index < MAX_DYNAMIC_SLOT_COUNT) {
                 maxIndexed = Math.max(maxIndexed, component.index + 1);
             }
         }
@@ -269,10 +272,10 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
             return CapabilityItemHandler.ITEM_HANDLER_CAPABILITY.cast(this.inventory);
         }
         if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
-            return CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY.cast(this.fluidTanks);
+            return CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY.cast(this.externalFluidHandler);
         }
         if (capability == Capabilities.GAS_HANDLER_CAPABILITY) {
-            return Capabilities.GAS_HANDLER_CAPABILITY.cast(this.gasHandler);
+            return Capabilities.GAS_HANDLER_CAPABILITY.cast(this.externalGasHandler);
         }
         return super.getCapability(capability, facing);
     }
@@ -743,5 +746,78 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     }
 
     private void logOutputExposure(final String phase) {
+    }
+
+    private class ExternalFluidHandler implements IFluidHandler {
+        private final boolean allowFill;
+        private final boolean allowDrain;
+
+        private ExternalFluidHandler(boolean allowFill, boolean allowDrain) {
+            this.allowFill = allowFill;
+            this.allowDrain = allowDrain;
+        }
+
+        @Override
+        public net.minecraftforge.fluids.capability.IFluidTankProperties[] getTankProperties() {
+            return fluidTanks.getTankProperties();
+        }
+
+        @Override
+        public synchronized int fill(net.minecraftforge.fluids.FluidStack resource, boolean doFill) {
+            return this.allowFill ? fluidTanks.fill(resource, doFill) : 0;
+        }
+
+        @Nullable
+        @Override
+        public synchronized net.minecraftforge.fluids.FluidStack drain(net.minecraftforge.fluids.FluidStack resource, boolean doDrain) {
+            return this.allowDrain ? fluidTanks.drain(resource, doDrain) : null;
+        }
+
+        @Nullable
+        @Override
+        public synchronized net.minecraftforge.fluids.FluidStack drain(int maxDrain, boolean doDrain) {
+            return this.allowDrain ? fluidTanks.drain(maxDrain, doDrain) : null;
+        }
+    }
+
+    private class ExternalGasHandler implements IExtendedGasHandler {
+        private final boolean allowReceive;
+        private final boolean allowDraw;
+
+        private ExternalGasHandler(boolean allowReceive, boolean allowDraw) {
+            this.allowReceive = allowReceive;
+            this.allowDraw = allowDraw;
+        }
+
+        @Override
+        public synchronized int receiveGas(@Nullable EnumFacing side, GasStack toReceive, boolean doTransfer) {
+            return this.allowReceive ? gasHandler.receiveGas(side, toReceive, doTransfer) : 0;
+        }
+
+        @Override
+        public synchronized GasStack drawGas(@Nullable EnumFacing side, int drawAmount, boolean doTransfer) {
+            return this.allowDraw ? gasHandler.drawGas(side, drawAmount, doTransfer) : null;
+        }
+
+        @Override
+        public synchronized GasStack drawGas(GasStack toDraw, boolean doTransfer) {
+            return this.allowDraw ? gasHandler.drawGas(toDraw, doTransfer) : null;
+        }
+
+        @Override
+        public boolean canReceiveGas(@Nullable EnumFacing side, mekanism.api.gas.Gas gas) {
+            return this.allowReceive && gasHandler.canReceiveGas(side, gas);
+        }
+
+        @Override
+        public boolean canDrawGas(@Nullable EnumFacing side, mekanism.api.gas.Gas gas) {
+            return this.allowDraw && gasHandler.canDrawGas(side, gas);
+        }
+
+        @Nonnull
+        @Override
+        public mekanism.api.gas.GasTankInfo[] getTankInfo() {
+            return gasHandler.getTankInfo();
+        }
     }
 }

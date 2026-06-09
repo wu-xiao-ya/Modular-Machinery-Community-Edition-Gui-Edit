@@ -11,7 +11,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
-import net.minecraftforge.fml.common.network.ByteBufUtils;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
@@ -37,14 +36,14 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
     @Override
     public void fromBytes(ByteBuf buf) {
         this.controllerPos = BlockPos.fromLong(buf.readLong());
-        this.interfaceType = ByteBufUtils.readUTF8String(buf);
+        this.interfaceType = NetworkBufferUtils.readBoundedUtf8(buf, MAX_INTERFACE_TYPE_LENGTH);
         this.value = buf.readFloat();
     }
 
     @Override
     public void toBytes(ByteBuf buf) {
         buf.writeLong(this.controllerPos.toLong());
-        ByteBufUtils.writeUTF8String(buf, this.interfaceType);
+        NetworkBufferUtils.writeBoundedUtf8(buf, this.interfaceType, MAX_INTERFACE_TYPE_LENGTH);
         buf.writeFloat(this.value);
     }
 
