@@ -20,6 +20,8 @@ import appeng.me.helpers.AENetworkProxy;
 import appeng.me.helpers.IGridProxyable;
 import appeng.me.helpers.MachineSource;
 import appeng.util.Platform;
+import com.fushu.mmceguiext.common.block.BlockCustomAEMixedOutputBus;
+import com.fushu.mmceguiext.common.item.ItemBlockCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry;
 import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import com.mekeng.github.common.me.data.IAEGasStack;
@@ -43,6 +45,8 @@ import hellfirepvp.modularmachinery.common.tiles.base.TileColorableMachineCompon
 import hellfirepvp.modularmachinery.common.util.IOInventory;
 import mekanism.api.gas.GasStack;
 import mekanism.common.capabilities.Capabilities;
+import net.minecraft.block.Block;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -271,9 +275,9 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
 
     @Override
     public boolean hasCapability(@Nonnull Capability<?> capability, @Nullable EnumFacing facing) {
-        return capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY
-            || capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY
-            || capability == Capabilities.GAS_HANDLER_CAPABILITY
+        return capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY && hasDefinedItemSlots()
+            || capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY && hasDefinedFluidSlots()
+            || capability == Capabilities.GAS_HANDLER_CAPABILITY && hasDefinedGasSlots()
             || super.hasCapability(capability, facing);
     }
 
@@ -281,13 +285,13 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     @Override
     public <T> T getCapability(@Nonnull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
-            return CapabilityItemHandler.ITEM_HANDLER_CAPABILITY.cast(this.externalItemHandler);
+            return hasDefinedItemSlots() ? CapabilityItemHandler.ITEM_HANDLER_CAPABILITY.cast(this.externalItemHandler) : super.getCapability(capability, facing);
         }
         if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
-            return CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY.cast(this.externalFluidHandler);
+            return hasDefinedFluidSlots() ? CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY.cast(this.externalFluidHandler) : super.getCapability(capability, facing);
         }
         if (capability == Capabilities.GAS_HANDLER_CAPABILITY) {
-            return Capabilities.GAS_HANDLER_CAPABILITY.cast(this.externalGasHandler);
+            return hasDefinedGasSlots() ? Capabilities.GAS_HANDLER_CAPABILITY.cast(this.externalGasHandler) : super.getCapability(capability, facing);
         }
         return super.getCapability(capability, facing);
     }
@@ -327,6 +331,45 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         this.fluidTanks.writeToNBT(compound, "tanks");
         compound.setTag("gasTanks", this.gasTanks.save());
         compound.setString("definitionId", this.definitionId == null ? "" : this.definitionId);
+    }
+
+    public void writeDroppedData(final NBTTagCompound compound) {
+        compound.setTag("inventory", this.inventory.writeNBT());
+        this.fluidTanks.writeToNBT(compound, "tanks");
+        compound.setTag("gasTanks", this.gasTanks.save());
+        compound.setString("definitionId", this.definitionId == null ? "" : this.definitionId);
+    }
+
+    public void readDroppedData(final NBTTagCompound compound) {
+        if (compound == null) {
+            return;
+        }
+        String id = CustomIdValidator.readSanitizedString(compound, "definitionId");
+        this.definitionId = id == null ? "" : id;
+        configureStorageLayout();
+        if (compound.hasKey("inventory")) {
+            this.inventory = IOInventory.deserialize(this, compound.getCompoundTag("inventory"));
+            bindInventoryListener();
+        }
+        configureStorageLayout();
+        this.fluidTanks.readFromNBT(compound, "tanks");
+        this.gasTanks.load(compound.getCompoundTag("gasTanks"));
+        this.changedItemSlots = new boolean[this.inventory.getSlots()];
+        this.changedFluidSlots = new boolean[this.fluidTanks.getSlots()];
+        this.changedGasSlots = new boolean[this.gasTanks.size()];
+        markForUpdateSync();
+    }
+
+    public void clearDroppedData() {
+        for (int i = 0; i < this.inventory.getSlots(); i++) {
+            this.inventory.setStackInSlot(i, ItemStack.EMPTY);
+        }
+        for (int i = 0; i < this.fluidTanks.getSlots(); i++) {
+            this.fluidTanks.setFluidInSlot(i, null);
+        }
+        for (int i = 0; i < this.gasTanks.size(); i++) {
+            this.gasTanks.setGas(i, null);
+        }
     }
 
     public IOInventory getInventory() {
@@ -400,6 +443,33 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
                 continue;
             }
             if (role.equalsIgnoreCase(component.role == null ? "" : component.role)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasDefinedItemSlots() {
+        for (int slot = 0; slot < getActiveItemSlotBound(); slot++) {
+            if (isItemSlotDefined(slot)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasDefinedFluidSlots() {
+        for (int slot = 0; slot < getActiveFluidSlotBound(); slot++) {
+            if (isFluidSlotDefined(slot)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasDefinedGasSlots() {
+        for (int slot = 0; slot < getActiveGasSlotBound(); slot++) {
+            if (isGasSlotDefined(slot)) {
                 return true;
             }
         }
@@ -892,7 +962,21 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
 
     @Override
     public void securityBreak() {
-        getWorld().destroyBlock(getPos(), true);
+        if (getWorld() != null && !getWorld().isRemote) {
+            IBlockState state = getWorld().getBlockState(getPos());
+            if (state.getBlock() instanceof BlockCustomAEMixedOutputBus) {
+                BlockCustomAEMixedOutputBus block = (BlockCustomAEMixedOutputBus) state.getBlock();
+                ItemStack dropped = ItemBlockCustomAEMixedOutputBus.createStack(block);
+                NBTTagCompound tag = new NBTTagCompound();
+                writeDroppedData(tag);
+                String registryId = block.getRegistryName() == null ? "" : block.getRegistryName().toString();
+                tag.setString("definitionId", registryId);
+                dropped.setTagCompound(tag);
+                clearDroppedData();
+                Block.spawnAsEntity(getWorld(), getPos(), dropped);
+            }
+        }
+        getWorld().destroyBlock(getPos(), false);
     }
 
     private void logOutputExposure(final String phase) {

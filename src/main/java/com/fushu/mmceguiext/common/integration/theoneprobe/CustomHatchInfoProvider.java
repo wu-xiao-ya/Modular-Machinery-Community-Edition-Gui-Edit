@@ -4,6 +4,7 @@ import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedInputBus;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.tile.TileCustomHatch;
+import com.fushu.mmceguiext.common.util.UnitFormat;
 import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import mcjty.theoneprobe.api.IProbeHitData;
 import mcjty.theoneprobe.api.IProbeInfo;
@@ -21,6 +22,7 @@ import net.minecraftforge.fluids.FluidStack;
 public class CustomHatchInfoProvider implements IProbeInfoProvider {
     private static final int BAR_FILLED = 0xFF3F8DFF;
     private static final int BAR_GAS_FILLED = 0xFF7BE6FF;
+    private static final int BAR_ENERGY_FILLED = 0xFF3DDC84;
     private static final int BAR_BACKGROUND = 0xFF202020;
     private static final int BAR_BORDER = 0xFF000000;
 
@@ -56,39 +58,112 @@ public class CustomHatchInfoProvider implements IProbeInfoProvider {
         if (cfg.showDefinitionId && hatch.getDefinitionId() != null) {
             box.text(TextFormatting.DARK_GRAY + hatch.getDefinitionId());
         }
-        if (cfg.showItemInfo) {
+        DisplayTypes displayTypes = resolveDisplayTypes(def);
+        if (cfg.showItemInfo && displayTypes.item) {
             addItemInfo(box, hatch);
         }
-        if (cfg.showFluidInfo) {
+        if (cfg.showFluidInfo && displayTypes.fluid) {
             addFluidInfo(box, hatch);
         }
-        if (cfg.showGasInfo) {
+        if (cfg.showGasInfo && displayTypes.gas) {
             addGasInfo(box, hatch);
+        }
+        if (cfg.showEnergyInfo && displayTypes.energy) {
+            addEnergyInfo(box, hatch);
         }
     }
 
-    private static String describeComponents(CustomHatchRegistry.CustomHatchDef def) {
-        if (def.machineComponents != null && !def.machineComponents.isEmpty()) {
-            StringBuilder builder = new StringBuilder();
+    private static DisplayTypes resolveDisplayTypes(CustomHatchRegistry.CustomHatchDef def) {
+        DisplayTypes out = new DisplayTypes();
+        boolean hasMachineDeclaration = def.machineComponents != null && !def.machineComponents.isEmpty();
+        if (hasMachineDeclaration) {
             for (CustomHatchRegistry.MachineComponentDef component : def.machineComponents) {
-                if (component == null || component.type == null || component.type.trim().isEmpty()) {
-                    continue;
-                }
-                if (builder.length() > 0) {
-                    builder.append(", ");
-                }
-                builder.append(component.type.trim());
-                if (component.io != null && !component.io.trim().isEmpty()) {
-                    builder.append("(").append(component.io.trim()).append(")");
-                }
+                applyContentType(out, component == null ? null : component.type);
             }
-            if (builder.length() > 0) {
-                return builder.toString();
-            }
+        } else {
+            applyContentType(out, def.componentType == null || def.componentType.trim().isEmpty() ? "fluid" : def.componentType);
         }
-        String type = def.componentType == null || def.componentType.trim().isEmpty() ? "fluid" : def.componentType.trim();
-        String io = def.ioType == null || def.ioType.trim().isEmpty() ? "input" : def.ioType.trim();
-        return type + "(" + io + ")";
+        applyGuiContentTypes(out, def);
+        return out;
+    }
+
+    private static void applyGuiContentTypes(DisplayTypes out, CustomHatchRegistry.CustomHatchDef def) {
+        if (def.gui == null || def.gui.components == null || def.gui.components.isEmpty()) {
+            return;
+        }
+        for (CustomHatchRegistry.ComponentDef component : def.gui.components) {
+            if (component == null) {
+                continue;
+            }
+            if ("slot".equalsIgnoreCase(component.type) && isRuntimeItemSlot(component.role)) {
+                out.item = true;
+            }
+            applyContentType(out, component.content);
+            applyTextValueContent(out, component.value);
+        }
+    }
+
+    private static boolean isRuntimeItemSlot(String role) {
+        return "input".equalsIgnoreCase(role) || "output".equalsIgnoreCase(role);
+    }
+
+    private static void applyTextValueContent(DisplayTypes out, String value) {
+        String normalized = normalizeType(value);
+        if (normalized == null) {
+            return;
+        }
+        int dot = normalized.indexOf('.');
+        if (dot > 0) {
+            applyContentType(out, normalized.substring(0, dot));
+        }
+    }
+
+    private static void applyContentType(DisplayTypes out, String type) {
+        String normalized = normalizeType(type);
+        if (normalized == null) {
+            return;
+        }
+        if ("mixed".equals(normalized) || "hybrid".equals(normalized) || "item_fluid_gas".equals(normalized)) {
+            out.item = true;
+            out.fluid = true;
+            out.gas = true;
+            return;
+        }
+        if ("item_fluid".equals(normalized)) {
+            out.item = true;
+            out.fluid = true;
+            return;
+        }
+        if ("item".equals(normalized)) {
+            out.item = true;
+            return;
+        }
+        if ("fluid".equals(normalized)) {
+            out.fluid = true;
+            return;
+        }
+        if ("gas".equals(normalized)) {
+            out.gas = true;
+            return;
+        }
+        if ("energy".equals(normalized) || "power".equals(normalized) || "fe".equals(normalized) || "rf".equals(normalized)) {
+            out.energy = true;
+        }
+    }
+
+    private static String normalizeType(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim().toLowerCase().replace('-', '_');
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private static final class DisplayTypes {
+        private boolean item;
+        private boolean fluid;
+        private boolean gas;
+        private boolean energy;
     }
 
     private static void addItemInfo(IProbeInfo box, TileCustomHatch hatch) {
@@ -155,15 +230,14 @@ public class CustomHatchInfoProvider implements IProbeInfoProvider {
 
         box.text(TextFormatting.WHITE + "流体:" + TextFormatting.AQUA + name);
         box.progress(
-            amount,
-            capacity,
+            progressPercent(amount, capacity),
+            100,
             box.defaultProgressStyle()
                 .width(120)
                 .height(14)
                 .showText(true)
-                .numberFormat(NumberFormat.COMMAS)
-                .prefix(name + ": ")
-                .suffix(" / " + capacity + " mB")
+                .numberFormat(NumberFormat.NONE)
+                .prefix(name + ": " + UnitFormat.amountWithUnit(amount, "mB") + " / " + UnitFormat.amountWithUnit(capacity, "mB"))
                 .filledColor(BAR_FILLED)
                 .alternateFilledColor(BAR_FILLED)
                 .backgroundColor(BAR_BACKGROUND)
@@ -180,15 +254,14 @@ public class CustomHatchInfoProvider implements IProbeInfoProvider {
 
             box.text(TextFormatting.WHITE + "气体:" + TextFormatting.AQUA + name);
             box.progress(
-                amount,
-                capacity,
+                progressPercent(amount, capacity),
+                100,
                 box.defaultProgressStyle()
                     .width(120)
                     .height(14)
                     .showText(true)
-                    .numberFormat(NumberFormat.COMMAS)
-                    .prefix(name + ": ")
-                    .suffix(" / " + capacity + " mB")
+                    .numberFormat(NumberFormat.NONE)
+                    .prefix(name + ": " + UnitFormat.amountWithUnit(amount, "mB") + " / " + UnitFormat.amountWithUnit(capacity, "mB"))
                     .filledColor(BAR_GAS_FILLED)
                     .alternateFilledColor(BAR_GAS_FILLED)
                     .backgroundColor(BAR_BACKGROUND)
@@ -197,5 +270,33 @@ public class CustomHatchInfoProvider implements IProbeInfoProvider {
         } catch (Throwable ignored) {
             // Mekanism is optional; keep TOP usable if gas classes are absent or transformed late.
         }
+    }
+
+    private static void addEnergyInfo(IProbeInfo box, TileCustomHatch hatch) {
+        long stored = hatch.getEnergyStoredLong();
+        long capacity = Math.max(1L, hatch.getEnergyCapacity());
+
+        box.text(TextFormatting.WHITE + "能量:" + TextFormatting.GREEN + UnitFormat.amountWithUnit(stored, "FE"));
+        box.progress(
+            progressPercent(stored, capacity),
+            100,
+            box.defaultProgressStyle()
+                .width(120)
+                .height(14)
+                .showText(true)
+                .numberFormat(NumberFormat.NONE)
+                .prefix("FE: " + UnitFormat.amountWithUnit(stored, "FE") + " / " + UnitFormat.amountWithUnit(capacity, "FE"))
+                .filledColor(BAR_ENERGY_FILLED)
+                .alternateFilledColor(BAR_ENERGY_FILLED)
+                .backgroundColor(BAR_BACKGROUND)
+                .borderColor(BAR_BORDER)
+        );
+    }
+
+    private static int progressPercent(long amount, long capacity) {
+        if (capacity <= 0L || amount <= 0L) {
+            return 0;
+        }
+        return (int) Math.max(0L, Math.min(100L, Math.round(amount * 100.0D / capacity)));
     }
 }

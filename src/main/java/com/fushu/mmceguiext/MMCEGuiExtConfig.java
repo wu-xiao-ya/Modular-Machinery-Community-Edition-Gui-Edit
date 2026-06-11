@@ -488,6 +488,9 @@ public class MMCEGuiExtConfig {
 
         @Config.Comment("是否显示 MMCEGE 自己绘制的气体条 / Show MMCEGE's own gas bar.")
         public boolean showGasInfo = true;
+
+        @Config.Comment("是否显示 MMCEGE 自己绘制的能源条 / Show MMCEGE's own energy bar.")
+        public boolean showEnergyInfo = true;
     }
 }
 

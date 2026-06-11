@@ -1,5 +1,6 @@
 package com.fushu.mmceguiext.common.tile;
 
+import com.fushu.mmceguiext.common.block.BlockCustomHatch;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
 import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import github.kasuminova.mmce.common.util.InfItemFluidHandler;
@@ -13,6 +14,7 @@ import hellfirepvp.modularmachinery.common.machine.MachineComponent;
 import hellfirepvp.modularmachinery.common.tiles.base.MachineComponentTile;
 import hellfirepvp.modularmachinery.common.tiles.base.SelectiveUpdateTileEntity;
 import hellfirepvp.modularmachinery.common.tiles.base.TileEntityRestrictedTick;
+import hellfirepvp.modularmachinery.common.util.IEnergyHandlerAsync;
 import hellfirepvp.modularmachinery.common.util.IOInventory;
 import mekanism.api.gas.Gas;
 import mekanism.api.gas.IGasItem;
@@ -38,6 +40,8 @@ import net.minecraftforge.fluids.capability.IFluidHandlerItem;
 import net.minecraftforge.fluids.capability.IFluidTankProperties;
 import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.IItemHandlerModifiable;
+import net.minecraftforge.energy.CapabilityEnergy;
+import net.minecraftforge.energy.IEnergyStorage;
 import net.minecraftforge.fml.common.Optional;
 
 import javax.annotation.Nonnull;
@@ -60,6 +64,8 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     public static final int INPUT_SLOT = 0;
     public static final int OUTPUT_SLOT = 1;
     private static final int MAX_DYNAMIC_SLOT_INDEX = 4095;
+    private static final int MAX_HATCH_CAPACITY = Integer.MAX_VALUE;
+    private static final long MAX_ENERGY_CAPACITY = Integer.MAX_VALUE;
 
     private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
     private final long componentGroupId = github.kasuminova.mmce.common.tile.base.MachineCombinationComponent.GROUP_ACQUIRER.incrementAndGet();
@@ -72,6 +78,10 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     private int capacity = 1000;
     private int fluidCapacity = 1000;
     private int gasCapacity = 1000;
+    private long energy = 0L;
+    private long energyCapacity = 1000L;
+    private long energyTransfer = 1000L;
+    private boolean syncingDefinition = false;
     private final ProcessorTank tank = new ProcessorTank(this.fluidCapacity);
     private final ProcessorGasTank gasTank = new ProcessorGasTank(this.gasCapacity, 1);
     private final ExternalFluidHandler inputFluidCapability = new ExternalFluidHandler(true, false);
@@ -80,6 +90,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     private final ExternalGasHandler inputGasCapability = new ExternalGasHandler(true, false);
     private final ExternalGasHandler outputGasCapability = new ExternalGasHandler(false, true);
     private final ExternalGasHandler bidirectionalGasCapability = new ExternalGasHandler(true, true);
+    private final EnergyHandler energyHandler = new EnergyHandler();
     private String hatchId = "";
     private String inventorySignature = "";
 
@@ -101,11 +112,43 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     @Nullable
     public CustomHatchRegistry.CustomHatchDef getDefinition() {
         CustomHatchRegistry.CustomHatchDef def = CustomHatchRegistry.findById(this.hatchId);
-        return def;
+        return def == null ? resolveDefinitionFromBlock() : def;
+    }
+
+    @Nullable
+    private CustomHatchRegistry.CustomHatchDef resolveDefinitionFromBlock() {
+        if (this.world == null || this.pos == null || !this.world.isBlockLoaded(this.pos)) {
+            return null;
+        }
+        if (!(this.world.getBlockState(this.pos).getBlock() instanceof BlockCustomHatch)) {
+            return null;
+        }
+        BlockCustomHatch block = (BlockCustomHatch) this.world.getBlockState(this.pos).getBlock();
+        String registryId = block.getRegistryName() == null ? null : block.getRegistryName().toString();
+        if (registryId != null && !registryId.equals(this.hatchId)) {
+            this.hatchId = registryId;
+            syncDefinition();
+            if (!this.world.isRemote) {
+                markChunkDirty();
+            }
+        }
+        return block.getDefinition();
     }
 
     public IOInventory getInventory() {
         return this.inventory;
+    }
+
+    public void refreshDefinitionLayout() {
+        syncDefinition();
+    }
+
+    public void refreshDefinitionLayout(CustomHatchRegistry.CustomHatchDef def) {
+        if (def == null) {
+            syncDefinition();
+            return;
+        }
+        applyDefinition(def);
     }
 
     @Override
@@ -131,12 +174,76 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         return this.gasCapacity;
     }
 
+    public long getEnergyStoredLong() {
+        return this.energy;
+    }
+
+    public long getEnergyCapacity() {
+        return this.energyCapacity;
+    }
+
+    public long getEnergyTransfer() {
+        return this.energyTransfer;
+    }
+
+    public void applyClientEnergyStored(long value) {
+        this.energy = clampEnergy(value);
+    }
+
+    public void applyClientEnergyCapacity(long value) {
+        this.energyCapacity = clampEnergyCapacity(value);
+        this.energy = clampEnergy(this.energy);
+    }
+
+    public void applyClientEnergyTransfer(long value) {
+        this.energyTransfer = clampEnergyCapacity(value);
+    }
+
     public int[] getRecipeInputSlots() {
         return this.recipeInputSlots.clone();
     }
 
     public int[] getRecipeOutputSlots() {
         return this.recipeOutputSlots.clone();
+    }
+
+    public void writeDroppedData(NBTTagCompound compound) {
+        if (compound == null) {
+            return;
+        }
+        compound.setTag("inv", this.inventory.writeNBT());
+        compound.setTag("fluid", this.tank.writeToNBT(new NBTTagCompound()));
+        this.gasTank.writeToNBT(compound, "gas");
+        compound.setInteger("capacity", this.capacity);
+        compound.setInteger("fluidCapacity", this.fluidCapacity);
+        compound.setInteger("gasCapacity", this.gasCapacity);
+        compound.setLong("energy", this.energy);
+        compound.setLong("energyCapacity", this.energyCapacity);
+        compound.setLong("energyTransfer", this.energyTransfer);
+    }
+
+    public void readDroppedData(@Nullable NBTTagCompound compound) {
+        if (compound == null) {
+            return;
+        }
+        syncDefinition();
+        if (compound.hasKey("inv", Constants.NBT.TAG_COMPOUND)) {
+            this.inventory.readNBT(compound.getCompoundTag("inv"));
+            this.inventory.setListener(this::onInventoryChanged);
+            ensureInventoryLayoutMatchesDefinition();
+        }
+        if (compound.hasKey("fluid", Constants.NBT.TAG_COMPOUND)) {
+            this.tank.readFromNBT(compound.getCompoundTag("fluid"));
+            clampStoredFluid();
+        }
+        if (compound.hasKey("gas", Constants.NBT.TAG_COMPOUND)) {
+            this.gasTank.readFromNBT(compound, "gas");
+            clampStoredGas();
+        }
+        if (compound.hasKey("energy")) {
+            this.energy = clampEnergy(compound.getLong("energy"));
+        }
+        markNoUpdateSync();
     }
 
     @Nullable
@@ -167,12 +274,13 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         }
         List<MachineComponent<?>> out = new ArrayList<MachineComponent<?>>();
         long baseGroupId = getUniqueGroupID();
-        if (addCombinedComponents(def.machineComponents, out, baseGroupId)) {
-            return out;
-        }
-        int index = 0;
+        boolean combined = addCombinedComponents(def.machineComponents, out, baseGroupId);
+        int index = combined ? 1 : 0;
         for (CustomHatchRegistry.MachineComponentDef componentDef : def.machineComponents) {
             if (componentDef == null || componentDef.type == null) {
+                continue;
+            }
+            if (combined && isExplicitCombinedComponentType(componentDef.type)) {
                 continue;
             }
             MachineComponent<?> component = createMachineComponent(componentDef.type, parseIOType(componentDef.io), baseGroupId + index++);
@@ -348,7 +456,6 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         }
         ItemStack container = input.copy();
         container.setCount(1);
-        container.setCount(1);
         GasStack gas = getGasFromItem(container);
         if (gas == null || gas.amount <= 0) {
             return false;
@@ -380,6 +487,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return false;
         }
         ItemStack container = input.copy();
+        container.setCount(1);
         int accepted = addGasToItem(container, available.copy(), true);
         if (accepted <= 0) {
             return false;
@@ -570,21 +678,36 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     }
 
     private void syncDefinition() {
-        CustomHatchRegistry.CustomHatchDef def = getDefinition();
-        if (def != null) {
-            this.capacity = Math.max(1, def.capacity);
-            this.fluidCapacity = Math.max(1, def.fluidCapacity > 0 ? def.fluidCapacity : this.capacity);
-            this.gasCapacity = Math.max(1, def.gasCapacity > 0 ? def.gasCapacity : this.capacity);
-            this.tank.setCustomCapacity(this.fluidCapacity);
-            this.gasTank.setCapacity(this.gasCapacity);
-            syncInventoryLayout(def);
+        if (this.syncingDefinition) {
+            return;
         }
+        this.syncingDefinition = true;
+        try {
+            CustomHatchRegistry.CustomHatchDef def = getDefinition();
+            if (def != null) {
+                applyDefinition(def);
+            }
+        } finally {
+            this.syncingDefinition = false;
+        }
+    }
+
+    private void applyDefinition(CustomHatchRegistry.CustomHatchDef def) {
+        this.capacity = Math.max(1, def.capacity);
+        this.fluidCapacity = Math.max(1, def.fluidCapacity > 0 ? def.fluidCapacity : this.capacity);
+        this.gasCapacity = Math.max(1, def.gasCapacity > 0 ? def.gasCapacity : this.capacity);
+        this.energyCapacity = Math.max(1L, def.energyCapacity > 0L ? def.energyCapacity : this.capacity);
+        this.energyTransfer = Math.max(1L, def.energyTransfer > 0L ? def.energyTransfer : this.energyCapacity);
+        this.energy = clampEnergy(this.energy);
+        this.tank.setCustomCapacity(this.fluidCapacity);
+        this.gasTank.setCapacity(this.gasCapacity);
+        syncInventoryLayout(def);
     }
 
     private void syncInventoryLayout(CustomHatchRegistry.CustomHatchDef def) {
         InventoryLayout layout = buildInventoryLayout(def);
         String signature = layout.signature();
-        if (signature.equals(this.inventorySignature)) {
+        if (signature.equals(this.inventorySignature) && this.inventory.getSlots() == layout.slotCount) {
             return;
         }
         IOInventory old = this.inventory;
@@ -598,6 +721,15 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         this.recipeInputSlots = layout.inputSlots;
         this.recipeOutputSlots = layout.outputSlots;
         this.inventorySignature = signature;
+    }
+
+    private void ensureInventoryLayoutMatchesDefinition() {
+        CustomHatchRegistry.CustomHatchDef def = getDefinition();
+        if (def == null) {
+            return;
+        }
+        this.inventorySignature = "";
+        syncInventoryLayout(def);
     }
 
     public static InventoryLayout buildInventoryLayout(@Nullable CustomHatchRegistry.CustomHatchDef def) {
@@ -709,6 +841,12 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         if ("gas".equalsIgnoreCase(componentType)) {
             return new GasMachineComponent(ioType, groupId);
         }
+        if ("energy".equalsIgnoreCase(componentType)
+            || "power".equalsIgnoreCase(componentType)
+            || "fe".equalsIgnoreCase(componentType)
+            || "rf".equalsIgnoreCase(componentType)) {
+            return new EnergyMachineComponent(ioType, groupId);
+        }
         return null;
     }
 
@@ -717,20 +855,26 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         super.readCustomNBT(compound);
         String id = CustomIdValidator.readSanitizedString(compound, "hatchId");
         this.hatchId = id == null ? "" : id;
+        this.capacity = compound.hasKey("capacity") ? clampCapacity(compound.getInteger("capacity")) : this.capacity;
+        this.fluidCapacity = compound.hasKey("fluidCapacity") ? clampCapacity(compound.getInteger("fluidCapacity")) : this.capacity;
+        this.gasCapacity = compound.hasKey("gasCapacity") ? clampCapacity(compound.getInteger("gasCapacity")) : this.capacity;
+        this.energyCapacity = compound.hasKey("energyCapacity") ? clampEnergyCapacity(compound.getLong("energyCapacity")) : this.energyCapacity;
+        this.energyTransfer = compound.hasKey("energyTransfer") ? clampEnergyCapacity(compound.getLong("energyTransfer")) : this.energyTransfer;
+        syncDefinition();
         if (compound.hasKey("inv", Constants.NBT.TAG_COMPOUND)) {
             this.inventory.readNBT(compound.getCompoundTag("inv"));
             this.inventory.setListener(this::onInventoryChanged);
+            ensureInventoryLayoutMatchesDefinition();
         }
         if (compound.hasKey("fluid", Constants.NBT.TAG_COMPOUND)) {
             this.tank.readFromNBT(compound.getCompoundTag("fluid"));
+            clampStoredFluid();
         }
         if (compound.hasKey("gas", Constants.NBT.TAG_COMPOUND)) {
             this.gasTank.readFromNBT(compound, "gas");
+            clampStoredGas();
         }
-        this.capacity = compound.hasKey("capacity") ? compound.getInteger("capacity") : this.capacity;
-        this.fluidCapacity = compound.hasKey("fluidCapacity") ? compound.getInteger("fluidCapacity") : this.capacity;
-        this.gasCapacity = compound.hasKey("gasCapacity") ? compound.getInteger("gasCapacity") : this.capacity;
-        syncDefinition();
+        this.energy = compound.hasKey("energy") ? clampEnergy(compound.getLong("energy")) : clampEnergy(this.energy);
     }
 
     @Override
@@ -743,13 +887,17 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         compound.setInteger("capacity", this.capacity);
         compound.setInteger("fluidCapacity", this.fluidCapacity);
         compound.setInteger("gasCapacity", this.gasCapacity);
+        compound.setLong("energy", this.energy);
+        compound.setLong("energyCapacity", this.energyCapacity);
+        compound.setLong("energyTransfer", this.energyTransfer);
     }
 
     @Override
     public boolean hasCapability(@Nonnull Capability<?> capability, @Nullable EnumFacing facing) {
-        return capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY
-            || capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY
-            || isMekanismGasCapability(capability)
+        return capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY && supportsExternalCapability(ExternalAccessKind.ITEM)
+            || capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY && supportsExternalCapability(ExternalAccessKind.FLUID)
+            || capability == CapabilityEnergy.ENERGY && supportsExternalCapability(ExternalAccessKind.ENERGY)
+            || isMekanismGasCapability(capability) && supportsExternalCapability(ExternalAccessKind.GAS)
             || super.hasCapability(capability, facing);
     }
 
@@ -757,18 +905,26 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     @Override
     public <T> T getCapability(@Nonnull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
-            return (T) this.inventory;
+            return supportsExternalCapability(ExternalAccessKind.ITEM) ? (T) this.inventory : super.getCapability(capability, facing);
         }
         if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
-            return (T) getExternalFluidCapability();
+            return supportsExternalCapability(ExternalAccessKind.FLUID) ? (T) getExternalFluidCapability() : super.getCapability(capability, facing);
+        }
+        if (capability == CapabilityEnergy.ENERGY) {
+            return supportsExternalCapability(ExternalAccessKind.ENERGY) ? (T) this.energyHandler : super.getCapability(capability, facing);
         }
         if (isMekanismGasHandlerCapability(capability)) {
-            return (T) getExternalGasCapability();
+            return supportsExternalCapability(ExternalAccessKind.GAS) ? (T) getExternalGasCapability() : super.getCapability(capability, facing);
         }
         if (isMekanismTubeConnectionCapability(capability)) {
-            return (T) this;
+            return supportsExternalCapability(ExternalAccessKind.GAS) ? (T) this : super.getCapability(capability, facing);
         }
         return super.getCapability(capability, facing);
+    }
+
+    private boolean supportsExternalCapability(ExternalAccessKind kind) {
+        DirectionAccess access = resolveExternalAccess(kind);
+        return access.input || access.output;
     }
 
     private IFluidHandler getExternalFluidCapability() {
@@ -809,6 +965,10 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             }
         }
         if (!matchedComponent) {
+            String rootComponentType = def == null || def.componentType == null ? "fluid" : def.componentType;
+            if (!kind.matches(rootComponentType)) {
+                return new DirectionAccess(false, false);
+            }
             if (parseIOType(def == null ? null : def.ioType) == IOType.OUTPUT) {
                 output = true;
             } else {
@@ -920,6 +1080,16 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     }
 
     private enum ExternalAccessKind {
+        ITEM {
+            @Override
+            boolean matches(@Nullable String componentType) {
+                return "item".equalsIgnoreCase(componentType)
+                    || "item_fluid".equalsIgnoreCase(componentType)
+                    || "item_fluid_gas".equalsIgnoreCase(componentType)
+                    || "mixed".equalsIgnoreCase(componentType)
+                    || "hybrid".equalsIgnoreCase(componentType);
+            }
+        },
         FLUID {
             @Override
             boolean matches(@Nullable String componentType) {
@@ -933,6 +1103,15 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
                     || "item_fluid_gas".equalsIgnoreCase(componentType)
                     || "mixed".equalsIgnoreCase(componentType)
                     || "hybrid".equalsIgnoreCase(componentType);
+            }
+        },
+        ENERGY {
+            @Override
+            boolean matches(@Nullable String componentType) {
+                return "energy".equalsIgnoreCase(componentType)
+                    || "power".equalsIgnoreCase(componentType)
+                    || "fe".equalsIgnoreCase(componentType)
+                    || "rf".equalsIgnoreCase(componentType);
             }
         };
 
@@ -1025,6 +1204,128 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         }
     }
 
+    private long clampEnergy(long value) {
+        return Math.max(0L, Math.min(value, this.energyCapacity));
+    }
+
+    private static int clampCapacity(int value) {
+        return Math.max(1, Math.min(value, MAX_HATCH_CAPACITY));
+    }
+
+    private static long clampEnergyCapacity(long value) {
+        return Math.max(1L, Math.min(value, MAX_ENERGY_CAPACITY));
+    }
+
+    private void clampStoredFluid() {
+        FluidStack fluid = this.tank.getFluid();
+        if (fluid != null && fluid.amount > this.fluidCapacity) {
+            fluid.amount = this.fluidCapacity;
+        }
+    }
+
+    @Optional.Method(modid = "mekanism")
+    private void clampStoredGas() {
+        GasStack gas = this.gasTank.getGasInSlot(0);
+        if (gas != null && gas.amount > this.gasCapacity) {
+            gas.amount = this.gasCapacity;
+            this.gasTank.setGasInSlot(0, gas);
+        }
+    }
+
+    private int downcastEnergy(long value) {
+        return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, value);
+    }
+
+    private class EnergyHandler implements IEnergyStorage, IEnergyHandlerAsync {
+        @Override
+        public synchronized int receiveEnergy(int maxReceive, boolean simulate) {
+            if (maxReceive <= 0 || !canReceive()) {
+                return 0;
+            }
+            long accepted = Math.min(Math.min((long) maxReceive, energyTransfer), energyCapacity - energy);
+            if (accepted <= 0L) {
+                return 0;
+            }
+            if (!simulate) {
+                energy += accepted;
+                markNoUpdateSync();
+            }
+            return downcastEnergy(accepted);
+        }
+
+        @Override
+        public synchronized int extractEnergy(int maxExtract, boolean simulate) {
+            if (maxExtract <= 0 || !canExtract()) {
+                return 0;
+            }
+            long extracted = Math.min(Math.min((long) maxExtract, energyTransfer), energy);
+            if (extracted <= 0L) {
+                return 0;
+            }
+            if (!simulate) {
+                energy -= extracted;
+                markNoUpdateSync();
+            }
+            return downcastEnergy(extracted);
+        }
+
+        @Override
+        public synchronized int getEnergyStored() {
+            return downcastEnergy(energy);
+        }
+
+        @Override
+        public synchronized int getMaxEnergyStored() {
+            return downcastEnergy(energyCapacity);
+        }
+
+        @Override
+        public boolean canExtract() {
+            return resolveExternalAccess(ExternalAccessKind.ENERGY).output;
+        }
+
+        @Override
+        public boolean canReceive() {
+            return resolveExternalAccess(ExternalAccessKind.ENERGY).input;
+        }
+
+        @Override
+        public synchronized long getCurrentEnergy() {
+            return energy;
+        }
+
+        @Override
+        public synchronized void setCurrentEnergy(long value) {
+            energy = clampEnergy(value);
+            markNoUpdateSync();
+        }
+
+        @Override
+        public synchronized long getMaxEnergy() {
+            return energyCapacity;
+        }
+
+        @Override
+        public synchronized boolean extractEnergy(long value) {
+            if (value < 0L || energy < value) {
+                return false;
+            }
+            energy -= value;
+            markNoUpdateSync();
+            return true;
+        }
+
+        @Override
+        public synchronized boolean receiveEnergy(long value) {
+            if (value < 0L || energyCapacity - energy < value) {
+                return false;
+            }
+            energy += value;
+            markNoUpdateSync();
+            return true;
+        }
+    }
+
     private class CombinedMachineComponent extends MachineComponent<InfItemFluidHandler> {
         private final long groupId;
 
@@ -1104,6 +1405,25 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         @Override
         public IExtendedGasHandler getContainerProvider() {
             return TileCustomHatch.this.gasTank;
+        }
+
+        @Override
+        public long getGroupID() {
+            return this.groupId;
+        }
+    }
+
+    private class EnergyMachineComponent extends MachineComponent.EnergyHatch {
+        private final long groupId;
+
+        private EnergyMachineComponent(IOType ioType, long groupId) {
+            super(ioType);
+            this.groupId = groupId;
+        }
+
+        @Override
+        public IEnergyHandlerAsync getContainerProvider() {
+            return TileCustomHatch.this.energyHandler;
         }
 
         @Override

@@ -35,8 +35,10 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
 
     @Override
     public void fromBytes(ByteBuf buf) {
+        NetworkBufferUtils.requireReadable(buf, 8);
         this.controllerPos = BlockPos.fromLong(buf.readLong());
         this.interfaceType = NetworkBufferUtils.readBoundedUtf8(buf, MAX_INTERFACE_TYPE_LENGTH);
+        NetworkBufferUtils.requireReadable(buf, 4);
         this.value = buf.readFloat();
     }
 
@@ -89,6 +91,10 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
         if (controller == null || controllerPos == null || interfaceType == null || !Float.isFinite(value)) {
             return false;
         }
+        boolean configuredKey = ControllerButtonPolicyManager.isConfiguredSmartKey(controller, interfaceType);
+        if (!configuredKey && !hasFoundSmartInterface(controller, interfaceType)) {
+            return false;
+        }
         if (tryInvokeControllerSmartUpdate(controller, interfaceType, value)) {
             return true;
         }
@@ -112,8 +118,7 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
             updated = true;
             break;
         }
-        if (!updated && ControllerButtonPolicyManager.isConfiguredSmartKey(controller, interfaceType)
-            && hasControllerCustomData(controller, interfaceType)) {
+        if (!updated && configuredKey) {
             updated = tryWriteControllerCustomData(controller, interfaceType, value);
         }
         if (updated) {
@@ -128,6 +133,15 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() || trimmed.length() > maxLength ? null : trimmed;
+    }
+
+    private static boolean hasFoundSmartInterface(TileMultiblockMachineController controller, String interfaceType) {
+        for (Map.Entry<TileSmartInterface.SmartInterfaceProvider, String> entry : controller.getFoundSmartInterfaces().entrySet()) {
+            if (interfaceType.equals(entry.getValue()) && entry.getKey() != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean tryInvokeControllerSmartUpdate(TileMultiblockMachineController controller, String interfaceType, float value) {
@@ -173,12 +187,21 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
         if (player.getDistanceSqToCenter(controllerPos) > 64D) {
             return false;
         }
+        if (player.openContainer == null || !player.openContainer.canInteractWith(player)) {
+            return false;
+        }
 
         if (player.openContainer instanceof ContainerController) {
-            return ((ContainerController) player.openContainer).getOwner().getPos().equals(controllerPos);
+            TileMultiblockMachineController owner = ((ContainerController) player.openContainer).getOwner();
+            return owner != null
+                && owner.getPos().equals(controllerPos)
+                && player.world.getTileEntity(controllerPos) == owner;
         }
         if (player.openContainer instanceof ContainerFactoryController) {
-            return ((ContainerFactoryController) player.openContainer).getOwner().getPos().equals(controllerPos);
+            TileMultiblockMachineController owner = ((ContainerFactoryController) player.openContainer).getOwner();
+            return owner != null
+                && owner.getPos().equals(controllerPos)
+                && player.world.getTileEntity(controllerPos) == owner;
         }
         return false;
     }

@@ -1,6 +1,7 @@
 package com.fushu.mmceguiext.client.integration;
 
 import com.fushu.mmceguiext.client.gui.GuiFactoryControllerResizable;
+import com.fushu.mmceguiext.client.gui.GuiFluidProcessorHatchCustom;
 import com.fushu.mmceguiext.client.gui.GuiMachineControllerResizable;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.IModRegistry;
@@ -17,7 +18,8 @@ public class MMCEGuiExtJeiPlugin implements IModPlugin {
     public void register(IModRegistry registry) {
         registry.addAdvancedGuiHandlers(
             new MachineControllerHandler(),
-            new FactoryControllerHandler()
+            new FactoryControllerHandler(),
+            new CustomHatchHandler()
         );
     }
 
@@ -52,5 +54,16 @@ public class MMCEGuiExtJeiPlugin implements IModPlugin {
             return Collections.singletonList(extra);
         }
     }
-}
 
+    private static class CustomHatchHandler implements IAdvancedGuiHandler<GuiFluidProcessorHatchCustom> {
+        @Override
+        public Class<GuiFluidProcessorHatchCustom> getGuiContainerClass() {
+            return GuiFluidProcessorHatchCustom.class;
+        }
+
+        @Override
+        public List<Rectangle> getGuiExtraAreas(GuiFluidProcessorHatchCustom guiContainer) {
+            return guiContainer.getJeiExtraAreas();
+        }
+    }
+}

@@ -40,6 +40,7 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
 
     @Override
     public void fromBytes(ByteBuf buf) {
+        NetworkBufferUtils.requireReadable(buf, 16);
         this.pos = BlockPos.fromLong(buf.readLong());
         this.target = buf.readInt();
         this.slotIndex = buf.readInt();
@@ -63,6 +64,9 @@ public class PktCustomAEMixedSlotUpdate implements IMessage, IMessageHandler<Pkt
     }
 
     private static void handle(PktCustomAEMixedSlotUpdate message, EntityPlayerMP player) {
+        if (message == null) {
+            return;
+        }
         if (player == null || player.world == null || !player.world.isBlockLoaded(message.pos)) {
             return;
         }

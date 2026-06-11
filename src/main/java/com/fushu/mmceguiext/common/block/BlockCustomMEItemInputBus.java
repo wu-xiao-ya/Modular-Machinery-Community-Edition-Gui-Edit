@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 
 public class BlockCustomMEItemInputBus extends BlockMEItemInputBus {
     private final CustomAEItemInputBusRegistry.Def definition;
+    private final ThreadLocal<Boolean> dropNextBreak = new ThreadLocal<Boolean>();
 
     public BlockCustomMEItemInputBus(CustomAEItemInputBusRegistry.Def definition) {
         this.definition = definition;
@@ -74,6 +75,11 @@ public class BlockCustomMEItemInputBus extends BlockMEItemInputBus {
 
     @Override
     public void breakBlock(final World worldIn, @Nonnull final BlockPos pos, @Nonnull final IBlockState state) {
+        if (!Boolean.TRUE.equals(this.dropNextBreak.get())) {
+            worldIn.removeTileEntity(pos);
+            return;
+        }
+
         TileEntity te = worldIn.getTileEntity(pos);
         ItemStack dropped = ItemBlockCustomMEItemInputBus.createStack(this);
 
@@ -116,6 +122,35 @@ public class BlockCustomMEItemInputBus extends BlockMEItemInputBus {
     }
 
     @Override
+    public boolean removedByPlayer(@Nonnull final IBlockState state,
+                                   @Nonnull final World world,
+                                   @Nonnull final BlockPos pos,
+                                   @Nonnull final EntityPlayer player,
+                                   final boolean willHarvest) {
+        return willHarvest || super.removedByPlayer(state, world, pos, player, willHarvest);
+    }
+
+    @Override
+    public void harvestBlock(@Nonnull final World world,
+                             @Nonnull final EntityPlayer player,
+                             @Nonnull final BlockPos pos,
+                             @Nonnull final IBlockState state,
+                             final TileEntity te,
+                             @Nonnull final ItemStack stack) {
+        super.harvestBlock(world, player, pos, state, te, stack);
+        if (player != null && !player.capabilities.isCreativeMode) {
+            this.dropNextBreak.set(Boolean.TRUE);
+            try {
+                world.setBlockToAir(pos);
+            } finally {
+                this.dropNextBreak.remove();
+            }
+        } else {
+            world.setBlockToAir(pos);
+        }
+    }
+
+    @Override
     public void getDrops(@Nonnull final NonNullList<ItemStack> drops, @Nonnull final IBlockAccess world, @Nonnull final BlockPos pos, @Nonnull final IBlockState state, final int fortune) {
     }
 
@@ -139,6 +174,10 @@ public class BlockCustomMEItemInputBus extends BlockMEItemInputBus {
             String nbtDefinition = CustomIdValidator.readSanitizedString(tag, "definitionId");
             if (registryId != null && registryId.equals(nbtDefinition)) {
                 custom.setDefinitionId(nbtDefinition);
+            }
+            if (tag != null && tag.hasKey("inventory") && tag.hasKey("configInventory")) {
+                custom.readInventoryNBT(tag.getCompoundTag("inventory"));
+                custom.readConfigInventoryNBT(tag.getCompoundTag("configInventory"));
             }
         }
     }

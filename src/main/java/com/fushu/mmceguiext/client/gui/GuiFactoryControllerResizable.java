@@ -249,11 +249,13 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
 
         if (this.customBackgroundTexture != null) {
             this.mc.getTextureManager().bindTexture(this.customBackgroundTexture);
+            int drawWidth = Math.max(1, this.renderWidth);
+            int drawHeight = Math.max(1, this.renderHeight);
             drawResizableArea(
                 this.guiLeft - textureOffsetX,
                 this.guiTop - textureOffsetY,
-                this.renderWidth + textureOffsetX,
-                this.renderHeight + textureOffsetY,
+                drawWidth,
+                drawHeight,
                 useNineSlice,
                 texW,
                 texH,
@@ -399,7 +401,8 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     }
 
     private void drawRecipeQueue() {
-        int offsetY = RECIPE_QUEUE_OFFSET_Y;
+        int offsetX = getThreadQueueX();
+        int offsetY = getThreadQueueY();
         int currentScroll = recipeScrollbar.getCurrentScroll();
 
         Collection<FactoryRecipeThread> coreThreadList = factory.getCoreRecipeThreads().values();
@@ -414,12 +417,12 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         int drawableSize = Math.min(visibleRows, Math.max(0, recipeThreadList.size() - currentScroll));
         for (int i = 0; i < drawableSize; i++) {
             FactoryRecipeThread thread = recipeThreadList.get(i + currentScroll);
-            drawRecipeInfo(thread, i + currentScroll, offsetY);
+            drawRecipeInfo(thread, i + currentScroll, offsetX, offsetY);
             offsetY += FACTORY_ELEMENT_HEIGHT + 1;
         }
     }
 
-    private void drawRecipeInfo(FactoryRecipeThread thread, int id, int offsetY) {
+    private void drawRecipeInfo(FactoryRecipeThread thread, int id, int offsetX, int offsetY) {
         CraftingStatus status = thread.getStatus();
         ActiveMachineRecipe activeRecipe = thread.getActiveRecipe();
 
@@ -430,7 +433,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         } else {
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         }
-        drawTexturedModalRect(RECIPE_QUEUE_OFFSET_X, offsetY, 0, 0, FACTORY_ELEMENT_WIDTH, FACTORY_ELEMENT_HEIGHT);
+        drawTexturedModalRect(offsetX, offsetY, 0, 0, FACTORY_ELEMENT_WIDTH, FACTORY_ELEMENT_HEIGHT);
 
         if (status.isCrafting()) {
             GlStateManager.color(0.6F, 1.0F, 0.75F, 1.0F);
@@ -441,7 +444,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         if (activeRecipe != null && activeRecipe.getTotalTick() > 0) {
             float progress = (float) activeRecipe.getTick() / (float) activeRecipe.getTotalTick();
             drawTexturedModalRect(
-                RECIPE_QUEUE_OFFSET_X,
+                offsetX,
                 offsetY,
                 0,
                 0,
@@ -450,15 +453,15 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             );
         }
 
-        drawRecipeStatus(thread, id, offsetY + 2);
+        drawRecipeStatus(thread, id, offsetX, offsetY + 2);
     }
 
-    private void drawRecipeStatus(FactoryRecipeThread thread, int id, int y) {
+    private void drawRecipeStatus(FactoryRecipeThread thread, int id, int x, int y) {
         GlStateManager.pushMatrix();
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         GlStateManager.scale(FONT_SCALE, FONT_SCALE, FONT_SCALE);
 
-        int offsetX = (int) (RECIPE_QUEUE_OFFSET_X / FONT_SCALE) + 2;
+        int offsetX = (int) (x / FONT_SCALE) + 2;
         int offsetY = (int) (y / FONT_SCALE);
 
         ActiveMachineRecipe activeRecipe = thread.getActiveRecipe();
@@ -1228,8 +1231,8 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         int visibleRows = defaultBackground ? MAX_PAGE_ELEMENTS : getVisibleQueueRows();
         int scrollbarHeight = defaultBackground ? SCROLLBAR_HEIGHT : visibleRows * (FACTORY_ELEMENT_HEIGHT + 1) - 1;
         recipeScrollbar
-            .setLeft(SCROLLBAR_LEFT + displayX)
-            .setTop(SCROLLBAR_TOP + displayY)
+            .setLeft(getThreadScrollbarX() + displayX)
+            .setTop(getThreadScrollbarY() + displayY)
             .setHeight(scrollbarHeight);
 
         Map<String, FactoryRecipeThread> coreThreads = factory.getCoreRecipeThreads();
@@ -1244,8 +1247,36 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     }
 
     private int getMaxQueueRowsByHeight() {
-        int available = Math.max(FACTORY_ELEMENT_HEIGHT, this.renderHeight - RECIPE_QUEUE_OFFSET_Y - 8);
+        int available = Math.max(FACTORY_ELEMENT_HEIGHT, this.renderHeight - getThreadQueueY() - 8);
         return Math.max(1, (available + 1) / (FACTORY_ELEMENT_HEIGHT + 1));
+    }
+
+    private int getThreadQueueX() {
+        if (styleOverride.threadQueueX != null) {
+            return Math.max(0, styleOverride.threadQueueX.intValue());
+        }
+        return RECIPE_QUEUE_OFFSET_X;
+    }
+
+    private int getThreadQueueY() {
+        if (styleOverride.threadQueueY != null) {
+            return Math.max(0, styleOverride.threadQueueY.intValue());
+        }
+        return RECIPE_QUEUE_OFFSET_Y;
+    }
+
+    private int getThreadScrollbarX() {
+        if (styleOverride.threadScrollbarX != null) {
+            return Math.max(0, styleOverride.threadScrollbarX.intValue());
+        }
+        return SCROLLBAR_LEFT;
+    }
+
+    private int getThreadScrollbarY() {
+        if (styleOverride.threadScrollbarY != null) {
+            return Math.max(0, styleOverride.threadScrollbarY.intValue());
+        }
+        return SCROLLBAR_TOP;
     }
 
     private void drawPanelScrollBar(PanelDef panel) {
@@ -1817,6 +1848,9 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
 
     @Nullable
     public Rectangle getJeiRightExtensionArea() {
+        if (getDisableRightExtension()) {
+            return null;
+        }
         int extraWidth = this.renderWidth - BASE_WIDTH;
         if (extraWidth <= 0) {
             return null;

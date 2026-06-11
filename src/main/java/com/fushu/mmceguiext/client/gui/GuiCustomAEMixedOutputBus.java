@@ -155,6 +155,9 @@ public class GuiCustomAEMixedOutputBus extends AEBaseGui {
     }
 
     private void drawTiledSprite(int x, int y, int width, int height, TextureAtlasSprite sprite) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
         int remainingHeight = height;
         int drawY = y;
         while (remainingHeight > 0) {

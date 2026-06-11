@@ -336,7 +336,20 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
     }
 
     private int resolveComponentIndex(CustomAEMixedInputBusRegistry.ComponentDef component) {
-        return component == null || component.index < 0 ? 0 : component.index;
+        if (component == null) {
+            return 0;
+        }
+        if (component.index >= 0) {
+            return component.index;
+        }
+        int index = 0;
+        for (CustomAEMixedInputBusRegistry.ComponentDef candidate : findComponents(component.type, component.role)) {
+            if (candidate == component) {
+                return index;
+            }
+            index++;
+        }
+        return 0;
     }
 
     @Nullable
@@ -356,6 +369,9 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
     }
 
     private void drawTiledSprite(int x, int y, int width, int height, TextureAtlasSprite sprite) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
         int remainingHeight = height;
         int drawY = y;
         while (remainingHeight > 0) {

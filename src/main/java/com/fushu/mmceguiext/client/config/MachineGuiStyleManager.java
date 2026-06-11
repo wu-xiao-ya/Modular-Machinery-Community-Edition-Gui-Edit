@@ -198,6 +198,14 @@ public final class MachineGuiStyleManager {
         @Nullable
         public Integer specialThreadBackgroundColor;
         @Nullable
+        public Integer threadQueueX;
+        @Nullable
+        public Integer threadQueueY;
+        @Nullable
+        public Integer threadScrollbarX;
+        @Nullable
+        public Integer threadScrollbarY;
+        @Nullable
         public Boolean disableRightExtension;
         @Nullable
         public Boolean enableSmartInterfaceEditor;
@@ -256,6 +264,10 @@ public final class MachineGuiStyleManager {
                    && backgroundCorner == null
                    && useNineSlice == null
                    && specialThreadBackgroundColor == null
+                   && threadQueueX == null
+                   && threadQueueY == null
+                   && threadScrollbarX == null
+                   && threadScrollbarY == null
                    && disableRightExtension == null
                    && enableSmartInterfaceEditor == null
                    && smartInterfaceEditorX == null

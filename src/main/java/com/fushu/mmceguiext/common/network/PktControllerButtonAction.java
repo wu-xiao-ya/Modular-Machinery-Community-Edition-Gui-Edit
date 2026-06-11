@@ -58,17 +58,22 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
 
     @Override
     public void fromBytes(ByteBuf buf) {
+        NetworkBufferUtils.requireReadable(buf, 9);
         this.controllerPos = BlockPos.fromLong(buf.readLong());
         this.kind = buf.readByte();
         this.key = NetworkBufferUtils.readBoundedUtf8(buf, MAX_KEY_LENGTH);
         this.buttonId = NetworkBufferUtils.readBoundedUtf8(buf, MAX_BUTTON_ID_LENGTH);
+        NetworkBufferUtils.requireReadable(buf, 5);
         this.value = buf.readFloat();
         this.hasMin = buf.readBoolean();
         if (this.hasMin) {
+            NetworkBufferUtils.requireReadable(buf, 4);
             this.min = buf.readFloat();
         }
+        NetworkBufferUtils.requireReadable(buf, 1);
         this.hasMax = buf.readBoolean();
         if (this.hasMax) {
+            NetworkBufferUtils.requireReadable(buf, 4);
             this.max = buf.readFloat();
         }
     }
@@ -101,6 +106,9 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
     }
 
     private static void handle(PktControllerButtonAction message, EntityPlayerMP player) {
+        if (message == null) {
+            return;
+        }
         if (player == null || player.world == null || !player.world.isBlockLoaded(message.controllerPos)) {
             return;
         }
@@ -137,14 +145,12 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         if (message.kind == KIND_SMART_ADD) {
             SmartInterfaceData current = controller.getSmartInterfaceData(key);
             Float customValue = readControllerCustomData(controller, key);
-            if (current == null && customValue == null) {
-                return;
-            }
             float base = current != null
                 ? current.getValue()
                 : customValue != null && Float.isFinite(customValue.floatValue()) ? customValue.floatValue() : 0.0F;
             resolved = base + message.value;
         } else if (controller.getSmartInterfaceData(key) == null
+            && !ControllerButtonPolicyManager.isConfiguredSmartKey(controller, key)
             && !PktControllerSmartInterfaceUpdate.hasControllerCustomData(controller, key)) {
             return;
         }
@@ -208,12 +214,21 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         if (player.getDistanceSqToCenter(controllerPos) > 64D) {
             return false;
         }
+        if (player.openContainer == null || !player.openContainer.canInteractWith(player)) {
+            return false;
+        }
 
         if (player.openContainer instanceof ContainerController) {
-            return ((ContainerController) player.openContainer).getOwner().getPos().equals(controllerPos);
+            TileMultiblockMachineController owner = ((ContainerController) player.openContainer).getOwner();
+            return owner != null
+                && owner.getPos().equals(controllerPos)
+                && player.world.getTileEntity(controllerPos) == owner;
         }
         if (player.openContainer instanceof ContainerFactoryController) {
-            return ((ContainerFactoryController) player.openContainer).getOwner().getPos().equals(controllerPos);
+            TileMultiblockMachineController owner = ((ContainerFactoryController) player.openContainer).getOwner();
+            return owner != null
+                && owner.getPos().equals(controllerPos)
+                && player.world.getTileEntity(controllerPos) == owner;
         }
         return false;
     }

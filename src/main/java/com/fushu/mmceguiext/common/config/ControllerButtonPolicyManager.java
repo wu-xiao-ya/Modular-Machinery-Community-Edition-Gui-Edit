@@ -307,7 +307,7 @@ public final class ControllerButtonPolicyManager {
         if (raw == null) {
             return;
         }
-        String[] split = raw.split("[,;]");
+        String[] split = raw.split("[,;\\r\\n，；]");
         for (String value : split) {
             String key = normalize(value);
             if (key != null && !out.contains(key) && out.size() < MAX_SMART_EDITOR_KEYS_PER_CONTROLLER) {

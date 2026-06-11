@@ -2,6 +2,7 @@ package com.fushu.mmceguiext;
 
 import com.fushu.mmceguiext.common.block.BlockCustomAEMixedInputBus;
 import com.fushu.mmceguiext.common.block.BlockCustomAEMixedOutputBus;
+import com.fushu.mmceguiext.common.block.BlockCustomHatch;
 import com.fushu.mmceguiext.common.block.BlockCustomMEItemInputBus;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry;
@@ -13,6 +14,7 @@ import com.fushu.mmceguiext.common.container.ContainerFluidProcessorHatchCustom;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
 import com.fushu.mmceguiext.common.network.PktControllerButtonAction;
 import com.fushu.mmceguiext.common.network.PktCustomAEMixedSlotUpdate;
+import com.fushu.mmceguiext.common.network.PktCustomHatchEnergySync;
 import com.fushu.mmceguiext.common.network.PktCustomMEItemInputBusInvAction;
 import com.fushu.mmceguiext.common.tile.TileCustomMEItemInputBus;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedInputBus;
@@ -78,6 +80,12 @@ public class MMCEGuiExt {
             nextPacketId++,
             Side.SERVER
         );
+        NET_CHANNEL.registerMessage(
+            PktCustomHatchEnergySync.class,
+            PktCustomHatchEnergySync.class,
+            nextPacketId++,
+            Side.CLIENT
+        );
         CustomHatchRegistry.loadAll();
         CustomAEItemInputBusRegistry.loadAll();
         CustomAEMixedInputBusRegistry.loadAll();
@@ -135,7 +143,7 @@ public class MMCEGuiExt {
                 return null;
             }
             TileCustomHatch tile = (TileCustomHatch) tileEntity;
-            com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef def = tile.getDefinition();
+            com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef def = resolveCustomHatchDef(world, pos, tile);
             return def == null ? null : new ContainerFluidProcessorHatchCustom(tile, player, def);
         }
 
@@ -194,10 +202,10 @@ public class MMCEGuiExt {
                 return null;
             }
             TileCustomHatch tile = (TileCustomHatch) tileEntity;
-            com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef def = tile.getDefinition();
+            com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef def = resolveCustomHatchDef(world, pos, tile);
             return def == null ? null : createClientGui(
                 "com.fushu.mmceguiext.client.gui.GuiFluidProcessorHatchCustom",
-                new Class<?>[]{TileCustomHatch.class, EntityPlayer.class, com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef.class},
+                new Class<?>[]{TileEntity.class, EntityPlayer.class, com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef.class},
                 tile,
                 player,
                 def
@@ -220,6 +228,20 @@ public class MMCEGuiExt {
             } catch (Exception e) {
                 return null;
             }
+        }
+
+        @Nullable
+        private com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef resolveCustomHatchDef(World world, net.minecraft.util.math.BlockPos pos, TileCustomHatch tile) {
+            com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef def = tile.getDefinition();
+            if (def != null) {
+                return def;
+            }
+            if (world.getBlockState(pos).getBlock() instanceof BlockCustomHatch) {
+                BlockCustomHatch block = (BlockCustomHatch) world.getBlockState(pos).getBlock();
+                tile.setDefinitionId(block.getRegistryName() == null ? null : block.getRegistryName().toString());
+                return block.getDefinition();
+            }
+            return null;
         }
 
         @Nullable

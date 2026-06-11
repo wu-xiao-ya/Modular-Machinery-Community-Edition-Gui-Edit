@@ -1,8 +1,12 @@
 package com.fushu.mmceguiext.common.container;
 
+import com.fushu.mmceguiext.MMCEGuiExt;
+import com.fushu.mmceguiext.common.network.PktCustomHatchEnergySync;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomHatch;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.inventory.IContainerListener;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
@@ -17,9 +21,15 @@ import java.lang.reflect.Method;
 public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachinery.common.container.ContainerBase<TileEntity> {
     private final int customSlotCount;
     private final List<Integer> customInputSlotIndices = new ArrayList<Integer>();
+    private long lastEnergyCapacity = Long.MIN_VALUE;
+    private long lastEnergyTransfer = Long.MIN_VALUE;
+    private long lastEnergyStored = Long.MIN_VALUE;
 
     public ContainerFluidProcessorHatchCustom(TileEntity owner, EntityPlayer opening, CustomHatchRegistry.CustomHatchDef def) {
         super(owner, opening);
+        if (owner instanceof TileCustomHatch) {
+            ((TileCustomHatch) owner).refreshDefinitionLayout(def);
+        }
         IItemHandlerModifiable itemHandler = resolveGuiAccess(owner);
         if (itemHandler != null) {
             int added = 0;
@@ -66,6 +76,33 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
             && this.owner.getWorld() == playerIn.world
             && this.owner.getWorld().getTileEntity(this.owner.getPos()) == this.owner
             && playerIn.getDistanceSqToCenter(this.owner.getPos()) <= 64D;
+    }
+
+    @Override
+    public void addListener(@Nonnull IContainerListener listener) {
+        super.addListener(listener);
+        sendEnergyState(listener);
+    }
+
+    @Override
+    public void detectAndSendChanges() {
+        super.detectAndSendChanges();
+        if (!(this.owner instanceof TileCustomHatch)) {
+            return;
+        }
+        TileCustomHatch hatch = (TileCustomHatch) this.owner;
+        long capacity = hatch.getEnergyCapacity();
+        long transfer = hatch.getEnergyTransfer();
+        long stored = hatch.getEnergyStoredLong();
+        if (capacity == this.lastEnergyCapacity && transfer == this.lastEnergyTransfer && stored == this.lastEnergyStored) {
+            return;
+        }
+        this.lastEnergyCapacity = capacity;
+        this.lastEnergyTransfer = transfer;
+        this.lastEnergyStored = stored;
+        for (IContainerListener listener : this.listeners) {
+            sendEnergyState(listener, capacity, transfer, stored);
+        }
     }
 
     @Nonnull
@@ -116,6 +153,30 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
         }
 
         return itemstack;
+    }
+
+    private void sendEnergyState(IContainerListener listener) {
+        if (!(this.owner instanceof TileCustomHatch)) {
+            return;
+        }
+        TileCustomHatch hatch = (TileCustomHatch) this.owner;
+        long capacity = hatch.getEnergyCapacity();
+        long transfer = hatch.getEnergyTransfer();
+        long stored = hatch.getEnergyStoredLong();
+        sendEnergyState(listener, capacity, transfer, stored);
+        this.lastEnergyCapacity = capacity;
+        this.lastEnergyTransfer = transfer;
+        this.lastEnergyStored = stored;
+    }
+
+    private void sendEnergyState(IContainerListener listener, long capacity, long transfer, long stored) {
+        if (!(listener instanceof EntityPlayerMP) || this.owner == null || this.owner.getPos() == null) {
+            return;
+        }
+        MMCEGuiExt.NET_CHANNEL.sendTo(
+            new PktCustomHatchEnergySync(this.owner.getPos(), stored, capacity, transfer),
+            (EntityPlayerMP) listener
+        );
     }
 
     private static boolean hasGuiSlotComponents(CustomHatchRegistry.CustomHatchDef def) {

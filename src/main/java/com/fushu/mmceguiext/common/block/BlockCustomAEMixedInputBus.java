@@ -1,6 +1,7 @@
 package com.fushu.mmceguiext.common.block;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
+import com.fushu.mmceguiext.common.item.ItemBlockCustomAEMixedInputBus;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedInputBus;
 import com.fushu.mmceguiext.common.util.CustomIdValidator;
@@ -10,11 +11,14 @@ import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.NonNullList;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
 import javax.annotation.Nonnull;
@@ -22,6 +26,7 @@ import javax.annotation.Nullable;
 
 public class BlockCustomAEMixedInputBus extends BlockMEMachineComponent {
     private final CustomAEMixedInputBusRegistry.Def definition;
+    private final ThreadLocal<Boolean> dropNextBreak = new ThreadLocal<Boolean>();
 
     public BlockCustomAEMixedInputBus(CustomAEMixedInputBusRegistry.Def definition) {
         this.definition = definition;
@@ -64,11 +69,65 @@ public class BlockCustomAEMixedInputBus extends BlockMEMachineComponent {
     }
 
     @Override
+    public void breakBlock(@Nonnull World worldIn, @Nonnull BlockPos pos, @Nonnull IBlockState state) {
+        if (!worldIn.isRemote && Boolean.TRUE.equals(this.dropNextBreak.get())) {
+            TileEntity tileEntity = worldIn.getTileEntity(pos);
+            ItemStack dropped = ItemBlockCustomAEMixedInputBus.createStack(this);
+            if (tileEntity instanceof TileCustomAEMixedInputBus) {
+                TileCustomAEMixedInputBus tile = (TileCustomAEMixedInputBus) tileEntity;
+                NBTTagCompound tag = new NBTTagCompound();
+                tile.writeDroppedData(tag);
+                String registryId = getRegistryName() == null ? "" : getRegistryName().toString();
+                tag.setString("definitionId", registryId);
+                dropped.setTagCompound(tag);
+                tile.clearDroppedData();
+            }
+            spawnAsEntity(worldIn, pos, dropped);
+        }
+        worldIn.removeTileEntity(pos);
+    }
+
+    @Override
+    public boolean removedByPlayer(@Nonnull IBlockState state, @Nonnull World world, @Nonnull BlockPos pos, @Nonnull EntityPlayer player, boolean willHarvest) {
+        return willHarvest || super.removedByPlayer(state, world, pos, player, willHarvest);
+    }
+
+    @Override
+    public void harvestBlock(@Nonnull World world, @Nonnull EntityPlayer player, @Nonnull BlockPos pos, @Nonnull IBlockState state, TileEntity te, @Nonnull ItemStack stack) {
+        super.harvestBlock(world, player, pos, state, te, stack);
+        if (player != null && !player.capabilities.isCreativeMode) {
+            this.dropNextBreak.set(Boolean.TRUE);
+            try {
+                world.setBlockToAir(pos);
+            } finally {
+                this.dropNextBreak.remove();
+            }
+        } else {
+            world.setBlockToAir(pos);
+        }
+    }
+
+    @Override
+    public void getDrops(@Nonnull NonNullList<ItemStack> drops, @Nonnull IBlockAccess world, @Nonnull BlockPos pos, @Nonnull IBlockState state, int fortune) {
+    }
+
+    @Override
+    public void dropBlockAsItemWithChance(@Nonnull World worldIn, @Nonnull BlockPos pos, @Nonnull IBlockState state, float chance, int fortune) {
+    }
+
+    @Override
     public void onBlockPlacedBy(@Nonnull World worldIn, @Nonnull BlockPos pos, @Nonnull IBlockState state, @Nonnull EntityLivingBase placer, @Nonnull ItemStack stack) {
         super.onBlockPlacedBy(worldIn, pos, state, placer, stack);
         TileEntity tileEntity = worldIn.getTileEntity(pos);
         if (tileEntity instanceof TileCustomAEMixedInputBus) {
-            ((TileCustomAEMixedInputBus) tileEntity).setDefinitionId(getRegistryName() == null ? null : getRegistryName().toString());
+            TileCustomAEMixedInputBus tile = (TileCustomAEMixedInputBus) tileEntity;
+            String registryId = getRegistryName() == null ? null : getRegistryName().toString();
+            tile.setDefinitionId(registryId);
+            NBTTagCompound tag = stack.getTagCompound();
+            String nbtDefinition = CustomIdValidator.readSanitizedString(tag, "definitionId");
+            if (registryId != null && registryId.equals(nbtDefinition)) {
+                tile.readDroppedData(tag);
+            }
         }
     }
 

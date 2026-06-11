@@ -94,7 +94,7 @@ public final class CustomHatchGameRegistry {
             model = def.blockModel.trim();
         }
         if (isDirectHatchModelPath(model)) {
-            return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "facing=north");
+            return resolveDirectHatchModelBinding(model);
         }
         ModelBinding location = parseModelBinding(model);
         if (location == null) {
@@ -144,6 +144,14 @@ public final class CustomHatchGameRegistry {
             return false;
         }
         return value.startsWith("hatch/");
+    }
+
+    private static ModelBinding resolveDirectHatchModelBinding(@Nullable String raw) {
+        String value = normalizeComparableModelPath(raw);
+        if ("hatch/mix_in_lv1".equals(value)) {
+            return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "mix_in_hatch_lv1"), "normal");
+        }
+        return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "facing=north");
     }
 
     @Nullable

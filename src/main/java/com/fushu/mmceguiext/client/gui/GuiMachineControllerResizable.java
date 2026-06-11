@@ -172,11 +172,13 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
         if (this.customBackgroundTexture != null) {
             this.mc.getTextureManager().bindTexture(this.customBackgroundTexture);
+            int drawWidth = Math.max(1, this.renderWidth);
+            int drawHeight = Math.max(1, this.renderHeight);
             drawResizableArea(
                 this.guiLeft - textureOffsetX,
                 this.guiTop - textureOffsetY,
-                this.renderWidth + textureOffsetX,
-                this.renderHeight + textureOffsetY,
+                drawWidth,
+                drawHeight,
                 useNineSlice,
                 texW,
                 texH,
@@ -1546,6 +1548,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
     @Nullable
     public Rectangle getJeiRightExtensionArea() {
+        if (getDisableRightExtension()) {
+            return null;
+        }
         int extraWidth = this.renderWidth - BASE_WIDTH;
         if (extraWidth <= 0) {
             return null;

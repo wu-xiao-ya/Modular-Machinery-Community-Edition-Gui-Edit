@@ -4,6 +4,7 @@ import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import com.fushu.mmceguiext.client.config.GlobalGuiStyleManager;
 import com.fushu.mmceguiext.common.container.ContainerFluidProcessorHatchCustom;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
+import com.fushu.mmceguiext.common.util.UnitFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.inventory.GuiContainer;
@@ -20,12 +21,15 @@ import mekanism.api.gas.GasStack;
 import net.minecraftforge.fml.common.Optional;
 
 import javax.annotation.Nullable;
+import java.awt.Rectangle;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.lwjgl.input.Mouse;
 
 public class GuiFluidProcessorHatchCustom extends GuiContainer {
@@ -205,14 +209,32 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         }
         FluidStack fluid = getFluid();
         GasStack gas = getGas();
-        boolean useGas = shouldUseGas(tankComponent, fluid, gas);
-        int amount = useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
-        int capacity = Math.max(1, getTankCapacity(tankComponent, useGas));
+        boolean useEnergy = shouldUseEnergy(tankComponent);
+        boolean useGas = !useEnergy && shouldUseGas(tankComponent, fluid, gas);
+        long amount = useEnergy ? getEnergyStored() : useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
+        long capacity = Math.max(1L, getTankCapacity(tankComponent, useGas, useEnergy));
         List<String> tooltip = new ArrayList<String>();
-        tooltip.add(useGas
-            ? gas == null ? I18n.format("tooltip.fluidhatch.empty") : gas.getGas().getLocalizedName()
-            : fluid == null ? I18n.format("tooltip.fluidhatch.empty") : fluid.getLocalizedName());
-        tooltip.add(I18n.format("tooltip.fluidhatch.tank", String.valueOf(amount), String.valueOf(capacity)));
+        List<String> configuredTips = resolveComponentTips(tankComponent);
+        if (configuredTips.isEmpty()) {
+            tooltip.add(useEnergy
+                ? "Energy"
+                : useGas
+                ? gas == null ? I18n.format("tooltip.fluidhatch.empty") : gas.getGas().getLocalizedName()
+                : fluid == null ? I18n.format("tooltip.fluidhatch.empty") : fluid.getLocalizedName());
+            tooltip.add(useEnergy
+                ? UnitFormat.amountWithUnit(amount, "FE") + " / " + UnitFormat.amountWithUnit(capacity, "FE")
+                : I18n.format("tooltip.fluidhatch.tank", UnitFormat.compact(amount), UnitFormat.compact(capacity)));
+        } else {
+            for (String tip : configuredTips) {
+                String resolved = resolveTemplate(tip, fluid, gas, useGas, useEnergy, amount, capacity);
+                if (resolved != null && !resolved.isEmpty()) {
+                    tooltip.add(resolved);
+                }
+            }
+        }
+        if (tooltip.isEmpty()) {
+            return;
+        }
         drawHoveringText(tooltip, mouseX, mouseY, this.fontRenderer);
     }
 
@@ -220,8 +242,8 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         FluidStack fluid = getFluid();
         GasStack gas = getGas();
         boolean useGas = shouldUseGas(null, fluid, gas);
-        int amount = useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
-        int capacity = getTankCapacity(null, useGas);
+        long amount = useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
+        long capacity = getTankCapacity(null, useGas, false);
         for (CustomHatchRegistry.ComponentDef component : this.components) {
             if (component == null || component.value == null || !("text".equalsIgnoreCase(component.type))) {
                 continue;
@@ -229,7 +251,11 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             if (priorityFilter != null && component.priority != priorityFilter.intValue()) {
                 continue;
             }
-            String value = resolveTextValue(component.value, fluid, gas, useGas, amount, capacity);
+            boolean componentUseEnergy = shouldUseEnergy(component);
+            boolean componentUseGas = !componentUseEnergy && shouldUseGas(component, fluid, gas);
+            long componentAmount = componentUseEnergy ? getEnergyStored() : componentUseGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
+            long componentCapacity = getTankCapacity(component, componentUseGas, componentUseEnergy);
+            String value = resolveTextValue(component.value, fluid, gas, componentUseGas, componentUseEnergy, componentAmount, componentCapacity);
             if (value == null || value.isEmpty()) {
                 continue;
             }
@@ -319,9 +345,10 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
     private void drawTankOverlay(int left, int top, @Nullable CustomHatchRegistry.ComponentDef component) {
         FluidStack fluid = getFluid();
         GasStack gas = getGas();
-        boolean useGas = shouldUseGas(component, fluid, gas);
-        int amount = useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
-        int capacity = Math.max(1, getTankCapacity(component, useGas));
+        boolean useEnergy = shouldUseEnergy(component);
+        boolean useGas = !useEnergy && shouldUseGas(component, fluid, gas);
+        long amount = useEnergy ? getEnergyStored() : useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
+        long capacity = Math.max(1L, getTankCapacity(component, useGas, useEnergy));
         int rawX = component == null ? definition.tank.x : component.x;
         int rawY = component == null ? definition.tank.y : component.y;
         int rawWidth = component == null ? definition.tank.width : component.width;
@@ -333,7 +360,15 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         int tankY = top + scaledY(rawY) - this.backgroundOffsetY;
         int tankWidth = scaledWidth(rawWidth);
         int tankHeight = scaledHeight(rawHeight);
-        if (useGas && gas != null && amount > 0) {
+        if (useEnergy && amount > 0L) {
+            int energyColor = GuiRenderUtils.parseColorARGBOrDefault(component == null ? null : component.color, 0xFF3DDC84);
+            float red = (energyColor >> 16 & 0xFF) / 255F;
+            float green = (energyColor >> 8 & 0xFF) / 255F;
+            float blue = (energyColor & 0xFF) / 255F;
+            float filledPercent = MathHelper.clamp(amount / (float) capacity, 0F, 1F);
+            int filled = MathHelper.ceil(filledPercent * tankHeight);
+            drawSolidTankFill(tankX, tankY + tankHeight - filled, tankWidth, filled, red, green, blue, resolveTankAlpha(component));
+        } else if (useGas && gas != null && amount > 0) {
             int gasColor = gas.getGas().getTint();
             float red = (gasColor >> 16 & 0xFF) / 255F;
             float green = (gasColor >> 8 & 0xFF) / 255F;
@@ -387,6 +422,9 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
     }
 
     private void drawTiledFluidSprite(int x, int y, int width, int height, TextureAtlasSprite sprite) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
         int remainingHeight = height;
         int drawY = y;
         while (remainingHeight > 0) {
@@ -441,7 +479,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
     }
 
     @Nullable
-    private String resolveTextValue(@Nullable String key, @Nullable FluidStack fluid, @Nullable GasStack gas, boolean useGas, int amount, int capacity) {
+    private String resolveTextValue(@Nullable String key, @Nullable FluidStack fluid, @Nullable GasStack gas, boolean useGas, boolean useEnergy, long amount, long capacity) {
         if (key == null) {
             return null;
         }
@@ -454,27 +492,74 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             return gas == null ? I18n.format("tooltip.fluidhatch.empty") : gas.getGas().getLocalizedName();
         }
         if ("tank.name".equalsIgnoreCase(key)) {
-            return useGas
+            return useEnergy
+                ? "Energy"
+                : useGas
                 ? gas == null ? I18n.format("tooltip.fluidhatch.empty") : gas.getGas().getLocalizedName()
                 : fluid == null ? I18n.format("tooltip.fluidhatch.empty") : fluid.getLocalizedName();
         }
         if ("tank.amount".equalsIgnoreCase(key)) {
-            return Integer.toString(amount);
+            return Long.toString(amount);
+        }
+        if ("tank.amount_formatted".equalsIgnoreCase(key) || "tank.amount.compact".equalsIgnoreCase(key)) {
+            return UnitFormat.compact(amount);
         }
         if ("gas.amount".equalsIgnoreCase(key)) {
             return Integer.toString(gas == null ? 0 : gas.amount);
         }
+        if ("gas.amount_formatted".equalsIgnoreCase(key) || "gas.amount.compact".equalsIgnoreCase(key)) {
+            return UnitFormat.compact(gas == null ? 0 : gas.amount);
+        }
         if ("tank.capacity".equalsIgnoreCase(key)) {
-            return Integer.toString(capacity);
+            return Long.toString(capacity);
+        }
+        if ("tank.capacity_formatted".equalsIgnoreCase(key) || "tank.capacity.compact".equalsIgnoreCase(key)) {
+            return UnitFormat.compact(capacity);
         }
         if ("gas.capacity".equalsIgnoreCase(key)) {
             return Integer.toString(getGasCapacity());
         }
+        if ("gas.capacity_formatted".equalsIgnoreCase(key) || "gas.capacity.compact".equalsIgnoreCase(key)) {
+            return UnitFormat.compact(getGasCapacity());
+        }
         if ("tank.amount_capacity".equalsIgnoreCase(key)) {
             return amount + " / " + capacity;
         }
+        if ("tank.amount_capacity_formatted".equalsIgnoreCase(key) || "tank.amount_capacity.compact".equalsIgnoreCase(key)) {
+            return UnitFormat.compact(amount) + " / " + UnitFormat.compact(capacity);
+        }
         if ("gas.amount_capacity".equalsIgnoreCase(key)) {
             return (gas == null ? 0 : gas.amount) + " / " + getGasCapacity();
+        }
+        if ("gas.amount_capacity_formatted".equalsIgnoreCase(key) || "gas.amount_capacity.compact".equalsIgnoreCase(key)) {
+            return UnitFormat.compact(gas == null ? 0 : gas.amount) + " / " + UnitFormat.compact(getGasCapacity());
+        }
+        if ("energy.name".equalsIgnoreCase(key)) {
+            return "Energy";
+        }
+        if ("energy.amount".equalsIgnoreCase(key) || "energy.stored".equalsIgnoreCase(key)) {
+            return Long.toString(getEnergyStored());
+        }
+        if ("energy.amount_formatted".equalsIgnoreCase(key) || "energy.amount.compact".equalsIgnoreCase(key) || "energy.stored_formatted".equalsIgnoreCase(key)) {
+            return UnitFormat.compact(getEnergyStored());
+        }
+        if ("energy.capacity".equalsIgnoreCase(key) || "energy.max".equalsIgnoreCase(key)) {
+            return Long.toString(getEnergyCapacity());
+        }
+        if ("energy.capacity_formatted".equalsIgnoreCase(key) || "energy.capacity.compact".equalsIgnoreCase(key) || "energy.max_formatted".equalsIgnoreCase(key)) {
+            return UnitFormat.compact(getEnergyCapacity());
+        }
+        if ("energy.amount_capacity".equalsIgnoreCase(key) || "energy.stored_capacity".equalsIgnoreCase(key)) {
+            return getEnergyStored() + " / " + getEnergyCapacity();
+        }
+        if ("energy.amount_capacity_formatted".equalsIgnoreCase(key) || "energy.amount_capacity.compact".equalsIgnoreCase(key) || "energy.stored_capacity_formatted".equalsIgnoreCase(key)) {
+            return UnitFormat.compact(getEnergyStored()) + " / " + UnitFormat.compact(getEnergyCapacity());
+        }
+        if ("energy.transfer".equalsIgnoreCase(key)) {
+            return Long.toString(getEnergyTransfer());
+        }
+        if ("energy.transfer_formatted".equalsIgnoreCase(key) || "energy.transfer.compact".equalsIgnoreCase(key)) {
+            return UnitFormat.compact(getEnergyTransfer());
         }
         if ("input.slot".equalsIgnoreCase(key)) {
             return "Input";
@@ -483,6 +568,75 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             return "Output";
         }
         return key;
+    }
+
+    private List<String> resolveComponentTips(@Nullable CustomHatchRegistry.ComponentDef component) {
+        if (component != null && component.tips != null && !component.tips.isEmpty()) {
+            return component.tips;
+        }
+        return this.definition.tips == null ? Collections.<String>emptyList() : this.definition.tips;
+    }
+
+    private String resolveTemplate(@Nullable String template,
+                                   @Nullable FluidStack fluid,
+                                   @Nullable GasStack gas,
+                                   boolean useGas,
+                                   boolean useEnergy,
+                                   long amount,
+                                   long capacity) {
+        if (template == null) {
+            return "";
+        }
+        String name = useEnergy
+            ? "Energy"
+            : useGas
+            ? gas == null ? I18n.format("tooltip.fluidhatch.empty") : gas.getGas().getLocalizedName()
+            : fluid == null ? I18n.format("tooltip.fluidhatch.empty") : fluid.getLocalizedName();
+        return template
+            .replace("{name}", name)
+            .replace("{tank.name}", name)
+            .replace("{amount}", Long.toString(amount))
+            .replace("{tank.amount}", Long.toString(amount))
+            .replace("{amount_formatted}", UnitFormat.compact(amount))
+            .replace("{tank.amount_formatted}", UnitFormat.compact(amount))
+            .replace("{amount.compact}", UnitFormat.compact(amount))
+            .replace("{capacity}", Long.toString(capacity))
+            .replace("{tank.capacity}", Long.toString(capacity))
+            .replace("{capacity_formatted}", UnitFormat.compact(capacity))
+            .replace("{tank.capacity_formatted}", UnitFormat.compact(capacity))
+            .replace("{capacity.compact}", UnitFormat.compact(capacity))
+            .replace("{amount_capacity}", amount + " / " + capacity)
+            .replace("{tank.amount_capacity}", amount + " / " + capacity)
+            .replace("{amount_capacity_formatted}", UnitFormat.compact(amount) + " / " + UnitFormat.compact(capacity))
+            .replace("{tank.amount_capacity_formatted}", UnitFormat.compact(amount) + " / " + UnitFormat.compact(capacity))
+            .replace("{energy}", Long.toString(getEnergyStored()))
+            .replace("{energy.amount}", Long.toString(getEnergyStored()))
+            .replace("{energy.stored}", Long.toString(getEnergyStored()))
+            .replace("{energy_formatted}", UnitFormat.compact(getEnergyStored()))
+            .replace("{energy.amount_formatted}", UnitFormat.compact(getEnergyStored()))
+            .replace("{energy.capacity}", Long.toString(getEnergyCapacity()))
+            .replace("{energy_capacity}", Long.toString(getEnergyCapacity()))
+            .replace("{energy.capacity_formatted}", UnitFormat.compact(getEnergyCapacity()))
+            .replace("{energy_capacity_formatted}", UnitFormat.compact(getEnergyCapacity()))
+            .replace("{energy.amount_capacity}", getEnergyStored() + " / " + getEnergyCapacity())
+            .replace("{energy_amount_capacity}", getEnergyStored() + " / " + getEnergyCapacity())
+            .replace("{energy.amount_capacity_formatted}", UnitFormat.compact(getEnergyStored()) + " / " + UnitFormat.compact(getEnergyCapacity()))
+            .replace("{energy_amount_capacity_formatted}", UnitFormat.compact(getEnergyStored()) + " / " + UnitFormat.compact(getEnergyCapacity()))
+            .replace("{energy.transfer}", Long.toString(getEnergyTransfer()))
+            .replace("{energy_transfer}", Long.toString(getEnergyTransfer()))
+            .replace("{energy.transfer_formatted}", UnitFormat.compact(getEnergyTransfer()))
+            .replace("{energy_transfer_formatted}", UnitFormat.compact(getEnergyTransfer()))
+            .replace("{unit}", useEnergy ? "FE" : "mB");
+    }
+
+    private boolean shouldUseEnergy(@Nullable CustomHatchRegistry.ComponentDef component) {
+        String content = component != null && component.content != null ? component.content : definition.tank.content;
+        if (content != null && ("energy".equalsIgnoreCase(content) || "power".equalsIgnoreCase(content) || "fe".equalsIgnoreCase(content))) {
+            return true;
+        }
+        return component != null
+            && component.type != null
+            && ("energy".equalsIgnoreCase(component.type) || "power".equalsIgnoreCase(component.type));
     }
 
     private boolean shouldUseGas(@Nullable CustomHatchRegistry.ComponentDef component, @Nullable FluidStack fluid, @Nullable GasStack gas) {
@@ -512,7 +666,10 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             || "color".equalsIgnoreCase(renderMode);
     }
 
-    private int getTankCapacity(@Nullable CustomHatchRegistry.ComponentDef component, boolean useGas) {
+    private long getTankCapacity(@Nullable CustomHatchRegistry.ComponentDef component, boolean useGas, boolean useEnergy) {
+        if (useEnergy) {
+            return getEnergyCapacity();
+        }
         String content = component != null && component.content != null ? component.content : definition.tank.content;
         content = content == null ? "fluid" : content;
         if ("gas".equalsIgnoreCase(content)) {
@@ -576,6 +733,36 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             return result instanceof Integer ? ((Integer) result).intValue() : getFluidCapacity();
         } catch (Exception ignored) {
             return getFluidCapacity();
+        }
+    }
+
+    private long getEnergyStored() {
+        try {
+            Method method = owner.getClass().getMethod("getEnergyStoredLong");
+            Object result = method.invoke(owner);
+            return result instanceof Number ? ((Number) result).longValue() : 0L;
+        } catch (Exception ignored) {
+            return 0L;
+        }
+    }
+
+    private long getEnergyCapacity() {
+        try {
+            Method method = owner.getClass().getMethod("getEnergyCapacity");
+            Object result = method.invoke(owner);
+            return result instanceof Number ? Math.max(1L, ((Number) result).longValue()) : 1L;
+        } catch (Exception ignored) {
+            return 1L;
+        }
+    }
+
+    private long getEnergyTransfer() {
+        try {
+            Method method = owner.getClass().getMethod("getEnergyTransfer");
+            Object result = method.invoke(owner);
+            return result instanceof Number ? Math.max(1L, ((Number) result).longValue()) : 1L;
+        } catch (Exception ignored) {
+            return 1L;
         }
     }
 
@@ -808,7 +995,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             if (!state.scrollbarEnabled || state.scrollbar == null || state.maxScroll <= 0) {
                 continue;
             }
-            state.scrollbar.draw(this, this.mc);
+            state.scrollbar.draw(this, this.mc, mouseX, mouseY);
         }
     }
 
@@ -850,6 +1037,123 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         } else {
             this.coordinateHeight = this.backgroundTextureHeight;
         }
+    }
+
+    public List<Rectangle> getJeiExtraAreas() {
+        Rectangle base = new Rectangle(this.guiLeft, this.guiTop, this.xSize, this.ySize);
+        Rectangle bounds = calculateOccupiedBounds(base);
+        if (bounds == null || base.contains(bounds)) {
+            return Collections.emptyList();
+        }
+        List<Rectangle> out = new ArrayList<Rectangle>();
+        int boundsRight = bounds.x + bounds.width;
+        int boundsBottom = bounds.y + bounds.height;
+        int baseRight = base.x + base.width;
+        int baseBottom = base.y + base.height;
+        if (boundsRight > baseRight) {
+            addArea(out, baseRight, bounds.y, boundsRight - baseRight, bounds.height);
+        }
+        if (bounds.x < base.x) {
+            addArea(out, bounds.x, bounds.y, base.x - bounds.x, bounds.height);
+        }
+        int sharedLeft = Math.max(bounds.x, base.x);
+        int sharedRight = Math.min(boundsRight, baseRight);
+        if (sharedRight > sharedLeft && bounds.y < base.y) {
+            addArea(out, sharedLeft, bounds.y, sharedRight - sharedLeft, base.y - bounds.y);
+        }
+        if (sharedRight > sharedLeft && boundsBottom > baseBottom) {
+            addArea(out, sharedLeft, baseBottom, sharedRight - sharedLeft, boundsBottom - baseBottom);
+        }
+        return out;
+    }
+
+    @Nullable
+    private Rectangle calculateOccupiedBounds(Rectangle base) {
+        Rectangle bounds = new Rectangle(base);
+        union(bounds, this.guiLeft - this.backgroundOffsetX, this.guiTop - this.backgroundOffsetY, this.xSize + this.backgroundOffsetX, this.ySize + this.backgroundOffsetY);
+        Set<String> slotGrids = new HashSet<String>();
+        for (CustomHatchRegistry.ComponentDef component : this.components) {
+            if (component == null || component.type == null) {
+                continue;
+            }
+            if ("slot".equalsIgnoreCase(component.type)) {
+                if (component.rows > 0 && component.columns > 0 && component.visibleRows > 0) {
+                    String key = buildSlotGridKey(component);
+                    if (slotGrids.add(key)) {
+                        unionSlotGrid(bounds, component);
+                    }
+                } else {
+                    unionComponent(bounds, component, Math.max(16, component.slotSize), Math.max(16, component.slotSize));
+                }
+            } else if ("tank".equalsIgnoreCase(component.type)) {
+                unionComponent(bounds, component, component.width, component.height);
+            } else if ("text".equalsIgnoreCase(component.type)) {
+                unionText(bounds, component);
+            } else if ("player_inventory".equalsIgnoreCase(component.type)) {
+                int hotbarY = component.hotbarY >= 0 ? component.hotbarY : component.y + 58;
+                unionComponent(bounds, component, 162, Math.max(76, hotbarY - component.y + 18));
+            }
+        }
+        for (GlobalTextureLayerConfig.LayerDef layer : this.textureLayers) {
+            if (layer == null) {
+                continue;
+            }
+            union(bounds, this.guiLeft - this.backgroundOffsetX + layer.x, this.guiTop - this.backgroundOffsetY + layer.y, layer.width, layer.height);
+        }
+        return bounds;
+    }
+
+    private void unionSlotGrid(Rectangle bounds, CustomHatchRegistry.ComponentDef component) {
+        int visibleRows = Math.max(1, Math.min(component.visibleRows, component.rows));
+        int visibleColumns = component.visibleColumns > 0 ? Math.min(component.visibleColumns, component.columns) : component.columns;
+        int width = visibleColumns * component.slotSize + Math.max(0, visibleColumns - 1) * component.spacingX;
+        int height = visibleRows * component.slotSize + Math.max(0, visibleRows - 1) * component.spacingY;
+        union(bounds, this.guiLeft + scaledX(component.gridBaseX) - this.backgroundOffsetX, this.guiTop + scaledY(component.gridBaseY) - this.backgroundOffsetY, scaledWidth(width), scaledHeight(height));
+        SlotGridState state = this.slotGridStates.get(buildSlotGridKey(component));
+        if (state != null && state.scrollbarEnabled && state.maxScroll > 0 && state.scrollbar != null) {
+            union(bounds, state.scrollbar.left, state.scrollbar.top, state.scrollbar.width, state.scrollbar.height);
+        }
+    }
+
+    private void unionComponent(Rectangle bounds, CustomHatchRegistry.ComponentDef component, int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        union(bounds, this.guiLeft + componentGuiX(component), this.guiTop + componentGuiY(component), scaledWidth(width), scaledHeight(height));
+    }
+
+    private void unionText(Rectangle bounds, CustomHatchRegistry.ComponentDef component) {
+        if (component.value == null || component.value.trim().isEmpty()) {
+            return;
+        }
+        FluidStack fluid = getFluid();
+        GasStack gas = getGas();
+        boolean useEnergy = shouldUseEnergy(component);
+        boolean useGas = !useEnergy && shouldUseGas(component, fluid, gas);
+        long amount = useEnergy ? getEnergyStored() : useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
+        long capacity = getTankCapacity(component, useGas, useEnergy);
+        String value = resolveTextValue(component.value, fluid, gas, useGas, useEnergy, amount, capacity);
+        if (value == null || value.isEmpty()) {
+            return;
+        }
+        float scale = component.scale == null ? 1.0F : component.scale.floatValue();
+        int width = Math.round(this.fontRenderer.getStringWidth(value) * scale);
+        int height = Math.round(this.fontRenderer.FONT_HEIGHT * scale);
+        int x = GuiRenderUtils.resolveAlignedTextX(this.guiLeft + componentGuiX(component), width, component.align);
+        union(bounds, x, this.guiTop + componentGuiY(component), width, height);
+    }
+
+    private static void addArea(List<Rectangle> out, int x, int y, int width, int height) {
+        if (width > 0 && height > 0) {
+            out.add(new Rectangle(x, y, width, height));
+        }
+    }
+
+    private static void union(Rectangle bounds, int x, int y, int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        bounds.add(new Rectangle(x, y, width, height));
     }
 
     private int componentGuiX(CustomHatchRegistry.ComponentDef component) {
@@ -1022,7 +1326,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             this.applyRange();
         }
 
-        private void draw(Gui gui, Minecraft mc) {
+        private void draw(Gui gui, Minecraft mc, int mouseX, int mouseY) {
             if (this.getRange() == 0) {
                 ResourceLocation tex = this.disabledTexture != null
                     ? this.disabledTexture
@@ -1033,8 +1337,6 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
                 return;
             }
 
-            int mouseX = org.lwjgl.input.Mouse.getX() * mc.currentScreen.width / mc.displayWidth;
-            int mouseY = mc.currentScreen.height - org.lwjgl.input.Mouse.getY() * mc.currentScreen.height / mc.displayHeight - 1;
             int available = Math.max(1, this.height - this.thumbHeight);
             int offset = (this.currentScroll - this.minScroll) * available / this.getRange();
             ResourceLocation tex = this.texture == null ? DEFAULT_SCROLLBAR_TEXTURE : this.texture;

@@ -30,6 +30,7 @@ public final class CustomAEMixedOutputBusRegistry {
     private static final long MAX_CONFIG_BYTES = 1024L * 1024L;
     private static final int MAX_GUI_COMPONENTS = 2048;
     private static final int MAX_COMPONENT_INDEX = 4095;
+    private static final int MAX_COMPONENT_SIZE = 4096;
     private static final int MAX_TEXTURE_LAYERS = 256;
     private static final List<Def> CACHE = new ArrayList<Def>();
     private static final Map<String, Def> REGISTERED = new LinkedHashMap<String, Def>();
@@ -198,8 +199,8 @@ public final class CustomAEMixedOutputBusRegistry {
             def.role = lower(getString(obj, "role"));
             def.x = getInt(obj, "x", 0);
             def.y = getInt(obj, "y", 0);
-            def.width = getInt(obj, "width", 16);
-            def.height = getInt(obj, "height", 16);
+            def.width = clamp(getInt(obj, "width", 16), 1, MAX_COMPONENT_SIZE);
+            def.height = clamp(getInt(obj, "height", 16), 1, MAX_COMPONENT_SIZE);
             def.index = getInt(obj, "index", -1);
             if (def.type != null && !def.type.trim().isEmpty()) {
                 out.add(def);

@@ -1,4 +1,4 @@
-package com.fushu.mmceguiext.mixin;
+package com.fushu.mmceguiext.core;
 
 import net.minecraftforge.fml.relauncher.IFMLLoadingPlugin;
 import org.spongepowered.asm.mixin.Mixins;

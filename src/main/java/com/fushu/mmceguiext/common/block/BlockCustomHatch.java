@@ -15,22 +15,27 @@ import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.BlockRenderLayer;
 import net.minecraft.util.EnumBlockRenderType;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.NonNullList;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.Rotation;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
 import javax.annotation.Nullable;
+import javax.annotation.Nonnull;
 
 public class BlockCustomHatch extends BlockMachineComponent {
     public static final PropertyEnum<EnumFacing> FACING = PropertyEnum.create("facing", EnumFacing.class, EnumFacing.HORIZONTALS);
     private final com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef definition;
+    private final ThreadLocal<Boolean> dropNextBreak = new ThreadLocal<Boolean>();
 
     public BlockCustomHatch(com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef definition) {
         super(resolveMaterial(definition));
@@ -78,8 +83,61 @@ public class BlockCustomHatch extends BlockMachineComponent {
         super.onBlockPlacedBy(worldIn, pos, state, placer, stack);
         TileEntity tile = worldIn.getTileEntity(pos);
         if (tile instanceof TileCustomHatch) {
-            ((TileCustomHatch) tile).setDefinitionId(getRegistryName() == null ? null : getRegistryName().toString());
+            TileCustomHatch custom = (TileCustomHatch) tile;
+            String registryId = getRegistryName() == null ? null : getRegistryName().toString();
+            custom.setDefinitionId(registryId);
+            NBTTagCompound tag = stack.getTagCompound();
+            String storedDefinition = CustomIdValidator.readSanitizedString(tag, "hatchId");
+            if (registryId != null && registryId.equals(storedDefinition)) {
+                custom.readDroppedData(tag);
+            }
         }
+    }
+
+    @Override
+    public void breakBlock(World worldIn, @Nonnull BlockPos pos, @Nonnull IBlockState state) {
+        if (!worldIn.isRemote && Boolean.TRUE.equals(this.dropNextBreak.get())) {
+            TileEntity tile = worldIn.getTileEntity(pos);
+            ItemStack dropped = com.fushu.mmceguiext.common.item.ItemBlockCustomHatch.createStack(this);
+            if (tile instanceof TileCustomHatch) {
+                TileCustomHatch hatch = (TileCustomHatch) tile;
+                NBTTagCompound tag = new NBTTagCompound();
+                hatch.writeDroppedData(tag);
+                String registryId = getRegistryName() == null ? "" : getRegistryName().toString();
+                tag.setString("hatchId", registryId);
+                dropped.setTagCompound(tag);
+            }
+            spawnAsEntity(worldIn, pos, dropped);
+        }
+        worldIn.removeTileEntity(pos);
+    }
+
+    @Override
+    public boolean removedByPlayer(@Nonnull IBlockState state, @Nonnull World world, @Nonnull BlockPos pos, @Nonnull EntityPlayer player, boolean willHarvest) {
+        return willHarvest || super.removedByPlayer(state, world, pos, player, willHarvest);
+    }
+
+    @Override
+    public void harvestBlock(@Nonnull World world, @Nonnull EntityPlayer player, @Nonnull BlockPos pos, @Nonnull IBlockState state, TileEntity te, @Nonnull ItemStack stack) {
+        super.harvestBlock(world, player, pos, state, te, stack);
+        if (player != null && !player.capabilities.isCreativeMode) {
+            this.dropNextBreak.set(Boolean.TRUE);
+            try {
+                world.setBlockToAir(pos);
+            } finally {
+                this.dropNextBreak.remove();
+            }
+        } else {
+            world.setBlockToAir(pos);
+        }
+    }
+
+    @Override
+    public void getDrops(@Nonnull NonNullList<ItemStack> drops, @Nonnull IBlockAccess world, @Nonnull BlockPos pos, @Nonnull IBlockState state, int fortune) {
+    }
+
+    @Override
+    public void dropBlockAsItemWithChance(@Nonnull World worldIn, @Nonnull BlockPos pos, @Nonnull IBlockState state, float chance, int fortune) {
     }
 
     @Override

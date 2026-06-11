@@ -26,6 +26,7 @@ public class PktCustomMEItemInputBusInvAction implements IMessage, IMessageHandl
 
     @Override
     public void fromBytes(final ByteBuf buf) {
+        NetworkBufferUtils.requireReadable(buf, 8);
         this.newAmount = buf.readInt();
         this.slotID = buf.readInt();
     }
@@ -47,6 +48,9 @@ public class PktCustomMEItemInputBusInvAction implements IMessage, IMessageHandl
     }
 
     private static void handle(final PktCustomMEItemInputBusInvAction message, final EntityPlayerMP player) {
+        if (message == null) {
+            return;
+        }
         if (!(player.openContainer instanceof ContainerCustomMEItemInputBus)) {
             return;
         }

@@ -17,7 +17,7 @@ minecraft {
     injectedTags.put("VERSION", project.version.toString())
 
     val args = mutableListOf("-ea:${project.group}")
-    args.add("-Dfml.coreMods.load=com.fushu.mmceguiext.mixin.MMCEGuiExtEarlyMixinLoader")
+    args.add("-Dfml.coreMods.load=com.fushu.mmceguiext.core.MMCEGuiExtEarlyMixinLoader")
     args.add("-Dmixin.hotSwap=true")
     args.add("-Dmixin.checks.interfaces=true")
     args.add("-Dmixin.debug.export=true")
@@ -114,7 +114,7 @@ publishing {
 tasks.jar.configure {
     manifest {
         val attributes = manifest.attributes
-        attributes["FMLCorePlugin"] = "com.fushu.mmceguiext.mixin.MMCEGuiExtEarlyMixinLoader"
+        attributes["FMLCorePlugin"] = "com.fushu.mmceguiext.core.MMCEGuiExtEarlyMixinLoader"
         attributes["FMLCorePluginContainsFMLMod"] = true
     }
 }

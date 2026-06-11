@@ -14,6 +14,9 @@ final class MachineGuiStyleParser {
     private static final int MAX_ARRAY_ENTRIES = 512;
     private static final int MAX_TEXTURE_LAYERS = 256;
     private static final int MAX_WARNINGS = 256;
+    private static final int MAX_GUI_SIZE = 4096;
+    private static final int MAX_COMPONENT_SIZE = 4096;
+    private static final int MAX_CORNER = 128;
     private static final float MIN_TEXT_SCALE = 0.05F;
     private static final float MAX_TEXT_SCALE = 8.0F;
 
@@ -99,37 +102,42 @@ final class MachineGuiStyleParser {
             "backgroundTextureOffsetY"
         );
         style.hideDefaultBackground = getBoolean(node, result, scope, "hideDefaultBackground", "hideDefault", "disableDefaultTexture");
-        style.guiWidth = validateMinInt(
+        style.guiWidth = validateRangeInt(
             getInt(node, result, scope, "guiWidth", "gui_width", "width"),
             1,
+            MAX_GUI_SIZE,
             result,
             scope,
             "guiWidth"
         );
-        style.guiHeight = validateMinInt(
+        style.guiHeight = validateRangeInt(
             getInt(node, result, scope, "guiHeight", "gui_height", "height"),
             1,
+            MAX_GUI_SIZE,
             result,
             scope,
             "guiHeight"
         );
-        style.backgroundTextureWidth = validateMinInt(
+        style.backgroundTextureWidth = validateRangeInt(
             getInt(node, result, scope, "backgroundTextureWidth", "background_texture_width", "textureWidth", "texture_width"),
             1,
+            MAX_COMPONENT_SIZE,
             result,
             scope,
             "backgroundTextureWidth"
         );
-        style.backgroundTextureHeight = validateMinInt(
+        style.backgroundTextureHeight = validateRangeInt(
             getInt(node, result, scope, "backgroundTextureHeight", "background_texture_height", "textureHeight", "texture_height"),
             1,
+            MAX_COMPONENT_SIZE,
             result,
             scope,
             "backgroundTextureHeight"
         );
-        style.backgroundCorner = validateMinInt(
+        style.backgroundCorner = validateRangeInt(
             getInt(node, result, scope, "backgroundCorner", "background_corner", "corner", "cornerSize", "corner_size"),
             1,
+            MAX_CORNER,
             result,
             scope,
             "backgroundCorner"
@@ -143,6 +151,46 @@ final class MachineGuiStyleParser {
             "specialThreadBgColor",
             "coreThreadBackgroundColor",
             "coreThreadBgColor"
+        );
+        style.threadQueueX = getInt(
+            node,
+            result,
+            scope,
+            "threadQueueX",
+            "thread_queue_x",
+            "queueX",
+            "queue_x",
+            "threadX",
+            "thread_x"
+        );
+        style.threadQueueY = getInt(
+            node,
+            result,
+            scope,
+            "threadQueueY",
+            "thread_queue_y",
+            "queueY",
+            "queue_y",
+            "threadY",
+            "thread_y"
+        );
+        style.threadScrollbarX = getInt(
+            node,
+            result,
+            scope,
+            "threadScrollbarX",
+            "thread_scrollbar_x",
+            "queueScrollbarX",
+            "queue_scrollbar_x"
+        );
+        style.threadScrollbarY = getInt(
+            node,
+            result,
+            scope,
+            "threadScrollbarY",
+            "thread_scrollbar_y",
+            "queueScrollbarY",
+            "queue_scrollbar_y"
         );
         style.disableRightExtension = getBoolean(
             node,
@@ -185,7 +233,7 @@ final class MachineGuiStyleParser {
             "dataPortY",
             "data_port_y"
         );
-        style.smartInterfaceEditorInputWidth = validateMinInt(
+        style.smartInterfaceEditorInputWidth = validateRangeInt(
             getInt(
                 node,
                 result,
@@ -198,6 +246,7 @@ final class MachineGuiStyleParser {
                 "data_port_width"
             ),
             1,
+            MAX_COMPONENT_SIZE,
             result,
             scope,
             "smartInterfaceEditorInputWidth"
@@ -453,7 +502,7 @@ final class MachineGuiStyleParser {
             editor.id = getTrimmedString(editorObj, result, itemScope, "id", "name");
             editor.x = x.intValue();
             editor.y = y.intValue();
-            editor.inputWidth = validateMinInt(getInt(editorObj, result, itemScope, "inputWidth", "input_width", "width"), 1, result, itemScope, "inputWidth");
+            editor.inputWidth = validateRangeInt(getInt(editorObj, result, itemScope, "inputWidth", "input_width", "width"), 1, MAX_COMPONENT_SIZE, result, itemScope, "inputWidth");
             editor.virtualKey = virtualKey;
             editor.title = getTrimmedString(editorObj, result, itemScope, "title", "label");
             editor.showTitle = getBoolean(editorObj, result, itemScope, "showTitle", "show_title");
@@ -542,8 +591,8 @@ final class MachineGuiStyleParser {
             button.id = getTrimmedString(obj, result, itemScope, "id", "name");
             button.x = x.intValue();
             button.y = y.intValue();
-            button.width = validateMinInt(getInt(obj, result, itemScope, "width", "w"), 1, result, itemScope, "width");
-            button.height = validateMinInt(getInt(obj, result, itemScope, "height", "h"), 1, result, itemScope, "height");
+            button.width = validateRangeInt(getInt(obj, result, itemScope, "width", "w"), 1, MAX_COMPONENT_SIZE, result, itemScope, "width");
+            button.height = validateRangeInt(getInt(obj, result, itemScope, "height", "h"), 1, MAX_COMPONENT_SIZE, result, itemScope, "height");
             button.label = label;
             button.action = normalizedAction;
             button.buttonId = buttonId;
@@ -691,11 +740,11 @@ final class MachineGuiStyleParser {
         layer.texture = texture;
         layer.offsetX = getInt(obj, result, scope, "offsetX", "offset_x", "x");
         layer.offsetY = getInt(obj, result, scope, "offsetY", "offset_y", "y");
-        layer.width = validateMinInt(getInt(obj, result, scope, "width", "drawWidth", "draw_width"), 1, result, scope, "width");
-        layer.height = validateMinInt(getInt(obj, result, scope, "height", "drawHeight", "draw_height"), 1, result, scope, "height");
-        layer.textureWidth = validateMinInt(getInt(obj, result, scope, "textureWidth", "texture_width", "texW"), 1, result, scope, "textureWidth");
-        layer.textureHeight = validateMinInt(getInt(obj, result, scope, "textureHeight", "texture_height", "texH"), 1, result, scope, "textureHeight");
-        layer.corner = validateMinInt(getInt(obj, result, scope, "corner", "cornerSize", "corner_size"), 1, result, scope, "corner");
+        layer.width = validateRangeInt(getInt(obj, result, scope, "width", "drawWidth", "draw_width"), 1, MAX_COMPONENT_SIZE, result, scope, "width");
+        layer.height = validateRangeInt(getInt(obj, result, scope, "height", "drawHeight", "draw_height"), 1, MAX_COMPONENT_SIZE, result, scope, "height");
+        layer.textureWidth = validateRangeInt(getInt(obj, result, scope, "textureWidth", "texture_width", "texW"), 1, MAX_COMPONENT_SIZE, result, scope, "textureWidth");
+        layer.textureHeight = validateRangeInt(getInt(obj, result, scope, "textureHeight", "texture_height", "texH"), 1, MAX_COMPONENT_SIZE, result, scope, "textureHeight");
+        layer.corner = validateRangeInt(getInt(obj, result, scope, "corner", "cornerSize", "corner_size"), 1, MAX_CORNER, result, scope, "corner");
         layer.useNineSlice = getBoolean(obj, result, scope, "useNineSlice", "use_nine_slice", "nineSlice");
         layer.priority = getInt(obj, result, scope, "priority", "zIndex", "z_index", "z", "layer");
         layer.foreground = forceForeground
@@ -909,6 +958,29 @@ final class MachineGuiStyleParser {
         }
         if (value.intValue() < min) {
             result.warn(field(scope, fieldName) + " must be >= " + min + ".");
+            return null;
+        }
+        return value;
+    }
+
+    @Nullable
+    private static Integer validateRangeInt(
+        @Nullable Integer value,
+        int min,
+        int max,
+        MachineFileParseResult result,
+        String scope,
+        String fieldName
+    ) {
+        if (value == null) {
+            return null;
+        }
+        if (value.intValue() < min) {
+            result.warn(field(scope, fieldName) + " must be >= " + min + ".");
+            return null;
+        }
+        if (value.intValue() > max) {
+            result.warn(field(scope, fieldName) + " must be <= " + max + ".");
             return null;
         }
         return value;

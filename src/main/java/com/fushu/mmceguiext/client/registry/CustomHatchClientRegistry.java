@@ -78,9 +78,30 @@ public final class CustomHatchClientRegistry {
 
     private static void wrapCustomHatchModel(ModelBakeEvent event, ModelResourceLocation location) {
         IBakedModel baked = event.getModelRegistry().getObject(location);
+        if (baked == null) {
+            ModelResourceLocation fallbackLocation = resolveFallbackModelLocation(location);
+            baked = event.getModelRegistry().getObject(fallbackLocation);
+            if (baked instanceof CustomHatchBakedModel) {
+                event.getModelRegistry().putObject(location, baked);
+            } else if (baked != null) {
+                event.getModelRegistry().putObject(location, new CustomHatchBakedModel(baked, resolveBakedModelLocation(fallbackLocation)));
+            }
+            return;
+        }
         if (baked != null && !(baked instanceof CustomHatchBakedModel)) {
             event.getModelRegistry().putObject(location, new CustomHatchBakedModel(baked, resolveBakedModelLocation(location)));
         }
+    }
+
+    private static ModelResourceLocation resolveFallbackModelLocation(ModelResourceLocation location) {
+        String variant = location == null ? "facing=north" : location.getVariant();
+        if ("inventory".equals(variant)) {
+            return new ModelResourceLocation(DEFAULT_MODEL, "inventory");
+        }
+        if (variant != null && variant.startsWith("facing=")) {
+            return new ModelResourceLocation(DEFAULT_MODEL, variant);
+        }
+        return new ModelResourceLocation(DEFAULT_MODEL, "facing=north");
     }
 
     private static ResourceLocation resolveBakedModelLocation(ModelResourceLocation location) {

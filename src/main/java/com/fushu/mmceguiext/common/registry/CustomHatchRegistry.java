@@ -32,6 +32,10 @@ public final class CustomHatchRegistry {
     private static final int MAX_TEXTS = 512;
     private static final int MAX_GUI_COMPONENTS = 4096;
     private static final int MAX_MACHINE_COMPONENTS = 256;
+    private static final int MAX_COMPONENT_SIZE = 4096;
+    private static final int MAX_SLOT_SPACING = 256;
+    private static final int MAX_HATCH_CAPACITY = Integer.MAX_VALUE;
+    private static final long MAX_ENERGY_CAPACITY = Integer.MAX_VALUE;
     private static final List<CustomHatchDef> CACHE = new ArrayList<CustomHatchDef>();
     private static final Map<String, CustomHatchDef> REGISTERED = new LinkedHashMap<String, CustomHatchDef>();
 
@@ -119,9 +123,12 @@ public final class CustomHatchRegistry {
             def.componentType = lower(getString(root, "componentType"));
             def.ioType = lower(getString(root, "ioType"));
             def.machineComponents = parseMachineComponents(getArray(root, "components"));
-            def.capacity = getInt(root, "capacity", 1000);
-            def.fluidCapacity = getInt(root, "fluidCapacity", def.capacity);
-            def.gasCapacity = getInt(root, "gasCapacity", def.capacity);
+            def.capacity = clamp(getInt(root, "capacity", 1000), 1, MAX_HATCH_CAPACITY);
+            def.fluidCapacity = clamp(getInt(root, "fluidCapacity", def.capacity), 1, MAX_HATCH_CAPACITY);
+            def.gasCapacity = clamp(getInt(root, "gasCapacity", def.capacity), 1, MAX_HATCH_CAPACITY);
+            def.energyCapacity = clampLong(getLong(root, "energyCapacity", getLong(root, "energy", def.capacity)), 1L, MAX_ENERGY_CAPACITY);
+            def.energyTransfer = clampLong(getLong(root, "energyTransfer", getLong(root, "energyTransferLimit", def.energyCapacity)), 1L, MAX_ENERGY_CAPACITY);
+            def.tips = parseStringList(root, "tips", "tooltip", "tooltips");
             def.inputSlot = parseSlot(getObject(root, "inputSlot"));
             def.outputSlot = parseSlot(getObject(root, "outputSlot"));
             def.tank = parseTank(getObject(root, "tank"));
@@ -171,8 +178,8 @@ public final class CustomHatchRegistry {
         }
         tank.x = getInt(obj, "x", 0);
         tank.y = getInt(obj, "y", 0);
-        tank.width = getInt(obj, "width", 16);
-        tank.height = getInt(obj, "height", 48);
+        tank.width = clamp(getInt(obj, "width", 16), 1, MAX_COMPONENT_SIZE);
+        tank.height = clamp(getInt(obj, "height", 48), 1, MAX_COMPONENT_SIZE);
         tank.content = lower(getString(obj, "content"));
         tank.renderMode = lower(getFirstString(obj, "renderMode", "render_mode", "render", "mode"));
         tank.alpha = normalizeAlpha(getFirstFloat(obj, "alpha", "opacity", "transparency"));
@@ -228,6 +235,7 @@ public final class CustomHatchRegistry {
         if (array.size() > MAX_GUI_COMPONENTS) {
             LOGGER.warn("Skipping {} extra custom hatch GUI components; max is {}", array.size() - MAX_GUI_COMPONENTS, MAX_GUI_COMPONENTS);
         }
+        int nextAutoSlotIndex = 0;
         for (int i = 0; i < limit; i++) {
             JsonElement element = array.get(i);
             if (!element.isJsonObject()) {
@@ -240,29 +248,29 @@ public final class CustomHatchRegistry {
             def.x = getInt(obj, "x", 0);
             def.y = getInt(obj, "y", 0);
             def.index = getInt(obj, "index", -1);
-            def.width = getInt(obj, "width", 0);
-            def.height = getInt(obj, "height", 0);
+            def.width = clampOptionalSize(getInt(obj, "width", 0));
+            def.height = clampOptionalSize(getInt(obj, "height", 0));
             def.hotbarY = getInt(obj, "hotbarY", -1);
             def.rows = getInt(obj, "rows", 0);
             def.columns = getInt(obj, "columns", 0);
-            def.visibleRows = getInt(obj, "visibleRows", getInt(obj, "visible_rows", 0));
-            def.visibleColumns = getInt(obj, "visibleColumns", getInt(obj, "visible_columns", 0));
-            def.spacingX = getInt(obj, "spacingX", getInt(obj, "spacing_x", 2));
-            def.spacingY = getInt(obj, "spacingY", getInt(obj, "spacing_y", 2));
-            def.slotSize = getInt(obj, "slotSize", getInt(obj, "slot_size", getInt(obj, "size", 16)));
+            def.visibleRows = clampOptionalSize(getInt(obj, "visibleRows", getInt(obj, "visible_rows", 0)));
+            def.visibleColumns = clampOptionalSize(getInt(obj, "visibleColumns", getInt(obj, "visible_columns", 0)));
+            def.spacingX = clamp(getInt(obj, "spacingX", getInt(obj, "spacing_x", 2)), 0, MAX_SLOT_SPACING);
+            def.spacingY = clamp(getInt(obj, "spacingY", getInt(obj, "spacing_y", 2)), 0, MAX_SLOT_SPACING);
+            def.slotSize = clamp(getInt(obj, "slotSize", getInt(obj, "slot_size", getInt(obj, "size", 16))), 1, 256);
             def.scrollMode = lower(getString(obj, "scrollMode"));
             def.scrollbar = getBoolean(obj, "scrollbar");
             def.scrollbarX = getInt(obj, "scrollbarX", getInt(obj, "scrollbar_x", 0));
             def.scrollbarY = getInt(obj, "scrollbarY", getInt(obj, "scrollbar_y", 0));
-            def.scrollbarHeight = getInt(obj, "scrollbarHeight", getInt(obj, "scrollbar_height", 0));
-            def.scrollbarWidth = getInt(obj, "scrollbarWidth", getInt(obj, "scrollbar_width", 12));
-            def.scrollbarThumbHeight = getInt(obj, "scrollbarThumbHeight", getInt(obj, "scrollbar_thumb_height", 15));
+            def.scrollbarHeight = clampOptionalSize(getInt(obj, "scrollbarHeight", getInt(obj, "scrollbar_height", 0)));
+            def.scrollbarWidth = clamp(getInt(obj, "scrollbarWidth", getInt(obj, "scrollbar_width", 12)), 1, MAX_COMPONENT_SIZE);
+            def.scrollbarThumbHeight = clamp(getInt(obj, "scrollbarThumbHeight", getInt(obj, "scrollbar_thumb_height", 15)), 1, MAX_COMPONENT_SIZE);
             def.scrollbarTexture = getString(obj, "scrollbarTexture");
             def.scrollbarHoverTexture = getString(obj, "scrollbarHoverTexture");
             def.scrollbarPressedTexture = getString(obj, "scrollbarPressedTexture");
             def.scrollbarDisabledTexture = getString(obj, "scrollbarDisabledTexture");
-            def.scrollbarTextureWidth = getInt(obj, "scrollbarTextureWidth", getInt(obj, "scrollbar_texture_width", 256));
-            def.scrollbarTextureHeight = getInt(obj, "scrollbarTextureHeight", getInt(obj, "scrollbar_texture_height", 256));
+            def.scrollbarTextureWidth = clamp(getInt(obj, "scrollbarTextureWidth", getInt(obj, "scrollbar_texture_width", 256)), 1, MAX_COMPONENT_SIZE);
+            def.scrollbarTextureHeight = clamp(getInt(obj, "scrollbarTextureHeight", getInt(obj, "scrollbar_texture_height", 256)), 1, MAX_COMPONENT_SIZE);
             def.scrollbarU = getInt(obj, "scrollbarU", getInt(obj, "scrollbar_u", 232));
             def.scrollbarV = getInt(obj, "scrollbarV", getInt(obj, "scrollbar_v", 0));
             def.scrollbarHoverU = getInt(obj, "scrollbarHoverU", getInt(obj, "scrollbar_hover_u", def.scrollbarU));
@@ -273,8 +281,8 @@ public final class CustomHatchRegistry {
             def.scrollbarDisabledV = getInt(obj, "scrollbarDisabledV", getInt(obj, "scrollbar_disabled_v", 0));
             def.itemOverlay = getBoolean(obj, "itemOverlay");
             def.itemOverlayTexture = getString(obj, "itemOverlayTexture");
-            def.itemOverlayTextureWidth = getInt(obj, "itemOverlayTextureWidth", getInt(obj, "item_overlay_texture_width", 16));
-            def.itemOverlayTextureHeight = getInt(obj, "itemOverlayTextureHeight", getInt(obj, "item_overlay_texture_height", 16));
+            def.itemOverlayTextureWidth = clamp(getInt(obj, "itemOverlayTextureWidth", getInt(obj, "item_overlay_texture_width", 16)), 1, MAX_COMPONENT_SIZE);
+            def.itemOverlayTextureHeight = clamp(getInt(obj, "itemOverlayTextureHeight", getInt(obj, "item_overlay_texture_height", 16)), 1, MAX_COMPONENT_SIZE);
             def.itemOverlayU = getInt(obj, "itemOverlayU", getInt(obj, "item_overlay_u", 0));
             def.itemOverlayV = getInt(obj, "itemOverlayV", getInt(obj, "item_overlay_v", 0));
             def.value = getString(obj, "value");
@@ -286,11 +294,18 @@ public final class CustomHatchRegistry {
             def.scale = getFloat(obj, "scale");
             def.align = normalizeTextAlign(getString(obj, "align"), getString(obj, "alignment"), getString(obj, "textAlign"), getString(obj, "text_align"));
             def.overlay = getBoolean(obj, "overlay");
+            def.tips = parseStringList(obj, "tips", "tooltip", "tooltips");
             def.priority = getInt(obj, "priority", getInt(obj, "zIndex", getInt(obj, "z_index", getInt(obj, "z", getInt(obj, "layer", 0)))));
             if (def.type != null && !def.type.trim().isEmpty()) {
                 if ("slot_grid".equals(def.type) || "slots".equals(def.type)) {
-                    expandSlotGrid(obj, def, out);
+                    nextAutoSlotIndex = expandSlotGrid(obj, def, out, nextAutoSlotIndex);
                 } else {
+                    if ("slot".equals(def.type) && isRuntimeSlotRole(def.role)) {
+                        if (def.index < 0) {
+                            def.index = nextAutoSlotIndex;
+                        }
+                        nextAutoSlotIndex = Math.max(nextAutoSlotIndex, def.index + 1);
+                    }
                     out.add(def);
                 }
             }
@@ -298,29 +313,29 @@ public final class CustomHatchRegistry {
         return out;
     }
 
-    private static void expandSlotGrid(JsonObject obj, ComponentDef grid, List<ComponentDef> out) {
+    private static int expandSlotGrid(JsonObject obj, ComponentDef grid, List<ComponentDef> out, int nextAutoSlotIndex) {
         int rows = Math.max(1, getFirstInt(obj, 1, "rows", "rowCount", "yCount"));
         int columns = Math.max(1, getFirstInt(obj, 1, "columns", "cols", "columnCount", "xCount"));
         if (rows > MAX_GRID_ROWS || columns > MAX_GRID_COLUMNS || (long) rows * (long) columns > MAX_GRID_SLOTS) {
             LOGGER.warn("Skipping slot grid with size {}x{}; max cells is {}", rows, columns, MAX_GRID_SLOTS);
-            return;
+            return nextAutoSlotIndex;
         }
-        int spacingX = getFirstInt(obj, 2, "spacingX", "xSpacing", "gapX");
-        int spacingY = getFirstInt(obj, 2, "spacingY", "ySpacing", "gapY");
+        int spacingX = clamp(getFirstInt(obj, 2, "spacingX", "xSpacing", "gapX"), 0, MAX_SLOT_SPACING);
+        int spacingY = clamp(getFirstInt(obj, 2, "spacingY", "ySpacing", "gapY"), 0, MAX_SLOT_SPACING);
         int slotSize = clamp(getFirstInt(obj, 16, "slotSize", "size"), 1, 256);
-        int visibleRows = getFirstInt(obj, 0, "visibleRows", "visible_rows");
-        int visibleColumns = getFirstInt(obj, 0, "visibleColumns", "visible_columns");
+        int visibleRows = clampOptionalSize(getFirstInt(obj, 0, "visibleRows", "visible_rows"));
+        int visibleColumns = clampOptionalSize(getFirstInt(obj, 0, "visibleColumns", "visible_columns"));
         int scrollbarX = getFirstInt(obj, 0, "scrollbarX", "scrollbar_x");
         int scrollbarY = getFirstInt(obj, 0, "scrollbarY", "scrollbar_y");
-        int scrollbarHeight = getFirstInt(obj, 0, "scrollbarHeight", "scrollbar_height");
-        int scrollbarWidth = getFirstInt(obj, 12, "scrollbarWidth", "scrollbar_width");
-        int scrollbarThumbHeight = getFirstInt(obj, 15, "scrollbarThumbHeight", "scrollbar_thumb_height");
+        int scrollbarHeight = clampOptionalSize(getFirstInt(obj, 0, "scrollbarHeight", "scrollbar_height"));
+        int scrollbarWidth = clamp(getFirstInt(obj, 12, "scrollbarWidth", "scrollbar_width"), 1, MAX_COMPONENT_SIZE);
+        int scrollbarThumbHeight = clamp(getFirstInt(obj, 15, "scrollbarThumbHeight", "scrollbar_thumb_height"), 1, MAX_COMPONENT_SIZE);
         String scrollbarTexture = getString(obj, "scrollbarTexture");
         String scrollbarHoverTexture = getString(obj, "scrollbarHoverTexture");
         String scrollbarPressedTexture = getString(obj, "scrollbarPressedTexture");
         String scrollbarDisabledTexture = getString(obj, "scrollbarDisabledTexture");
-        int scrollbarTextureWidth = getFirstInt(obj, 256, "scrollbarTextureWidth", "scrollbar_texture_width");
-        int scrollbarTextureHeight = getFirstInt(obj, 256, "scrollbarTextureHeight", "scrollbar_texture_height");
+        int scrollbarTextureWidth = clamp(getFirstInt(obj, 256, "scrollbarTextureWidth", "scrollbar_texture_width"), 1, MAX_COMPONENT_SIZE);
+        int scrollbarTextureHeight = clamp(getFirstInt(obj, 256, "scrollbarTextureHeight", "scrollbar_texture_height"), 1, MAX_COMPONENT_SIZE);
         int scrollbarU = getFirstInt(obj, 232, "scrollbarU", "scrollbar_u");
         int scrollbarV = getFirstInt(obj, 0, "scrollbarV", "scrollbar_v");
         int scrollbarHoverU = getFirstInt(obj, scrollbarU, "scrollbarHoverU", "scrollbar_hover_u");
@@ -331,20 +346,20 @@ public final class CustomHatchRegistry {
         int scrollbarDisabledV = getFirstInt(obj, 0, "scrollbarDisabledV", "scrollbar_disabled_v");
         Boolean itemOverlay = getBoolean(obj, "itemOverlay");
         String itemOverlayTexture = getString(obj, "itemOverlayTexture");
-        int itemOverlayTextureWidth = getFirstInt(obj, 16, "itemOverlayTextureWidth", "item_overlay_texture_width");
-        int itemOverlayTextureHeight = getFirstInt(obj, 16, "itemOverlayTextureHeight", "item_overlay_texture_height");
+        int itemOverlayTextureWidth = clamp(getFirstInt(obj, 16, "itemOverlayTextureWidth", "item_overlay_texture_width"), 1, MAX_COMPONENT_SIZE);
+        int itemOverlayTextureHeight = clamp(getFirstInt(obj, 16, "itemOverlayTextureHeight", "item_overlay_texture_height"), 1, MAX_COMPONENT_SIZE);
         int itemOverlayU = getFirstInt(obj, 0, "itemOverlayU", "item_overlay_u");
         int itemOverlayV = getFirstInt(obj, 0, "itemOverlayV", "item_overlay_v");
         String scrollMode = lower(getString(obj, "scrollMode"));
         Boolean scrollbar = getBoolean(obj, "scrollbar");
-        int baseIndex = grid.index;
+        int baseIndex = grid.index >= 0 ? grid.index : nextAutoSlotIndex;
         if (baseIndex > Integer.MAX_VALUE - (rows * columns)) {
             LOGGER.warn("Skipping slot grid with overflowing base index {}", baseIndex);
-            return;
+            return nextAutoSlotIndex;
         }
         if (out.size() > MAX_GUI_COMPONENTS - (rows * columns)) {
             LOGGER.warn("Skipping slot grid with {} cells because custom hatch GUI component cap is {}", rows * columns, MAX_GUI_COMPONENTS);
-            return;
+            return nextAutoSlotIndex;
         }
         int ordinal = 0;
         for (int row = 0; row < rows; row++) {
@@ -352,10 +367,10 @@ public final class CustomHatchRegistry {
                 ComponentDef slot = new ComponentDef();
                 slot.type = "slot";
                 slot.role = grid.role;
-                slot.index = baseIndex >= 0 ? baseIndex + ordinal : -1;
+                slot.index = baseIndex + ordinal;
                 slot.x = grid.x + column * (slotSize + spacingX);
                 slot.y = grid.y + row * (slotSize + spacingY);
-                slot.gridBaseIndex = baseIndex >= 0 ? baseIndex : 0;
+                slot.gridBaseIndex = baseIndex;
                 slot.gridBaseX = grid.x;
                 slot.gridBaseY = grid.y;
                 slot.rows = rows;
@@ -392,10 +407,12 @@ public final class CustomHatchRegistry {
                 slot.itemOverlayTextureHeight = itemOverlayTextureHeight;
                 slot.itemOverlayU = itemOverlayU;
                 slot.itemOverlayV = itemOverlayV;
+                slot.tips = grid.tips;
                 out.add(slot);
                 ordinal++;
             }
         }
+        return Math.max(nextAutoSlotIndex, baseIndex + rows * columns);
     }
 
     private static List<MachineComponentDef> parseMachineComponents(@Nullable JsonArray array) {
@@ -421,6 +438,35 @@ public final class CustomHatchRegistry {
             }
         }
         return out;
+    }
+
+    private static List<String> parseStringList(JsonObject obj, String... keys) {
+        if (obj == null || keys == null) {
+            return Collections.emptyList();
+        }
+        for (String key : keys) {
+            JsonElement element = obj.get(key);
+            if (element == null || element.isJsonNull()) {
+                continue;
+            }
+            List<String> out = new ArrayList<String>();
+            if (element.isJsonArray()) {
+                JsonArray array = element.getAsJsonArray();
+                for (int i = 0; i < array.size() && i < MAX_TEXTS; i++) {
+                    String value = asString(array.get(i), null);
+                    if (value != null && !value.trim().isEmpty()) {
+                        out.add(value.trim());
+                    }
+                }
+            } else {
+                String value = asString(element, null);
+                if (value != null && !value.trim().isEmpty()) {
+                    out.add(value.trim());
+                }
+            }
+            return out.isEmpty() ? Collections.<String>emptyList() : out;
+        }
+        return Collections.emptyList();
     }
 
     private static void applyGuiComponents(CustomHatchDef def) {
@@ -463,6 +509,10 @@ public final class CustomHatchRegistry {
             texts.sort(java.util.Comparator.comparingInt(a -> a.priority));
             def.texts = texts;
         }
+    }
+
+    private static boolean isRuntimeSlotRole(@Nullable String role) {
+        return "input".equalsIgnoreCase(role) || "output".equalsIgnoreCase(role);
     }
 
     @Nullable
@@ -522,6 +572,11 @@ public final class CustomHatchRegistry {
         return asInt(e, fallback);
     }
 
+    private static long getLong(JsonObject obj, String key, long fallback) {
+        JsonElement e = obj.get(key);
+        return asLong(e, fallback);
+    }
+
     private static int getInt(@Nullable JsonObject primary, JsonObject fallbackObj, String key, int fallback) {
         JsonElement e = primary == null ? null : primary.get(key);
         if (e == null || e.isJsonNull()) {
@@ -544,8 +599,16 @@ public final class CustomHatchRegistry {
         return Math.max(min, Math.min(max, value));
     }
 
+    private static long clampLong(long value, long min, long max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
     private static int clampCoordinateSize(int value) {
         return value <= 0 ? -1 : clamp(value, 1, 4096);
+    }
+
+    private static int clampOptionalSize(int value) {
+        return value <= 0 ? 0 : clamp(value, 1, MAX_COMPONENT_SIZE);
     }
 
     @Nullable
@@ -611,6 +674,17 @@ public final class CustomHatchRegistry {
         }
     }
 
+    private static long asLong(@Nullable JsonElement e, long fallback) {
+        if (e == null || e.isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return e.getAsLong();
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
+    }
+
     @Nullable
     private static Float asFloat(@Nullable JsonElement e, @Nullable Float fallback) {
         if (e == null || e.isJsonNull()) {
@@ -669,6 +743,9 @@ public final class CustomHatchRegistry {
         public int capacity;
         public int fluidCapacity;
         public int gasCapacity;
+        public long energyCapacity;
+        public long energyTransfer;
+        public List<String> tips = Collections.emptyList();
         public SlotDef inputSlot = new SlotDef();
         public SlotDef outputSlot = new SlotDef();
         public TankDef tank = new TankDef();
@@ -766,6 +843,7 @@ public final class CustomHatchRegistry {
         @Nullable
         public String align;
         public Boolean overlay;
+        public List<String> tips = Collections.emptyList();
     }
 
     public static class MachineComponentDef {
