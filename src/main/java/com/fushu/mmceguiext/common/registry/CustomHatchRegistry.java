@@ -34,8 +34,8 @@ public final class CustomHatchRegistry {
     private static final int MAX_MACHINE_COMPONENTS = 256;
     private static final int MAX_COMPONENT_SIZE = 4096;
     private static final int MAX_SLOT_SPACING = 256;
-    private static final int MAX_HATCH_CAPACITY = Integer.MAX_VALUE;
-    private static final long MAX_ENERGY_CAPACITY = Integer.MAX_VALUE;
+    private static final long MAX_HATCH_CAPACITY = Long.MAX_VALUE;
+    private static final long MAX_ENERGY_CAPACITY = Long.MAX_VALUE;
     private static final List<CustomHatchDef> CACHE = new ArrayList<CustomHatchDef>();
     private static final Map<String, CustomHatchDef> REGISTERED = new LinkedHashMap<String, CustomHatchDef>();
 
@@ -123,9 +123,9 @@ public final class CustomHatchRegistry {
             def.componentType = lower(getString(root, "componentType"));
             def.ioType = lower(getString(root, "ioType"));
             def.machineComponents = parseMachineComponents(getArray(root, "components"));
-            def.capacity = clamp(getInt(root, "capacity", 1000), 1, MAX_HATCH_CAPACITY);
-            def.fluidCapacity = clamp(getInt(root, "fluidCapacity", def.capacity), 1, MAX_HATCH_CAPACITY);
-            def.gasCapacity = clamp(getInt(root, "gasCapacity", def.capacity), 1, MAX_HATCH_CAPACITY);
+            def.capacity = clampLong(getLong(root, "capacity", 1000L), 1L, MAX_HATCH_CAPACITY);
+            def.fluidCapacity = clampLong(getLong(root, "fluidCapacity", def.capacity), 1L, MAX_HATCH_CAPACITY);
+            def.gasCapacity = clampLong(getLong(root, "gasCapacity", def.capacity), 1L, MAX_HATCH_CAPACITY);
             def.energyCapacity = clampLong(getLong(root, "energyCapacity", getLong(root, "energy", def.capacity)), 1L, MAX_ENERGY_CAPACITY);
             def.energyTransfer = clampLong(getLong(root, "energyTransfer", getLong(root, "energyTransferLimit", def.energyCapacity)), 1L, MAX_ENERGY_CAPACITY);
             def.tips = parseStringList(root, "tips", "tooltip", "tooltips");
@@ -740,9 +740,9 @@ public final class CustomHatchRegistry {
         public String componentType = "fluid";
         public String ioType = "input";
         public List<MachineComponentDef> machineComponents = Collections.emptyList();
-        public int capacity;
-        public int fluidCapacity;
-        public int gasCapacity;
+        public long capacity;
+        public long fluidCapacity;
+        public long gasCapacity;
         public long energyCapacity;
         public long energyTransfer;
         public List<String> tips = Collections.emptyList();

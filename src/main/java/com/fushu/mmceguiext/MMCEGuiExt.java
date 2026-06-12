@@ -34,6 +34,8 @@ import net.minecraftforge.fml.common.network.IGuiHandler;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.relauncher.Side;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nullable;
 
@@ -45,6 +47,7 @@ import javax.annotation.Nullable;
 )
 public class MMCEGuiExt {
     public static final String MODID = "mmceguiext";
+    private static final Logger LOGGER = LogManager.getLogger(MODID);
     public static final String NAME = "Modular Machinery: Community Edition Gui Edit";
     public static final String VERSION = "1.1.0-beta";
     public static final int GUI_CUSTOM_HATCH = 1;
@@ -144,7 +147,11 @@ public class MMCEGuiExt {
             }
             TileCustomHatch tile = (TileCustomHatch) tileEntity;
             com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef def = resolveCustomHatchDef(world, pos, tile);
-            return def == null ? null : new ContainerFluidProcessorHatchCustom(tile, player, def);
+            if (def == null) {
+                LOGGER.warn("Cannot open custom hatch GUI at {}: missing definition, tile id={}.", pos, tile.getDefinitionId());
+                return null;
+            }
+            return new ContainerFluidProcessorHatchCustom(tile, player, def);
         }
 
         @Override
@@ -203,7 +210,11 @@ public class MMCEGuiExt {
             }
             TileCustomHatch tile = (TileCustomHatch) tileEntity;
             com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef def = resolveCustomHatchDef(world, pos, tile);
-            return def == null ? null : createClientGui(
+            if (def == null) {
+                LOGGER.warn("Cannot create custom hatch client GUI at {}: missing definition, tile id={}.", pos, tile.getDefinitionId());
+                return null;
+            }
+            return createClientGui(
                 "com.fushu.mmceguiext.client.gui.GuiFluidProcessorHatchCustom",
                 new Class<?>[]{TileEntity.class, EntityPlayer.class, com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef.class},
                 tile,
@@ -226,6 +237,7 @@ public class MMCEGuiExt {
             try {
                 return Class.forName(className).getConstructor(signature).newInstance(args);
             } catch (Exception e) {
+                LOGGER.warn("Failed to create GUI {}: {}", className, e.toString());
                 return null;
             }
         }

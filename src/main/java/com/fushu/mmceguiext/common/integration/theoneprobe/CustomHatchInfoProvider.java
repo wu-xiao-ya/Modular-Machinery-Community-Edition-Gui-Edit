@@ -224,8 +224,8 @@ public class CustomHatchInfoProvider implements IProbeInfoProvider {
 
     private static void addFluidInfo(IProbeInfo box, TileCustomHatch hatch) {
         FluidStack fluid = hatch.getFluidStack();
-        int amount = fluid == null ? 0 : fluid.amount;
-        int capacity = Math.max(1, hatch.getFluidCapacity());
+        long amount = hatch.getFluidAmountLong();
+        long capacity = Math.max(1L, hatch.getFluidCapacity());
         String name = fluid == null ? "空" : fluid.getLocalizedName();
 
         box.text(TextFormatting.WHITE + "流体:" + TextFormatting.AQUA + name);
@@ -248,8 +248,8 @@ public class CustomHatchInfoProvider implements IProbeInfoProvider {
     private static void addGasInfo(IProbeInfo box, TileCustomHatch hatch) {
         try {
             mekanism.api.gas.GasStack gas = hatch.getGasStack();
-            int amount = gas == null ? 0 : gas.amount;
-            int capacity = Math.max(1, hatch.getGasCapacity());
+            long amount = hatch.getGasAmountLong();
+            long capacity = Math.max(1L, hatch.getGasCapacity());
             String name = gas == null || gas.getGas() == null ? "空" : gas.getGas().getLocalizedName();
 
             box.text(TextFormatting.WHITE + "气体:" + TextFormatting.AQUA + name);

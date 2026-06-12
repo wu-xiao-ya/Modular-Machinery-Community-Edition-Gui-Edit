@@ -26,6 +26,7 @@ public final class CustomHatchGameRegistry {
     private static final Logger LOGGER = LogManager.getLogger(MMCEGuiExt.MODID);
     private static final Map<String, BlockCustomHatch> BLOCKS = new LinkedHashMap<String, BlockCustomHatch>();
     private static final Map<String, ModelBinding> MODEL_BINDINGS = new LinkedHashMap<String, ModelBinding>();
+    private static BlockCustomHatch genericBlock;
 
     private CustomHatchGameRegistry() {
     }
@@ -34,6 +35,11 @@ public final class CustomHatchGameRegistry {
     public static void onRegisterBlocks(RegistryEvent.Register<Block> event) {
         BLOCKS.clear();
         MODEL_BINDINGS.clear();
+        genericBlock = new BlockCustomHatch(null, "custom_hatch");
+        event.getRegistry().register(genericBlock);
+        BLOCKS.put("custom_hatch", genericBlock);
+        MODEL_BINDINGS.put("custom_hatch", new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "facing=north"));
+        CustomBlockIdRegistry.claim("custom_hatch", "generic custom hatch", "custom_hatch");
         List<CustomHatchRegistry.CustomHatchDef> defs = CustomHatchRegistry.getCached();
         if (defs.isEmpty()) {
             defs = CustomHatchRegistry.loadAll();
@@ -67,7 +73,7 @@ public final class CustomHatchGameRegistry {
         for (Map.Entry<String, BlockCustomHatch> entry : BLOCKS.entrySet()) {
             BlockCustomHatch block = entry.getValue();
             CustomHatchRegistry.CustomHatchDef def = block.getDefinition();
-            if (def == null) {
+            if (def == null && !block.isGenericRegistryBlock()) {
                 continue;
             }
             event.getRegistry().register(new ItemBlockCustomHatch(block, def));
@@ -76,6 +82,11 @@ public final class CustomHatchGameRegistry {
 
     public static BlockCustomHatch getBlock(@SuppressWarnings("SameParameterValue") String id) {
         return BLOCKS.get(CustomIdValidator.normalizePath(id, ""));
+    }
+
+    @Nullable
+    public static BlockCustomHatch getGenericBlock() {
+        return genericBlock;
     }
 
     public static Map<String, BlockCustomHatch> getRegisteredBlocks() {
@@ -95,6 +106,9 @@ public final class CustomHatchGameRegistry {
         }
         if (isDirectHatchModelPath(model)) {
             return resolveDirectHatchModelBinding(model);
+        }
+        if (!isKnownBlockstateModelPath(model)) {
+            return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "facing=north");
         }
         ModelBinding location = parseModelBinding(model);
         if (location == null) {
@@ -152,6 +166,17 @@ public final class CustomHatchGameRegistry {
             return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "mix_in_hatch_lv1"), "normal");
         }
         return new ModelBinding(new ResourceLocation(MMCEGuiExt.MODID, "custom_hatch"), "facing=north");
+    }
+
+    private static boolean isKnownBlockstateModelPath(@Nullable String raw) {
+        String value = normalizeComparableModelPath(raw);
+        if (value == null) {
+            return false;
+        }
+        return "custom_hatch".equals(value)
+            || "custom_gas_input_hatch".equals(value)
+            || "custom_gas_output_hatch".equals(value)
+            || "mix_in_hatch_lv1".equals(value);
     }
 
     @Nullable

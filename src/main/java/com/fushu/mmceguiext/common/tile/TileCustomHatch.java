@@ -1,11 +1,12 @@
 package com.fushu.mmceguiext.common.tile;
 
 import com.fushu.mmceguiext.common.block.BlockCustomHatch;
+import com.fushu.mmceguiext.common.requirement.LongFluidIOHandler;
+import com.fushu.mmceguiext.common.requirement.LongGasIOHandler;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
 import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import github.kasuminova.mmce.common.util.InfItemFluidHandler;
 import github.kasuminova.mmce.common.util.IExtendedGasHandler;
-import github.kasuminova.mmce.common.util.MultiGasTank;
 import github.kasuminova.mmce.common.util.concurrent.ReadWriteLockProvider;
 import hellfirepvp.modularmachinery.common.crafting.ComponentType;
 import hellfirepvp.modularmachinery.common.lib.ComponentTypesMM;
@@ -64,8 +65,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     public static final int INPUT_SLOT = 0;
     public static final int OUTPUT_SLOT = 1;
     private static final int MAX_DYNAMIC_SLOT_INDEX = 4095;
-    private static final int MAX_HATCH_CAPACITY = Integer.MAX_VALUE;
-    private static final long MAX_ENERGY_CAPACITY = Integer.MAX_VALUE;
+    private static final long MAX_HATCH_CAPACITY = Long.MAX_VALUE;
+    private static final long MAX_ENERGY_CAPACITY = Long.MAX_VALUE;
+    private static final String NBT_LONG_AMOUNT = "LongAmount";
 
     private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
     private final long componentGroupId = github.kasuminova.mmce.common.tile.base.MachineCombinationComponent.GROUP_ACQUIRER.incrementAndGet();
@@ -75,9 +77,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     private boolean processingInventory = false;
     private boolean pendingInventoryProcess = false;
 
-    private int capacity = 1000;
-    private int fluidCapacity = 1000;
-    private int gasCapacity = 1000;
+    private long capacity = 1000L;
+    private long fluidCapacity = 1000L;
+    private long gasCapacity = 1000L;
     private long energy = 0L;
     private long energyCapacity = 1000L;
     private long energyTransfer = 1000L;
@@ -162,16 +164,25 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         return fluid == null ? null : fluid.copy();
     }
 
-    public int getCapacity() {
+    public long getCapacity() {
         return this.fluidCapacity;
     }
 
-    public int getFluidCapacity() {
+    public long getFluidCapacity() {
         return this.fluidCapacity;
     }
 
-    public int getGasCapacity() {
+    public long getGasCapacity() {
         return this.gasCapacity;
+    }
+
+    public long getFluidAmountLong() {
+        return this.tank.getFluidAmountLong();
+    }
+
+    @Optional.Method(modid = "mekanism")
+    public long getGasAmountLong() {
+        return this.gasTank.getGasAmountLong();
     }
 
     public long getEnergyStoredLong() {
@@ -214,9 +225,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         compound.setTag("inv", this.inventory.writeNBT());
         compound.setTag("fluid", this.tank.writeToNBT(new NBTTagCompound()));
         this.gasTank.writeToNBT(compound, "gas");
-        compound.setInteger("capacity", this.capacity);
-        compound.setInteger("fluidCapacity", this.fluidCapacity);
-        compound.setInteger("gasCapacity", this.gasCapacity);
+        compound.setLong("capacity", this.capacity);
+        compound.setLong("fluidCapacity", this.fluidCapacity);
+        compound.setLong("gasCapacity", this.gasCapacity);
         compound.setLong("energy", this.energy);
         compound.setLong("energyCapacity", this.energyCapacity);
         compound.setLong("energyTransfer", this.energyTransfer);
@@ -318,6 +329,21 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             out.add(createCombinedMachineComponent(IOType.OUTPUT, -1L));
         }
         return true;
+    }
+
+    private boolean hasDeclaredAccess(CustomHatchRegistry.CustomHatchDef def, ExternalAccessKind kind, IOType ioType) {
+        if (def == null || def.machineComponents == null || def.machineComponents.isEmpty()) {
+            return false;
+        }
+        for (CustomHatchRegistry.MachineComponentDef component : def.machineComponents) {
+            if (component == null || !kind.matches(component.type)) {
+                continue;
+            }
+            if (parseIOType(component.io) == ioType) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -693,9 +719,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     }
 
     private void applyDefinition(CustomHatchRegistry.CustomHatchDef def) {
-        this.capacity = Math.max(1, def.capacity);
-        this.fluidCapacity = Math.max(1, def.fluidCapacity > 0 ? def.fluidCapacity : this.capacity);
-        this.gasCapacity = Math.max(1, def.gasCapacity > 0 ? def.gasCapacity : this.capacity);
+        this.capacity = Math.max(1L, def.capacity);
+        this.fluidCapacity = Math.max(1L, def.fluidCapacity > 0L ? def.fluidCapacity : this.capacity);
+        this.gasCapacity = Math.max(1L, def.gasCapacity > 0L ? def.gasCapacity : this.capacity);
         this.energyCapacity = Math.max(1L, def.energyCapacity > 0L ? def.energyCapacity : this.capacity);
         this.energyTransfer = Math.max(1L, def.energyTransfer > 0L ? def.energyTransfer : this.energyCapacity);
         this.energy = clampEnergy(this.energy);
@@ -855,9 +881,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         super.readCustomNBT(compound);
         String id = CustomIdValidator.readSanitizedString(compound, "hatchId");
         this.hatchId = id == null ? "" : id;
-        this.capacity = compound.hasKey("capacity") ? clampCapacity(compound.getInteger("capacity")) : this.capacity;
-        this.fluidCapacity = compound.hasKey("fluidCapacity") ? clampCapacity(compound.getInteger("fluidCapacity")) : this.capacity;
-        this.gasCapacity = compound.hasKey("gasCapacity") ? clampCapacity(compound.getInteger("gasCapacity")) : this.capacity;
+        this.capacity = compound.hasKey("capacity") ? clampCapacity(compound.getLong("capacity")) : this.capacity;
+        this.fluidCapacity = compound.hasKey("fluidCapacity") ? clampCapacity(compound.getLong("fluidCapacity")) : this.capacity;
+        this.gasCapacity = compound.hasKey("gasCapacity") ? clampCapacity(compound.getLong("gasCapacity")) : this.capacity;
         this.energyCapacity = compound.hasKey("energyCapacity") ? clampEnergyCapacity(compound.getLong("energyCapacity")) : this.energyCapacity;
         this.energyTransfer = compound.hasKey("energyTransfer") ? clampEnergyCapacity(compound.getLong("energyTransfer")) : this.energyTransfer;
         syncDefinition();
@@ -884,9 +910,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         compound.setTag("inv", this.inventory.writeNBT());
         compound.setTag("fluid", this.tank.writeToNBT(new NBTTagCompound()));
         this.gasTank.writeToNBT(compound, "gas");
-        compound.setInteger("capacity", this.capacity);
-        compound.setInteger("fluidCapacity", this.fluidCapacity);
-        compound.setInteger("gasCapacity", this.gasCapacity);
+        compound.setLong("capacity", this.capacity);
+        compound.setLong("fluidCapacity", this.fluidCapacity);
+        compound.setLong("gasCapacity", this.gasCapacity);
         compound.setLong("energy", this.energy);
         compound.setLong("energyCapacity", this.energyCapacity);
         compound.setLong("energyTransfer", this.energyTransfer);
@@ -1040,16 +1066,230 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         return this.rwLock;
     }
 
-    private class ProcessorTank extends FluidTank {
-        public ProcessorTank(int capacity) {
-            super(capacity);
+    private class ProcessorTank extends FluidTank implements LongFluidIOHandler {
+        private long longCapacity = 1000L;
+        private long longAmount = 0L;
+
+        public ProcessorTank(long capacity) {
+            super(downcastAmount(capacity));
+            setCustomCapacity(capacity);
         }
 
-        public void setCustomCapacity(int capacity) {
-            this.capacity = Math.max(1, capacity);
-            if (this.fluid != null && this.fluid.amount > this.capacity) {
-                this.fluid.amount = this.capacity;
+        public long getFluidAmountLong() {
+            return this.longAmount;
+        }
+
+        public long getCapacityLong() {
+            return this.longCapacity;
+        }
+
+        public void setCustomCapacity(long capacity) {
+            this.longCapacity = clampCapacity(capacity);
+            this.longAmount = Math.min(this.longAmount, this.longCapacity);
+            syncLegacyView();
+        }
+
+        @Override
+        @Nullable
+        public FluidStack getFluid() {
+            return this.fluid == null ? null : this.fluid.copy();
+        }
+
+        @Override
+        public void setFluid(@Nullable FluidStack fluid) {
+            if (fluid == null || fluid.amount <= 0) {
+                this.fluid = null;
+                this.longAmount = 0L;
+                return;
             }
+            this.longAmount = Math.min(Math.max(0L, (long) fluid.amount), this.longCapacity);
+            this.fluid = fluid.copy();
+            syncLegacyView();
+        }
+
+        @Override
+        public int getFluidAmount() {
+            return downcastAmount(this.longAmount);
+        }
+
+        @Override
+        public int getCapacity() {
+            return downcastAmount(this.longCapacity);
+        }
+
+        @Override
+        public void setCapacity(int capacity) {
+            setCustomCapacity(capacity);
+        }
+
+        @Override
+        public IFluidTankProperties[] getTankProperties() {
+            return new IFluidTankProperties[]{new LongFluidTankProperties()};
+        }
+
+        @Override
+        public int fill(FluidStack resource, boolean doFill) {
+            if (!canFillFluidType(resource)) {
+                return 0;
+            }
+            return fillInternal(resource, doFill);
+        }
+
+        @Override
+        public int fillInternal(FluidStack resource, boolean doFill) {
+            if (resource == null || resource.amount <= 0) {
+                return 0;
+            }
+            if (this.fluid != null && !this.fluid.isFluidEqual(resource)) {
+                return 0;
+            }
+            long acceptedLong = Math.min((long) resource.amount, this.longCapacity - this.longAmount);
+            int accepted = downcastAmount(acceptedLong);
+            if (accepted <= 0) {
+                return 0;
+            }
+            if (doFill) {
+                if (this.fluid == null) {
+                    this.fluid = resource.copy();
+                }
+                this.longAmount += accepted;
+                syncLegacyView();
+                onContentsChanged();
+            }
+            return accepted;
+        }
+
+        @Override
+        public long mmceguiext$simulateFluidIO(FluidStack stack, long maxAmount, IOType actionType) {
+            return doLongFluidIO(stack, maxAmount, actionType, false);
+        }
+
+        @Override
+        public long mmceguiext$doFluidIO(FluidStack stack, long maxAmount, IOType actionType) {
+            return doLongFluidIO(stack, maxAmount, actionType, true);
+        }
+
+        private long doLongFluidIO(FluidStack stack, long maxAmount, IOType actionType, boolean doTransfer) {
+            if (stack == null || maxAmount <= 0L) {
+                return 0L;
+            }
+            if (actionType == IOType.INPUT) {
+                if (this.fluid == null || this.longAmount <= 0L || !this.fluid.isFluidEqual(stack)) {
+                    return 0L;
+                }
+                long moved = Math.min(maxAmount, this.longAmount);
+                if (doTransfer && moved > 0L) {
+                    this.longAmount -= moved;
+                    syncLegacyView();
+                    onContentsChanged();
+                }
+                return moved;
+            }
+            if (this.fluid != null && !this.fluid.isFluidEqual(stack)) {
+                return 0L;
+            }
+            long moved = Math.min(maxAmount, this.longCapacity - this.longAmount);
+            if (doTransfer && moved > 0L) {
+                if (this.fluid == null) {
+                    this.fluid = stack.copy();
+                }
+                this.longAmount += moved;
+                syncLegacyView();
+                onContentsChanged();
+            }
+            return moved;
+        }
+
+        @Override
+        @Nullable
+        public FluidStack drain(FluidStack resource, boolean doDrain) {
+            if (!canDrainFluidType(getFluid())) {
+                return null;
+            }
+            return drainInternal(resource, doDrain);
+        }
+
+        @Override
+        @Nullable
+        public FluidStack drain(int maxDrain, boolean doDrain) {
+            if (!canDrainFluidType(this.fluid)) {
+                return null;
+            }
+            return drainInternal(maxDrain, doDrain);
+        }
+
+        @Override
+        @Nullable
+        public FluidStack drainInternal(FluidStack resource, boolean doDrain) {
+            if (resource == null || !resource.isFluidEqual(getFluid())) {
+                return null;
+            }
+            return drainInternal(resource.amount, doDrain);
+        }
+
+        @Override
+        @Nullable
+        public FluidStack drainInternal(int maxDrain, boolean doDrain) {
+            if (this.fluid == null || maxDrain <= 0 || this.longAmount <= 0L) {
+                return null;
+            }
+            int drained = downcastAmount(Math.min((long) maxDrain, this.longAmount));
+            if (drained <= 0) {
+                return null;
+            }
+            FluidStack stack = this.fluid.copy();
+            stack.amount = drained;
+            if (doDrain) {
+                this.longAmount -= drained;
+                syncLegacyView();
+                onContentsChanged();
+            }
+            return stack;
+        }
+
+        @Override
+        public FluidTank readFromNBT(NBTTagCompound nbt) {
+            if (nbt == null || nbt.hasKey("Empty")) {
+                this.fluid = null;
+                this.longAmount = 0L;
+                return this;
+            }
+            FluidStack fluid = FluidStack.loadFluidStackFromNBT(nbt);
+            if (fluid == null || fluid.amount <= 0) {
+                this.fluid = null;
+                this.longAmount = 0L;
+                return this;
+            }
+            this.longAmount = Math.min(Math.max(0L, nbt.hasKey(NBT_LONG_AMOUNT) ? nbt.getLong(NBT_LONG_AMOUNT) : (long) fluid.amount), this.longCapacity);
+            this.fluid = fluid.copy();
+            syncLegacyView();
+            return this;
+        }
+
+        @Override
+        public NBTTagCompound writeToNBT(NBTTagCompound nbt) {
+            if (nbt == null) {
+                nbt = new NBTTagCompound();
+            }
+            if (this.fluid != null && this.longAmount > 0L) {
+                FluidStack copy = this.fluid.copy();
+                copy.amount = downcastAmount(this.longAmount);
+                copy.writeToNBT(nbt);
+                nbt.setLong(NBT_LONG_AMOUNT, this.longAmount);
+            } else {
+                nbt.setString("Empty", "");
+            }
+            return nbt;
+        }
+
+        private void syncLegacyView() {
+            this.capacity = downcastAmount(this.longCapacity);
+            if (this.fluid == null || this.longAmount <= 0L) {
+                this.fluid = null;
+                this.longAmount = 0L;
+                return;
+            }
+            this.fluid.amount = downcastAmount(this.longAmount);
         }
 
         @Override
@@ -1057,15 +1297,384 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             scheduleInventoryProcess();
             markForUpdateSync();
         }
+
+        private class LongFluidTankProperties implements IFluidTankProperties {
+            @Nullable
+            @Override
+            public FluidStack getContents() {
+                return ProcessorTank.this.getFluid();
+            }
+
+            @Override
+            public int getCapacity() {
+                return ProcessorTank.this.getCapacity();
+            }
+
+            @Override
+            public boolean canFill() {
+                return ProcessorTank.this.canFill();
+            }
+
+            @Override
+            public boolean canDrain() {
+                return ProcessorTank.this.canDrain();
+            }
+
+            @Override
+            public boolean canFillFluidType(FluidStack fluidStack) {
+                return ProcessorTank.this.canFillFluidType(fluidStack);
+            }
+
+            @Override
+            public boolean canDrainFluidType(FluidStack fluidStack) {
+                return ProcessorTank.this.canDrainFluidType(fluidStack);
+            }
+        }
     }
 
-    private class ProcessorGasTank extends MultiGasTank {
-        public ProcessorGasTank(int capacity, int tankCount) {
-            super(capacity, tankCount);
-            setOnSlotChanged(slot -> {
-                scheduleInventoryProcess();
-                markForUpdateSync();
-            });
+    private class ProcessorGasTank implements IExtendedGasHandler, LongGasIOHandler {
+        private final GasStack[] contents;
+        private final long[] amounts;
+        private final GasTankInfo[] props;
+        private long capacity;
+
+        public ProcessorGasTank(long capacity, int tankCount) {
+            int tanks = Math.max(1, tankCount);
+            this.contents = new GasStack[tanks];
+            this.amounts = new long[tanks];
+            this.props = new GasTankInfo[tanks];
+            for (int i = 0; i < this.props.length; i++) {
+                this.props[i] = new GasTankInfoImpl(i);
+            }
+            setCapacity(capacity);
+        }
+
+        public long getCapacityLong() {
+            return this.capacity;
+        }
+
+        public long getGasAmountLong() {
+            return this.amounts.length == 0 ? 0L : this.amounts[0];
+        }
+
+        public ProcessorGasTank setCapacity(final long capacity) {
+            this.capacity = clampCapacity(capacity);
+            for (int i = 0; i < this.contents.length; i++) {
+                if (this.amounts[i] > this.capacity) {
+                    this.amounts[i] = this.capacity;
+                    syncSlot(i);
+                }
+            }
+            return this;
+        }
+
+        @Nonnull
+        @Override
+        public GasTankInfo[] getTankInfo() {
+            return this.props;
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public synchronized int receiveGas(EnumFacing side, GasStack gasStack, boolean doFill) {
+            if (gasStack == null || gasStack.amount <= 0) {
+                return 0;
+            }
+            GasStack insert = gasStack.copy();
+            int totalFillAmount = 0;
+            for (int i = 0; i < this.contents.length; i++) {
+                int filled = fill(i, insert, doFill);
+                totalFillAmount += filled;
+                if (insert.amount <= filled) {
+                    break;
+                }
+                insert.amount -= filled;
+            }
+            return totalFillAmount;
+        }
+
+        @Optional.Method(modid = "mekanism")
+        public int fill(final int slot, final GasStack insert, final boolean doFill) {
+            if (slot < 0 || slot >= this.contents.length || insert == null || insert.amount <= 0) {
+                return 0;
+            }
+            GasStack content = this.contents[slot];
+            if (content != null && !content.isGasEqual(insert)) {
+                return 0;
+            }
+            long acceptedLong = Math.min((long) insert.amount, this.capacity - this.amounts[slot]);
+            int accepted = downcastAmount(acceptedLong);
+            if (accepted <= 0) {
+                return 0;
+            }
+            if (doFill) {
+                if (content == null) {
+                    this.contents[slot] = insert.copy();
+                }
+                this.amounts[slot] += accepted;
+                syncSlot(iClamp(slot));
+                onSlotChanged(slot);
+            }
+            return accepted;
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public long mmceguiext$simulateGasIO(GasStack stack, long maxAmount, IOType actionType) {
+            return doLongGasIO(stack, maxAmount, actionType, false);
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public long mmceguiext$doGasIO(GasStack stack, long maxAmount, IOType actionType) {
+            return doLongGasIO(stack, maxAmount, actionType, true);
+        }
+
+        @Optional.Method(modid = "mekanism")
+        private long doLongGasIO(GasStack stack, long maxAmount, IOType actionType, boolean doTransfer) {
+            if (stack == null || stack.amount <= 0 || maxAmount <= 0L) {
+                return 0L;
+            }
+            long moved = 0L;
+            if (actionType == IOType.INPUT) {
+                for (int i = 0; i < this.contents.length && moved < maxAmount; i++) {
+                    GasStack content = this.contents[i];
+                    if (content == null || this.amounts[i] <= 0L || !content.isGasEqual(stack)) {
+                        continue;
+                    }
+                    long slotMoved = Math.min(maxAmount - moved, this.amounts[i]);
+                    if (doTransfer && slotMoved > 0L) {
+                        this.amounts[i] -= slotMoved;
+                        syncSlot(i);
+                        onSlotChanged(i);
+                    }
+                    moved += slotMoved;
+                }
+                return moved;
+            }
+            for (int i = 0; i < this.contents.length && moved < maxAmount; i++) {
+                GasStack content = this.contents[i];
+                if (content != null && !content.isGasEqual(stack)) {
+                    continue;
+                }
+                long slotMoved = Math.min(maxAmount - moved, this.capacity - this.amounts[i]);
+                if (slotMoved <= 0L) {
+                    continue;
+                }
+                if (doTransfer) {
+                    if (content == null) {
+                        this.contents[i] = stack.copy();
+                    }
+                    this.amounts[i] += slotMoved;
+                    syncSlot(i);
+                    onSlotChanged(i);
+                }
+                moved += slotMoved;
+            }
+            return moved;
+        }
+
+        @Nullable
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public synchronized GasStack drawGas(final GasStack resource, final boolean doDrain) {
+            if (resource == null || resource.amount <= 0) {
+                return null;
+            }
+            GasStack res = resource.copy();
+            int totalDrainAmount = 0;
+            for (int i = 0; i < this.contents.length; i++) {
+                GasStack content = this.contents[i];
+                if (content == null || !content.isGasEqual(res)) {
+                    continue;
+                }
+                GasStack drainedStack = drain(i, res.amount, doDrain);
+                if (drainedStack == null || drainedStack.amount <= 0) {
+                    continue;
+                }
+                int drained = drainedStack.amount;
+                totalDrainAmount += drained;
+                if (drained >= res.amount) {
+                    break;
+                }
+                res.amount -= drained;
+            }
+            if (totalDrainAmount <= 0) {
+                return null;
+            }
+            GasStack drained = resource.copy();
+            drained.amount = totalDrainAmount;
+            return drained;
+        }
+
+        @Nullable
+        @Optional.Method(modid = "mekanism")
+        public GasStack drain(final int slot, final int maxDrain, final boolean doDrain) {
+            if (slot < 0 || slot >= this.contents.length || maxDrain <= 0) {
+                return null;
+            }
+            GasStack content = this.contents[slot];
+            if (content == null || this.amounts[slot] <= 0L) {
+                return null;
+            }
+            int drained = downcastAmount(Math.min((long) maxDrain, this.amounts[slot]));
+            if (drained <= 0) {
+                return null;
+            }
+            GasStack copied = content.copy();
+            copied.amount = drained;
+            if (doDrain) {
+                this.amounts[slot] -= drained;
+                syncSlot(slot);
+                onSlotChanged(slot);
+            }
+            return copied;
+        }
+
+        @Nullable
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public synchronized GasStack drawGas(final EnumFacing side, final int maxDrain, final boolean doDrain) {
+            if (maxDrain <= 0) {
+                return null;
+            }
+            for (int i = 0; i < this.contents.length; i++) {
+                GasStack content = this.contents[i];
+                if (content == null || this.amounts[i] <= 0L) {
+                    continue;
+                }
+                GasStack toDrain = content.copy();
+                toDrain.amount = maxDrain;
+                return drawGas(toDrain, doDrain);
+            }
+            return null;
+        }
+
+        @Nullable
+        @Optional.Method(modid = "mekanism")
+        public GasStack getGasInSlot(final int slot) {
+            return slot >= 0 && slot < this.contents.length && this.contents[slot] != null ? this.contents[slot].copy() : null;
+        }
+
+        @Optional.Method(modid = "mekanism")
+        public void setGasInSlot(final int slot, final GasStack stack) {
+            if (slot < 0 || slot >= this.contents.length) {
+                return;
+            }
+            if (stack == null || stack.amount <= 0) {
+                this.contents[slot] = null;
+                this.amounts[slot] = 0L;
+            } else {
+                this.contents[slot] = stack.copy();
+                this.amounts[slot] = Math.min(Math.max(0L, (long) stack.amount), this.capacity);
+                syncSlot(slot);
+            }
+            onSlotChanged(slot);
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public boolean canReceiveGas(final EnumFacing side, final Gas type) {
+            return type != null && receiveGas(null, new GasStack(type, 1), false) > 0;
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public boolean canDrawGas(final EnumFacing side, final Gas type) {
+            if (type == null) {
+                return false;
+            }
+            GasStack drawn = drawGas(new GasStack(type, 1), false);
+            return drawn != null && drawn.amount > 0;
+        }
+
+        @Optional.Method(modid = "mekanism")
+        public void readFromNBT(final NBTTagCompound compound, final String name) {
+            Arrays.fill(this.contents, null);
+            Arrays.fill(this.amounts, 0L);
+            NBTTagCompound tag = compound.getCompoundTag(name);
+            if (tag.isEmpty()) {
+                return;
+            }
+            for (int i = 0; i < this.contents.length; i++) {
+                NBTTagCompound t = tag.getCompoundTag("#" + i);
+                if (t.isEmpty()) {
+                    continue;
+                }
+                GasStack gas = GasStack.readFromNBT(t);
+                if (gas == null || gas.amount <= 0) {
+                    continue;
+                }
+                this.contents[i] = gas.copy();
+                this.amounts[i] = Math.min(Math.max(0L, t.hasKey(NBT_LONG_AMOUNT) ? t.getLong(NBT_LONG_AMOUNT) : (long) gas.amount), this.capacity);
+                syncSlot(i);
+            }
+        }
+
+        @Optional.Method(modid = "mekanism")
+        public void writeToNBT(final NBTTagCompound compound, final String name) {
+            NBTTagCompound tag = new NBTTagCompound();
+            for (int i = 0; i < this.contents.length; i++) {
+                GasStack stack = this.contents[i];
+                if (stack == null || this.amounts[i] <= 0L) {
+                    continue;
+                }
+                NBTTagCompound t = new NBTTagCompound();
+                GasStack copy = stack.copy();
+                copy.amount = downcastAmount(this.amounts[i]);
+                copy.write(t);
+                t.setLong(NBT_LONG_AMOUNT, this.amounts[i]);
+                tag.setTag("#" + i, t);
+            }
+            compound.setTag(name, tag);
+        }
+
+        private int iClamp(int slot) {
+            return Math.max(0, Math.min(slot, this.contents.length - 1));
+        }
+
+        private void syncSlot(final int slot) {
+            if (slot < 0 || slot >= this.contents.length) {
+                return;
+            }
+            GasStack content = this.contents[slot];
+            if (content == null || this.amounts[slot] <= 0L) {
+                this.contents[slot] = null;
+                this.amounts[slot] = 0L;
+                return;
+            }
+            content.amount = downcastAmount(this.amounts[slot]);
+        }
+
+        private void onSlotChanged(final int slot) {
+            scheduleInventoryProcess();
+            markForUpdateSync();
+        }
+
+        private class GasTankInfoImpl implements GasTankInfo {
+            private final int index;
+
+            private GasTankInfoImpl(final int index) {
+                this.index = index;
+            }
+
+            @Nullable
+            @Override
+            public GasStack getGas() {
+                return ProcessorGasTank.this.getGasInSlot(this.index);
+            }
+
+            @Override
+            public int getStored() {
+                return this.index >= 0 && this.index < ProcessorGasTank.this.amounts.length
+                    ? downcastAmount(ProcessorGasTank.this.amounts[this.index])
+                    : 0;
+            }
+
+            @Override
+            public int getMaxGas() {
+                return downcastAmount(ProcessorGasTank.this.capacity);
+            }
         }
     }
 
@@ -1208,8 +1817,8 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         return Math.max(0L, Math.min(value, this.energyCapacity));
     }
 
-    private static int clampCapacity(int value) {
-        return Math.max(1, Math.min(value, MAX_HATCH_CAPACITY));
+    private static long clampCapacity(long value) {
+        return Math.max(1L, Math.min(value, MAX_HATCH_CAPACITY));
     }
 
     private static long clampEnergyCapacity(long value) {
@@ -1217,22 +1826,19 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     }
 
     private void clampStoredFluid() {
-        FluidStack fluid = this.tank.getFluid();
-        if (fluid != null && fluid.amount > this.fluidCapacity) {
-            fluid.amount = this.fluidCapacity;
-        }
+        this.tank.setCustomCapacity(this.fluidCapacity);
     }
 
     @Optional.Method(modid = "mekanism")
     private void clampStoredGas() {
-        GasStack gas = this.gasTank.getGasInSlot(0);
-        if (gas != null && gas.amount > this.gasCapacity) {
-            gas.amount = this.gasCapacity;
-            this.gasTank.setGasInSlot(0, gas);
-        }
+        this.gasTank.setCapacity(this.gasCapacity);
     }
 
     private int downcastEnergy(long value) {
+        return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, value);
+    }
+
+    private static int downcastAmount(long value) {
         return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, value);
     }
 
@@ -1432,7 +2038,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         }
     }
 
-    private static class CombinedHatchHandler extends InfItemFluidHandler {
+    private static class CombinedHatchHandler extends InfItemFluidHandler implements LongFluidIOHandler, LongGasIOHandler {
         private final IItemHandlerModifiable itemHandler;
         private final IFluidHandler fluidHandler;
         private final IExtendedGasHandler gasHandler;
@@ -1487,6 +2093,35 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return this.fluidHandler.fill(resource, doFill);
         }
 
+        @Override
+        public long mmceguiext$simulateFluidIO(FluidStack stack, long maxAmount, IOType actionType) {
+            if (this.fluidHandler instanceof LongFluidIOHandler) {
+                return ((LongFluidIOHandler) this.fluidHandler).mmceguiext$simulateFluidIO(stack, maxAmount, actionType);
+            }
+            return fallbackFluidIO(stack, maxAmount, actionType, false);
+        }
+
+        @Override
+        public long mmceguiext$doFluidIO(FluidStack stack, long maxAmount, IOType actionType) {
+            if (this.fluidHandler instanceof LongFluidIOHandler) {
+                return ((LongFluidIOHandler) this.fluidHandler).mmceguiext$doFluidIO(stack, maxAmount, actionType);
+            }
+            return fallbackFluidIO(stack, maxAmount, actionType, true);
+        }
+
+        private long fallbackFluidIO(FluidStack stack, long maxAmount, IOType actionType, boolean doTransfer) {
+            if (stack == null || maxAmount <= 0L) {
+                return 0L;
+            }
+            FluidStack copy = stack.copy();
+            copy.amount = downcastAmount(maxAmount);
+            if (actionType == IOType.INPUT) {
+                FluidStack drained = this.fluidHandler.drain(copy, doTransfer);
+                return drained == null ? 0L : Math.max(0L, drained.amount);
+            }
+            return Math.max(0, this.fluidHandler.fill(copy, doTransfer));
+        }
+
         @Nullable
         @Override
         public synchronized FluidStack drain(FluidStack resource, boolean doDrain) {
@@ -1509,6 +2144,38 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         @Optional.Method(modid = "mekanism")
         public int receiveGas(@Nullable EnumFacing side, GasStack toReceive, boolean doTransfer) {
             return this.gasHandler.receiveGas(side, toReceive, doTransfer);
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public long mmceguiext$simulateGasIO(GasStack stack, long maxAmount, IOType actionType) {
+            if (this.gasHandler instanceof LongGasIOHandler) {
+                return ((LongGasIOHandler) this.gasHandler).mmceguiext$simulateGasIO(stack, maxAmount, actionType);
+            }
+            return fallbackGasIO(stack, maxAmount, actionType, false);
+        }
+
+        @Override
+        @Optional.Method(modid = "mekanism")
+        public long mmceguiext$doGasIO(GasStack stack, long maxAmount, IOType actionType) {
+            if (this.gasHandler instanceof LongGasIOHandler) {
+                return ((LongGasIOHandler) this.gasHandler).mmceguiext$doGasIO(stack, maxAmount, actionType);
+            }
+            return fallbackGasIO(stack, maxAmount, actionType, true);
+        }
+
+        @Optional.Method(modid = "mekanism")
+        private long fallbackGasIO(GasStack stack, long maxAmount, IOType actionType, boolean doTransfer) {
+            if (stack == null || maxAmount <= 0L) {
+                return 0L;
+            }
+            GasStack copy = stack.copy();
+            copy.amount = downcastAmount(maxAmount);
+            if (actionType == IOType.INPUT) {
+                GasStack drawn = this.gasHandler.drawGas(copy, doTransfer);
+                return drawn == null ? 0L : Math.max(0L, drawn.amount);
+            }
+            return Math.max(0, this.gasHandler.receiveGas(null, copy, doTransfer));
         }
 
         @Override

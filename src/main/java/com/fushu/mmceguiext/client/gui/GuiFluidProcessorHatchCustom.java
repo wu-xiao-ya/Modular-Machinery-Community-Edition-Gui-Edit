@@ -211,7 +211,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         GasStack gas = getGas();
         boolean useEnergy = shouldUseEnergy(tankComponent);
         boolean useGas = !useEnergy && shouldUseGas(tankComponent, fluid, gas);
-        long amount = useEnergy ? getEnergyStored() : useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
+        long amount = useEnergy ? getEnergyStored() : useGas ? getGasAmount() : getFluidAmount();
         long capacity = Math.max(1L, getTankCapacity(tankComponent, useGas, useEnergy));
         List<String> tooltip = new ArrayList<String>();
         List<String> configuredTips = resolveComponentTips(tankComponent);
@@ -242,7 +242,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         FluidStack fluid = getFluid();
         GasStack gas = getGas();
         boolean useGas = shouldUseGas(null, fluid, gas);
-        long amount = useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
+        long amount = useGas ? getGasAmount() : getFluidAmount();
         long capacity = getTankCapacity(null, useGas, false);
         for (CustomHatchRegistry.ComponentDef component : this.components) {
             if (component == null || component.value == null || !("text".equalsIgnoreCase(component.type))) {
@@ -253,7 +253,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             }
             boolean componentUseEnergy = shouldUseEnergy(component);
             boolean componentUseGas = !componentUseEnergy && shouldUseGas(component, fluid, gas);
-            long componentAmount = componentUseEnergy ? getEnergyStored() : componentUseGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
+            long componentAmount = componentUseEnergy ? getEnergyStored() : componentUseGas ? getGasAmount() : getFluidAmount();
             long componentCapacity = getTankCapacity(component, componentUseGas, componentUseEnergy);
             String value = resolveTextValue(component.value, fluid, gas, componentUseGas, componentUseEnergy, componentAmount, componentCapacity);
             if (value == null || value.isEmpty()) {
@@ -347,7 +347,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         GasStack gas = getGas();
         boolean useEnergy = shouldUseEnergy(component);
         boolean useGas = !useEnergy && shouldUseGas(component, fluid, gas);
-        long amount = useEnergy ? getEnergyStored() : useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
+        long amount = useEnergy ? getEnergyStored() : useGas ? getGasAmount() : getFluidAmount();
         long capacity = Math.max(1L, getTankCapacity(component, useGas, useEnergy));
         int rawX = component == null ? definition.tank.x : component.x;
         int rawY = component == null ? definition.tank.y : component.y;
@@ -365,7 +365,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             float red = (energyColor >> 16 & 0xFF) / 255F;
             float green = (energyColor >> 8 & 0xFF) / 255F;
             float blue = (energyColor & 0xFF) / 255F;
-            float filledPercent = MathHelper.clamp(amount / (float) capacity, 0F, 1F);
+            float filledPercent = (float) MathHelper.clamp((double) amount / (double) capacity, 0.0D, 1.0D);
             int filled = MathHelper.ceil(filledPercent * tankHeight);
             drawSolidTankFill(tankX, tankY + tankHeight - filled, tankWidth, filled, red, green, blue, resolveTankAlpha(component));
         } else if (useGas && gas != null && amount > 0) {
@@ -373,7 +373,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             float red = (gasColor >> 16 & 0xFF) / 255F;
             float green = (gasColor >> 8 & 0xFF) / 255F;
             float blue = (gasColor & 0xFF) / 255F;
-            float filledPercent = MathHelper.clamp(amount / (float) capacity, 0F, 1F);
+            float filledPercent = (float) MathHelper.clamp((double) amount / (double) capacity, 0.0D, 1.0D);
             int filled = MathHelper.ceil(filledPercent * tankHeight);
             float alpha = resolveTankAlpha(component);
             if (usesSolidTankRender(resolveTankRenderMode(component))) {
@@ -395,7 +395,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             float green = (fluidColor >> 8 & 0xFF) / 255F;
             float blue = (fluidColor & 0xFF) / 255F;
 
-            float filledPercent = MathHelper.clamp(amount / (float) capacity, 0F, 1F);
+            float filledPercent = (float) MathHelper.clamp((double) amount / (double) capacity, 0.0D, 1.0D);
             int filled = MathHelper.ceil(filledPercent * tankHeight);
             float alpha = resolveTankAlpha(component);
             if (usesSolidTankRender(resolveTankRenderMode(component))) {
@@ -505,10 +505,10 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             return UnitFormat.compact(amount);
         }
         if ("gas.amount".equalsIgnoreCase(key)) {
-            return Integer.toString(gas == null ? 0 : gas.amount);
+            return Long.toString(getGasAmount());
         }
         if ("gas.amount_formatted".equalsIgnoreCase(key) || "gas.amount.compact".equalsIgnoreCase(key)) {
-            return UnitFormat.compact(gas == null ? 0 : gas.amount);
+            return UnitFormat.compact(getGasAmount());
         }
         if ("tank.capacity".equalsIgnoreCase(key)) {
             return Long.toString(capacity);
@@ -517,7 +517,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             return UnitFormat.compact(capacity);
         }
         if ("gas.capacity".equalsIgnoreCase(key)) {
-            return Integer.toString(getGasCapacity());
+            return Long.toString(getGasCapacity());
         }
         if ("gas.capacity_formatted".equalsIgnoreCase(key) || "gas.capacity.compact".equalsIgnoreCase(key)) {
             return UnitFormat.compact(getGasCapacity());
@@ -529,10 +529,10 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             return UnitFormat.compact(amount) + " / " + UnitFormat.compact(capacity);
         }
         if ("gas.amount_capacity".equalsIgnoreCase(key)) {
-            return (gas == null ? 0 : gas.amount) + " / " + getGasCapacity();
+            return getGasAmount() + " / " + getGasCapacity();
         }
         if ("gas.amount_capacity_formatted".equalsIgnoreCase(key) || "gas.amount_capacity.compact".equalsIgnoreCase(key)) {
-            return UnitFormat.compact(gas == null ? 0 : gas.amount) + " / " + UnitFormat.compact(getGasCapacity());
+            return UnitFormat.compact(getGasAmount()) + " / " + UnitFormat.compact(getGasCapacity());
         }
         if ("energy.name".equalsIgnoreCase(key)) {
             return "Energy";
@@ -706,33 +706,56 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         }
     }
 
-    private int getCapacity() {
+    private long getCapacity() {
         return getFluidCapacity();
     }
 
-    private int getFluidCapacity() {
+    private long getFluidCapacity() {
         try {
             Method method = owner.getClass().getMethod("getFluidCapacity");
             Object result = method.invoke(owner);
-            return result instanceof Integer ? ((Integer) result).intValue() : 0;
+            return result instanceof Number ? Math.max(1L, ((Number) result).longValue()) : 1L;
         } catch (Exception ignored) {
             try {
                 Method method = owner.getClass().getMethod("getCapacity");
                 Object result = method.invoke(owner);
-                return result instanceof Integer ? ((Integer) result).intValue() : 0;
+                return result instanceof Number ? Math.max(1L, ((Number) result).longValue()) : 1L;
             } catch (Exception ignoredAgain) {
-                return 0;
+                return 1L;
             }
         }
     }
 
-    private int getGasCapacity() {
+    private long getGasCapacity() {
         try {
             Method method = owner.getClass().getMethod("getGasCapacity");
             Object result = method.invoke(owner);
-            return result instanceof Integer ? ((Integer) result).intValue() : getFluidCapacity();
+            return result instanceof Number ? Math.max(1L, ((Number) result).longValue()) : getFluidCapacity();
         } catch (Exception ignored) {
             return getFluidCapacity();
+        }
+    }
+
+    private long getFluidAmount() {
+        try {
+            Method method = owner.getClass().getMethod("getFluidAmountLong");
+            Object result = method.invoke(owner);
+            return result instanceof Number ? Math.max(0L, ((Number) result).longValue()) : 0L;
+        } catch (Exception ignored) {
+            FluidStack fluid = getFluid();
+            return fluid == null ? 0L : Math.max(0L, (long) fluid.amount);
+        }
+    }
+
+    @Optional.Method(modid = "mekanism")
+    private long getGasAmount() {
+        try {
+            Method method = owner.getClass().getMethod("getGasAmountLong");
+            Object result = method.invoke(owner);
+            return result instanceof Number ? Math.max(0L, ((Number) result).longValue()) : 0L;
+        } catch (Exception ignored) {
+            GasStack gas = getGas();
+            return gas == null ? 0L : Math.max(0L, (long) gas.amount);
         }
     }
 
@@ -1130,7 +1153,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         GasStack gas = getGas();
         boolean useEnergy = shouldUseEnergy(component);
         boolean useGas = !useEnergy && shouldUseGas(component, fluid, gas);
-        long amount = useEnergy ? getEnergyStored() : useGas ? (gas == null ? 0 : gas.amount) : (fluid == null ? 0 : fluid.amount);
+        long amount = useEnergy ? getEnergyStored() : useGas ? getGasAmount() : getFluidAmount();
         long capacity = getTankCapacity(component, useGas, useEnergy);
         String value = resolveTextValue(component.value, fluid, gas, useGas, useEnergy, amount, capacity);
         if (value == null || value.isEmpty()) {

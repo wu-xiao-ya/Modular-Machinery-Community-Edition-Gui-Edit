@@ -35,16 +35,22 @@ import javax.annotation.Nonnull;
 public class BlockCustomHatch extends BlockMachineComponent {
     public static final PropertyEnum<EnumFacing> FACING = PropertyEnum.create("facing", EnumFacing.class, EnumFacing.HORIZONTALS);
     private final com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef definition;
+    private final String registryPath;
     private final ThreadLocal<Boolean> dropNextBreak = new ThreadLocal<Boolean>();
 
     public BlockCustomHatch(com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef definition) {
+        this(definition, definition == null || definition.id == null || definition.id.trim().isEmpty()
+            ? "custom_hatch"
+            : CustomIdValidator.normalizePath(definition.id, "custom_hatch"));
+    }
+
+    public BlockCustomHatch(com.fushu.mmceguiext.common.registry.CustomHatchRegistry.CustomHatchDef definition, String registryPath) {
         super(resolveMaterial(definition));
         this.definition = definition;
+        this.registryPath = CustomIdValidator.normalizePath(registryPath, "custom_hatch");
         applyBlockProperties(definition);
         setCreativeTabSafe(this, CommonProxy.creativeTabModularMachinery);
-        String path = definition == null || definition.id == null || definition.id.trim().isEmpty()
-            ? "custom_hatch"
-            : CustomIdValidator.normalizePath(definition.id, "custom_hatch");
+        String path = this.registryPath;
         setRegistryNameSafe(this, new ResourceLocation(MMCEGuiExt.MODID, path));
         setTranslationKeySafe(this, MMCEGuiExt.MODID + "." + path);
         setDefaultState(this.blockState.getBaseState().withProperty(FACING, EnumFacing.NORTH));
@@ -54,11 +60,15 @@ public class BlockCustomHatch extends BlockMachineComponent {
         return this.definition;
     }
 
+    public boolean isGenericRegistryBlock() {
+        return "custom_hatch".equals(this.registryPath);
+    }
+
     @Override
     public boolean onBlockActivated(World worldIn, BlockPos pos, IBlockState state, EntityPlayer playerIn, EnumHand hand, EnumFacing facing, float hitX, float hitY, float hitZ) {
         if (!worldIn.isRemote) {
             TileEntity te = worldIn.getTileEntity(pos);
-            if (te instanceof TileCustomHatch) {
+            if (playerIn.isSneaking() && te instanceof TileCustomHatch) {
                 TileCustomHatch hatch = (TileCustomHatch) te;
                 if (hatch.tryHeldItemInteraction(playerIn, hand)) {
                     return true;
@@ -73,7 +83,14 @@ public class BlockCustomHatch extends BlockMachineComponent {
     public ItemStack getPickBlock(IBlockState state, RayTraceResult target, World world, BlockPos pos, EntityPlayer player) {
         TileEntity tile = world.getTileEntity(pos);
         if (tile instanceof TileCustomHatch) {
-            return com.fushu.mmceguiext.common.item.ItemBlockCustomHatch.createStack(this);
+            TileCustomHatch hatch = (TileCustomHatch) tile;
+            ItemStack picked = com.fushu.mmceguiext.common.item.ItemBlockCustomHatch.createStack(this);
+            if (hatch.getDefinitionId() != null) {
+                NBTTagCompound tag = picked.hasTagCompound() ? picked.getTagCompound() : new NBTTagCompound();
+                tag.setString("hatchId", hatch.getDefinitionId());
+                picked.setTagCompound(tag);
+            }
+            return picked;
         }
         return new ItemStack(net.minecraft.item.Item.getItemFromBlock(this));
     }
@@ -85,10 +102,10 @@ public class BlockCustomHatch extends BlockMachineComponent {
         if (tile instanceof TileCustomHatch) {
             TileCustomHatch custom = (TileCustomHatch) tile;
             String registryId = getRegistryName() == null ? null : getRegistryName().toString();
-            custom.setDefinitionId(registryId);
             NBTTagCompound tag = stack.getTagCompound();
             String storedDefinition = CustomIdValidator.readSanitizedString(tag, "hatchId");
-            if (registryId != null && registryId.equals(storedDefinition)) {
+            custom.setDefinitionId(storedDefinition != null ? storedDefinition : registryId);
+            if (storedDefinition != null || (registryId != null && registryId.equals(custom.getDefinitionId()))) {
                 custom.readDroppedData(tag);
             }
         }
@@ -103,8 +120,9 @@ public class BlockCustomHatch extends BlockMachineComponent {
                 TileCustomHatch hatch = (TileCustomHatch) tile;
                 NBTTagCompound tag = new NBTTagCompound();
                 hatch.writeDroppedData(tag);
+                String definitionId = hatch.getDefinitionId();
                 String registryId = getRegistryName() == null ? "" : getRegistryName().toString();
-                tag.setString("hatchId", registryId);
+                tag.setString("hatchId", definitionId == null || definitionId.trim().isEmpty() ? registryId : definitionId);
                 dropped.setTagCompound(tag);
             }
             spawnAsEntity(worldIn, pos, dropped);
