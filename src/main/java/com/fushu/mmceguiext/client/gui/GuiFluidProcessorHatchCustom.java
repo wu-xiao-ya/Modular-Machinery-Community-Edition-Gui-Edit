@@ -376,9 +376,7 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
             float filledPercent = (float) MathHelper.clamp((double) amount / (double) capacity, 0.0D, 1.0D);
             int filled = MathHelper.ceil(filledPercent * tankHeight);
             float alpha = resolveTankAlpha(component);
-            if (usesSolidTankRender(resolveTankRenderMode(component))) {
-                drawSolidTankFill(tankX, tankY + tankHeight - filled, tankWidth, filled, red, green, blue, alpha);
-            } else {
+            if (usesTexturedTankRender(resolveTankRenderMode(component))) {
                 TextureAtlasSprite sprite = gas.getGas().getSprite();
                 if (sprite == null) {
                     sprite = Minecraft.getMinecraft().getTextureMapBlocks().getMissingSprite();
@@ -388,6 +386,8 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
                 this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
                 drawTiledFluidSprite(tankX, tankY + tankHeight - filled, tankWidth, filled, sprite);
                 GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            } else {
+                drawSolidTankFill(tankX, tankY + tankHeight - filled, tankWidth, filled, red, green, blue, alpha);
             }
         } else if (fluid != null && amount > 0) {
             int fluidColor = fluid.getFluid().getColor(fluid);
@@ -664,6 +664,12 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
         return "solid".equalsIgnoreCase(renderMode)
             || "flat".equalsIgnoreCase(renderMode)
             || "color".equalsIgnoreCase(renderMode);
+    }
+
+    private boolean usesTexturedTankRender(@Nullable String renderMode) {
+        return "texture".equalsIgnoreCase(renderMode)
+            || "textured".equalsIgnoreCase(renderMode)
+            || "sprite".equalsIgnoreCase(renderMode);
     }
 
     private long getTankCapacity(@Nullable CustomHatchRegistry.ComponentDef component, boolean useGas, boolean useEnergy) {
