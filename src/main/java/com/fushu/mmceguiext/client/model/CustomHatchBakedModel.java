@@ -2,6 +2,8 @@ package com.fushu.mmceguiext.client.model;
 
 import com.fushu.mmceguiext.common.block.BlockCustomHatch;
 import com.fushu.mmceguiext.common.item.ItemBlockCustomHatch;
+import com.fushu.mmceguiext.common.model.CustomHatchModelState;
+import com.fushu.mmceguiext.common.model.CustomHatchRenderState;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.IBakedModel;
@@ -9,6 +11,7 @@ import net.minecraft.client.renderer.block.model.ItemOverrideList;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.common.property.IExtendedBlockState;
 import net.minecraftforge.client.model.BakedModelWrapper;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
 
@@ -31,8 +34,9 @@ public class CustomHatchBakedModel extends BakedModelWrapper<IBakedModel> {
     public List<BakedQuad> getQuads(@Nullable IBlockState state, @Nullable EnumFacing side, long rand) {
         if (state != null && state.getBlock() instanceof BlockCustomHatch) {
             BlockCustomHatch block = (BlockCustomHatch) state.getBlock();
-            String id = block.getDefinition() == null ? null : block.getDefinition().id;
-            IBakedModel model = resolveVariantModel(id);
+            CustomHatchRenderState renderState = extractRenderState(state, block);
+            String id = renderState != null ? renderState.definitionId : (block.getDefinition() == null ? null : block.getDefinition().id);
+            IBakedModel model = resolveVariantModel(id, renderState);
             if (model != null) {
                 return model.getQuads(state, side, rand);
             }
@@ -46,9 +50,23 @@ public class CustomHatchBakedModel extends BakedModelWrapper<IBakedModel> {
     }
 
     @Nullable
-    private IBakedModel resolveVariantModel(@Nullable String id) {
+    private IBakedModel resolveVariantModel(@Nullable String id, @Nullable CustomHatchRenderState renderState) {
         ResourceLocation texture = CustomHatchModelRegistry.getTexture(id);
         ResourceLocation sourceModel = CustomHatchModelRegistry.getSourceModel(id);
+        if (renderState != null) {
+            CustomHatchModelRegistry.TextureLevelModel fluidLevel = CustomHatchModelRegistry.resolveTextureLevel(id, "fluid", renderState.fluidFillRatio);
+            CustomHatchModelRegistry.TextureLevelModel gasLevel = CustomHatchModelRegistry.resolveTextureLevel(id, "gas", renderState.gasFillRatio);
+            CustomHatchModelRegistry.TextureLevelModel energyLevel = CustomHatchModelRegistry.resolveTextureLevel(id, "energy", renderState.energyFillRatio);
+            CustomHatchModelRegistry.TextureLevelModel selected = selectLevel(fluidLevel, gasLevel, energyLevel);
+            if (selected != null) {
+                if (selected.texture != null) {
+                    texture = selected.texture;
+                }
+                if (selected.model != null) {
+                    sourceModel = selected.model;
+                }
+            }
+        }
         if (texture == null && sourceModel == null) {
             return null;
         }
@@ -91,12 +109,42 @@ public class CustomHatchBakedModel extends BakedModelWrapper<IBakedModel> {
             if (stack.getItem() instanceof ItemBlockCustomHatch) {
                 ItemBlockCustomHatch item = (ItemBlockCustomHatch) stack.getItem();
                 String id = item.getDefinition() == null ? null : item.getDefinition().id;
-                IBakedModel model = resolveVariantModel(id);
+                IBakedModel model = resolveVariantModel(id, null);
                 if (model != null) {
                     return model;
                 }
             }
             return CustomHatchBakedModel.this;
         }
+    }
+
+    @Nullable
+    private static CustomHatchRenderState extractRenderState(IBlockState state, BlockCustomHatch block) {
+        if (!(state instanceof IExtendedBlockState)) {
+            return null;
+        }
+        IExtendedBlockState extended = (IExtendedBlockState) state;
+        if (!extended.getUnlistedNames().contains(CustomHatchModelState.RENDER_STATE)) {
+            return null;
+        }
+        CustomHatchRenderState renderState = extended.getValue(CustomHatchModelState.RENDER_STATE);
+        if (renderState != null) {
+            return renderState;
+        }
+        return new CustomHatchRenderState(block.getDefinition() == null ? null : block.getDefinition().id, 0.0D, 0.0D, 0.0D);
+    }
+
+    @Nullable
+    private static CustomHatchModelRegistry.TextureLevelModel selectLevel(@Nullable CustomHatchModelRegistry.TextureLevelModel fluid,
+                                                                          @Nullable CustomHatchModelRegistry.TextureLevelModel gas,
+                                                                          @Nullable CustomHatchModelRegistry.TextureLevelModel energy) {
+        CustomHatchModelRegistry.TextureLevelModel selected = fluid;
+        if (selected == null || (gas != null && gas.minFillRatio >= selected.minFillRatio)) {
+            selected = gas != null ? gas : selected;
+        }
+        if (selected == null || (energy != null && energy.minFillRatio >= selected.minFillRatio)) {
+            selected = energy != null ? energy : selected;
+        }
+        return selected;
     }
 }

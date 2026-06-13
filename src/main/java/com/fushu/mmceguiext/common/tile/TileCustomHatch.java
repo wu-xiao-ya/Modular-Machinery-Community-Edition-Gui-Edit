@@ -29,6 +29,7 @@ import mekanism.api.gas.ITubeConnection;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraftforge.common.capabilities.Capability;
@@ -87,7 +88,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     private long energy = 0L;
     private long energyCapacity = 1000L;
     private long energyTransfer = 1000L;
+    private boolean outputSlotLock = true;
     private boolean syncingDefinition = false;
+    private ItemStack[] outputSlotTemplates = new ItemStack[0];
     private final ProcessorTank tank = new ProcessorTank(this.fluidCapacity);
     private final ProcessorGasTank gasTank = new ProcessorGasTank(this.gasCapacity, 1);
     private final ExternalFluidHandler inputFluidCapability = new ExternalFluidHandler(true, false);
@@ -202,6 +205,18 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         return this.energyTransfer;
     }
 
+    public double getFluidFillRatio() {
+        return fillRatio(getFluidAmountLong(), getFluidCapacity());
+    }
+
+    public double getGasFillRatio() {
+        return fillRatio(this.gasTank.getGasAmountLong(), getGasCapacity());
+    }
+
+    public double getEnergyFillRatio() {
+        return fillRatio(getEnergyStoredLong(), getEnergyCapacity());
+    }
+
     public void applyClientEnergyStored(long value) {
         this.energy = clampEnergy(value);
     }
@@ -236,6 +251,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         compound.setLong("energy", this.energy);
         compound.setLong("energyCapacity", this.energyCapacity);
         compound.setLong("energyTransfer", this.energyTransfer);
+        writeOutputSlotTemplates(compound);
     }
 
     public void readDroppedData(@Nullable NBTTagCompound compound) {
@@ -248,6 +264,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             this.inventory.setListener(this::onInventoryChanged);
             ensureInventoryLayoutMatchesDefinition();
         }
+        readOutputSlotTemplates(compound);
         if (compound.hasKey("fluid", Constants.NBT.TAG_COMPOUND)) {
             this.tank.readFromNBT(compound.getCompoundTag("fluid"));
             clampStoredFluid();
@@ -376,6 +393,12 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     private void onInventoryChanged(int slot) {
         if (slot < 0) {
             return;
+        }
+        if (isOutputSlot(slot)) {
+            ItemStack stack = this.inventory.getStackInSlot(slot);
+            if (!stack.isEmpty()) {
+                lockOutputSlot(slot, stack);
+            }
         }
         for (int inputSlot : this.recipeInputSlots) {
             if (inputSlot == slot) {
@@ -549,6 +572,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             grown.grow(producedContainer.getCount());
             this.inventory.setStackInSlot(outputSlot, grown);
         }
+        lockOutputSlot(outputSlot, producedContainer);
         markNoUpdateSync();
         return true;
     }
@@ -629,6 +653,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         if (stack.isEmpty()) {
             return outputSlots.length > 0 ? outputSlots[0] : -1;
         }
+        if (this.outputSlotLock) {
+            return findLockedOutputSlotFor(stack, outputSlots);
+        }
         for (int slot : outputSlots) {
             ItemStack output = this.inventory.getStackInSlot(slot);
             if (output.isEmpty()) {
@@ -643,6 +670,84 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         return -1;
     }
 
+    private boolean isOutputSlot(int slot) {
+        return indexOfOutputSlot(slot) >= 0;
+    }
+
+    private int findLockedOutputSlotFor(ItemStack stack, int[] outputSlots) {
+        int firstUnboundEmpty = -1;
+        for (int i = 0; i < outputSlots.length; i++) {
+            int slot = outputSlots[i];
+            ItemStack output = this.inventory.getStackInSlot(slot);
+            ItemStack template = getOutputSlotTemplate(slot);
+            if (!output.isEmpty()) {
+                if (!canStacksMerge(output, stack)) {
+                    continue;
+                }
+                int slotLimit = Math.min(this.inventory.getSlotLimit(slot), output.getMaxStackSize());
+                if (output.getCount() + stack.getCount() <= slotLimit) {
+                    return slot;
+                }
+                continue;
+            }
+            if (!template.isEmpty()) {
+                if (canStacksRepresentSameItem(template, stack)) {
+                    return slot;
+                }
+                continue;
+            }
+            if (firstUnboundEmpty < 0) {
+                firstUnboundEmpty = slot;
+            }
+        }
+        return firstUnboundEmpty;
+    }
+
+    private ItemStack getOutputSlotTemplate(int outputSlot) {
+        int index = indexOfOutputSlot(outputSlot);
+        return index >= 0 && index < this.outputSlotTemplates.length ? this.outputSlotTemplates[index] : ItemStack.EMPTY;
+    }
+
+    private void lockOutputSlot(int outputSlot, ItemStack template) {
+        if (!this.outputSlotLock || template.isEmpty()) {
+            return;
+        }
+        int index = indexOfOutputSlot(outputSlot);
+        if (index < 0) {
+            return;
+        }
+        resizeOutputSlotTemplates(this.recipeOutputSlots.length);
+        if (index >= this.outputSlotTemplates.length || !this.outputSlotTemplates[index].isEmpty()) {
+            return;
+        }
+        ItemStack locked = template.copy();
+        locked.setCount(1);
+        this.outputSlotTemplates[index] = locked;
+    }
+
+    private int indexOfOutputSlot(int outputSlot) {
+        for (int i = 0; i < this.recipeOutputSlots.length; i++) {
+            if (this.recipeOutputSlots[i] == outputSlot) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void resizeOutputSlotTemplates(int size) {
+        int length = Math.max(0, size);
+        if (this.outputSlotTemplates.length == length) {
+            return;
+        }
+        ItemStack[] next = new ItemStack[length];
+        Arrays.fill(next, ItemStack.EMPTY);
+        int copy = Math.min(this.outputSlotTemplates.length, next.length);
+        for (int i = 0; i < copy; i++) {
+            next[i] = this.outputSlotTemplates[i].isEmpty() ? ItemStack.EMPTY : this.outputSlotTemplates[i].copy();
+        }
+        this.outputSlotTemplates = next;
+    }
+
     private static boolean canStacksMerge(ItemStack existing, ItemStack incoming) {
         return !existing.isEmpty()
             && !incoming.isEmpty()
@@ -650,6 +755,55 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             && incoming.isStackable()
             && existing.isItemEqual(incoming)
             && ItemStack.areItemStackTagsEqual(existing, incoming);
+    }
+
+    private static boolean canStacksRepresentSameItem(ItemStack existing, ItemStack incoming) {
+        return !existing.isEmpty()
+            && !incoming.isEmpty()
+            && existing.isItemEqual(incoming)
+            && ItemStack.areItemStackTagsEqual(existing, incoming);
+    }
+
+    private void writeOutputSlotTemplates(NBTTagCompound compound) {
+        resizeOutputSlotTemplates(this.recipeOutputSlots.length);
+        NBTTagList list = new NBTTagList();
+        for (int i = 0; i < this.outputSlotTemplates.length; i++) {
+            ItemStack template = this.outputSlotTemplates[i];
+            if (template.isEmpty()) {
+                continue;
+            }
+            NBTTagCompound tag = new NBTTagCompound();
+            tag.setInteger("index", i);
+            if (i < this.recipeOutputSlots.length) {
+                tag.setInteger("slot", this.recipeOutputSlots[i]);
+            }
+            ItemStack copy = template.copy();
+            copy.setCount(1);
+            copy.writeToNBT(tag);
+            list.appendTag(tag);
+        }
+        compound.setTag("outputSlotTemplates", list);
+    }
+
+    private void readOutputSlotTemplates(NBTTagCompound compound) {
+        resizeOutputSlotTemplates(this.recipeOutputSlots.length);
+        Arrays.fill(this.outputSlotTemplates, ItemStack.EMPTY);
+        if (!compound.hasKey("outputSlotTemplates", Constants.NBT.TAG_LIST)) {
+            return;
+        }
+        NBTTagList list = compound.getTagList("outputSlotTemplates", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < list.tagCount(); i++) {
+            NBTTagCompound tag = list.getCompoundTagAt(i);
+            int index = tag.hasKey("slot") ? indexOfOutputSlot(tag.getInteger("slot")) : tag.getInteger("index");
+            if (index < 0 || index >= this.outputSlotTemplates.length) {
+                continue;
+            }
+            ItemStack template = new ItemStack(tag);
+            if (!template.isEmpty()) {
+                template.setCount(1);
+                this.outputSlotTemplates[index] = template;
+            }
+        }
     }
 
     @Nullable
@@ -730,6 +884,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         this.energyCapacity = Math.max(1L, def.energyCapacity > 0L ? def.energyCapacity : this.capacity);
         this.energyTransfer = Math.max(1L, def.energyTransfer > 0L ? def.energyTransfer : this.energyCapacity);
         this.energy = clampEnergy(this.energy);
+        this.outputSlotLock = def.outputSlotLock;
         this.tank.setCustomCapacity(this.fluidCapacity);
         this.gasTank.setCapacity(this.gasCapacity);
         syncInventoryLayout(def);
@@ -751,6 +906,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         this.inventory = next;
         this.recipeInputSlots = layout.inputSlots;
         this.recipeOutputSlots = layout.outputSlots;
+        resizeOutputSlotTemplates(layout.outputSlots.length);
         this.inventorySignature = signature;
     }
 
@@ -897,6 +1053,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             this.inventory.setListener(this::onInventoryChanged);
             ensureInventoryLayoutMatchesDefinition();
         }
+        readOutputSlotTemplates(compound);
         if (compound.hasKey("fluid", Constants.NBT.TAG_COMPOUND)) {
             this.tank.readFromNBT(compound.getCompoundTag("fluid"));
             clampStoredFluid();
@@ -921,6 +1078,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         compound.setLong("energy", this.energy);
         compound.setLong("energyCapacity", this.energyCapacity);
         compound.setLong("energyTransfer", this.energyTransfer);
+        writeOutputSlotTemplates(compound);
     }
 
     @Override
@@ -1856,6 +2014,16 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
 
     private int downcastEnergy(long value) {
         return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, value);
+    }
+
+    private static double fillRatio(long amount, long capacity) {
+        if (capacity <= 0L || amount <= 0L) {
+            return 0.0D;
+        }
+        if (amount >= capacity) {
+            return 1.0D;
+        }
+        return (double) amount / (double) capacity;
     }
 
     private static int downcastAmount(long value) {

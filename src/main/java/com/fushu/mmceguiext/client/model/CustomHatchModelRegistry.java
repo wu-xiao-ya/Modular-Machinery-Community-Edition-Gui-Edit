@@ -13,6 +13,7 @@ import java.util.Map;
 public final class CustomHatchModelRegistry {
     private static final Map<String, ResourceLocation> TEXTURES = new HashMap<String, ResourceLocation>();
     private static final Map<String, ResourceLocation> SOURCE_MODELS = new HashMap<String, ResourceLocation>();
+    private static final Map<String, java.util.List<TextureLevelModel>> TEXTURE_LEVELS = new HashMap<String, java.util.List<TextureLevelModel>>();
 
     private CustomHatchModelRegistry() {
     }
@@ -20,6 +21,7 @@ public final class CustomHatchModelRegistry {
     public static void rebuild() {
         TEXTURES.clear();
         SOURCE_MODELS.clear();
+        TEXTURE_LEVELS.clear();
         List<CustomHatchRegistry.CustomHatchDef> defs = CustomHatchRegistry.getRegistered();
         if (defs.isEmpty()) {
             defs = CustomHatchRegistry.getCached();
@@ -28,7 +30,10 @@ public final class CustomHatchModelRegistry {
             if (def == null || def.id == null || def.id.trim().isEmpty()) {
                 continue;
             }
-            ResourceLocation texture = CustomBlockTextureParser.parse(def.blockTexture);
+            ResourceLocation texture = CustomBlockTextureParser.parse(def.block == null ? null : def.block.texture);
+            if (texture == null) {
+                texture = CustomBlockTextureParser.parse(def.blockTexture);
+            }
             if (texture != null) {
                 TEXTURES.put(normalizeId(def.id), texture);
             }
@@ -38,6 +43,10 @@ public final class CustomHatchModelRegistry {
             }
             if (sourceModel != null) {
                 SOURCE_MODELS.put(normalizeId(def.id), sourceModel);
+            }
+            java.util.List<TextureLevelModel> textureLevels = buildTextureLevels(def);
+            if (!textureLevels.isEmpty()) {
+                TEXTURE_LEVELS.put(normalizeId(def.id), textureLevels);
             }
         }
     }
@@ -68,6 +77,39 @@ public final class CustomHatchModelRegistry {
         }
         String path = normalized.contains(":") ? normalized.substring(normalized.indexOf(':') + 1) : normalized;
         return SOURCE_MODELS.get(path);
+    }
+
+    @Nullable
+    public static TextureLevelModel resolveTextureLevel(@Nullable String id, @Nullable String content, double fillRatio) {
+        if (id == null || id.trim().isEmpty()) {
+            return null;
+        }
+        java.util.List<TextureLevelModel> levels = TEXTURE_LEVELS.get(normalizeId(id));
+        if (levels == null || levels.isEmpty()) {
+            String path = normalizeId(id);
+            if (path.contains(":")) {
+                path = path.substring(path.indexOf(':') + 1);
+            }
+            levels = TEXTURE_LEVELS.get(path);
+        }
+        if (levels == null || levels.isEmpty()) {
+            return null;
+        }
+        String normalizedContent = content == null ? "" : content.trim().toLowerCase(Locale.ROOT);
+        TextureLevelModel selected = null;
+        for (TextureLevelModel level : levels) {
+            if (level == null) {
+                continue;
+            }
+            if (level.content != null && !level.content.isEmpty() && !level.content.equals(normalizedContent)) {
+                continue;
+            }
+            if (fillRatio + 1.0E-9D < level.minFillRatio) {
+                continue;
+            }
+            selected = level;
+        }
+        return selected;
     }
 
     @Nullable
@@ -119,6 +161,42 @@ public final class CustomHatchModelRegistry {
 
     private static String normalizeId(String id) {
         return id.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static java.util.List<TextureLevelModel> buildTextureLevels(CustomHatchRegistry.CustomHatchDef def) {
+        if (def == null || def.block == null || def.block.textureLevels == null || def.block.textureLevels.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        java.util.List<TextureLevelModel> out = new java.util.ArrayList<TextureLevelModel>();
+        for (CustomHatchRegistry.BlockTextureLevelDef level : def.block.textureLevels) {
+            if (level == null) {
+                continue;
+            }
+            ResourceLocation texture = CustomBlockTextureParser.parse(level.texture);
+            ResourceLocation model = parseDirectModel(level.model);
+            if (texture == null && model == null) {
+                continue;
+            }
+            out.add(new TextureLevelModel(level.content == null ? null : level.content.trim().toLowerCase(Locale.ROOT), level.minFillRatio, texture, model));
+        }
+        return out;
+    }
+
+    public static final class TextureLevelModel {
+        @Nullable
+        public final String content;
+        public final double minFillRatio;
+        @Nullable
+        public final ResourceLocation texture;
+        @Nullable
+        public final ResourceLocation model;
+
+        public TextureLevelModel(@Nullable String content, double minFillRatio, @Nullable ResourceLocation texture, @Nullable ResourceLocation model) {
+            this.content = content;
+            this.minFillRatio = minFillRatio;
+            this.texture = texture;
+            this.model = model;
+        }
     }
 
 }

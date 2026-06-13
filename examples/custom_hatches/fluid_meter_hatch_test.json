@@ -1,0 +1,66 @@
+{
+  "id": "fluid_meter_hatch_test",
+  "displayName": "Fluid Meter Hatch Test",
+  "componentType": "fluid",
+  "ioType": "input",
+  "capacity": 4000,
+  "fluidCapacity": 4000,
+  "block": {
+    "model": "mmceguiext:hatch/mix_in_lv1",
+    "texture": "minecraft:textures/blocks/glass.png",
+    "textureLevels": [
+      {
+        "content": "fluid",
+        "minFillRatio": 0.25,
+        "texture": "minecraft:textures/blocks/wool_colored_light_blue.png"
+      },
+      {
+        "content": "fluid",
+        "minFillRatio": 0.50,
+        "texture": "minecraft:textures/blocks/wool_colored_blue.png"
+      },
+      {
+        "content": "fluid",
+        "minFillRatio": 0.75,
+        "texture": "minecraft:textures/blocks/lapis_block.png"
+      },
+      {
+        "content": "fluid",
+        "minFillRatio": 1.0,
+        "texture": "minecraft:textures/blocks/diamond_block.png"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "fluid",
+      "io": "input"
+    }
+  ],
+  "gui": {
+    "width": 176,
+    "height": 166,
+    "coordinateWidth": 176,
+    "coordinateHeight": 166,
+    "components": [
+      {
+        "type": "tank",
+        "x": 80,
+        "y": 15,
+        "width": 18,
+        "height": 61,
+        "content": "fluid",
+        "overlay": true,
+        "tips": [
+          "Fluid: {amount_capacity_formatted} mB"
+        ]
+      },
+      {
+        "type": "player_inventory",
+        "x": 8,
+        "y": 84,
+        "hotbarY": 142
+      }
+    ]
+  }
+}

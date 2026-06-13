@@ -1,6 +1,8 @@
 package com.fushu.mmceguiext.common.block;
 
 import com.fushu.mmceguiext.MMCEGuiExt;
+import com.fushu.mmceguiext.common.model.CustomHatchModelState;
+import com.fushu.mmceguiext.common.model.CustomHatchRenderState;
 import com.fushu.mmceguiext.common.tile.TileCustomHatch;
 import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import net.minecraft.block.Block;
@@ -28,6 +30,8 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
+import net.minecraftforge.common.property.ExtendedBlockState;
+import net.minecraftforge.common.property.IExtendedBlockState;
 
 import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
@@ -175,7 +179,7 @@ public class BlockCustomHatch extends BlockMachineComponent {
 
     @Override
     protected BlockStateContainer createBlockState() {
-        return new BlockStateContainer(this, FACING);
+        return new ExtendedBlockState(this, new net.minecraft.block.properties.IProperty[]{FACING}, new net.minecraftforge.common.property.IUnlistedProperty[]{CustomHatchModelState.RENDER_STATE});
     }
 
     @Override
@@ -186,6 +190,26 @@ public class BlockCustomHatch extends BlockMachineComponent {
     @Override
     public EnumBlockRenderType getRenderType(IBlockState state) {
         return EnumBlockRenderType.MODEL;
+    }
+
+    @Override
+    public IBlockState getExtendedState(IBlockState state, IBlockAccess world, BlockPos pos) {
+        if (!(state instanceof IExtendedBlockState)) {
+            return state;
+        }
+        TileEntity tile = world.getTileEntity(pos);
+        if (!(tile instanceof TileCustomHatch)) {
+            return ((IExtendedBlockState) state).withProperty(CustomHatchModelState.RENDER_STATE, new CustomHatchRenderState(
+                this.definition == null ? null : this.definition.id, 0.0D, 0.0D, 0.0D
+            ));
+        }
+        TileCustomHatch hatch = (TileCustomHatch) tile;
+        return ((IExtendedBlockState) state).withProperty(CustomHatchModelState.RENDER_STATE, new CustomHatchRenderState(
+            hatch.getDefinitionId(),
+            hatch.getFluidFillRatio(),
+            hatch.getGasFillRatio(),
+            hatch.getEnergyFillRatio()
+        ));
     }
 
     @Override

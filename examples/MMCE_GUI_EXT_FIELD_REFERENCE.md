@@ -197,6 +197,50 @@ This file is a quick reference for pack authors.
 CN: 下面这个例子用一个蓝色方块贴图拉成长条，看起来像进度条。
 EN: The example below stretches a blue square texture into a long bar, which can look like a progress bar.
 
+## Custom hatch block texture levels / 自定义仓室方块贴图分级
+
+- `block.texture`
+  - ZH: 自定义仓室方块默认贴图。未命中任何分级时使用它。
+  - EN: Default block texture used when no texture level matches.
+- `block.textureLevels`
+  - ZH: 根据当前仓量比例切换方块贴图或模型的列表。旧配置可省略。
+  - EN: Optional list that switches the hatch block texture or model by current fill ratio.
+- `outputSlotLock`
+  - ZH: 是否锁定流体/气体自动处理的输出槽模板，默认 `true`。开启后，输出槽第一次产出某种容器后，即使被取空，也只会继续接收同类容器，避免多输出槽串位。
+  - EN: Locks output slot templates for automatic fluid/gas container handling. Default: `true`.
+
+### `block.textureLevels[]` fields / 分级字段
+
+- `content`
+  - ZH: 监视的仓类型。可填 `fluid`、`gas`、`energy`；当前重点支持流体仓。
+  - EN: Storage type to monitor. Supported values are `fluid`, `gas`, and `energy`; fluid is the primary use case now.
+- `minFillRatio`
+  - ZH: 生效下限，范围 `0.0` 到 `1.0`。例如 `0.75` 表示存量达到 75% 后启用。
+  - EN: Inclusive lower bound in the `0.0` to `1.0` range. Example: `0.75` means active from 75 percent filled.
+- `texture`
+  - ZH: 命中该分级后覆盖使用的方块贴图。
+  - EN: Replacement block texture used when this level matches.
+- `model`
+  - ZH: 命中该分级后覆盖使用的方块模型；可与 `texture` 二选一，也可同时提供。
+  - EN: Replacement block model used when this level matches; optional and can be combined with `texture`.
+
+```json
+{
+  "id": "demo:fluid_meter_hatch",
+  "componentType": "fluid",
+  "fluidCapacity": 64000,
+  "block": {
+    "texture": "demo:textures/blocks/hatch_empty.png",
+    "textureLevels": [
+      { "content": "fluid", "minFillRatio": 0.25, "texture": "demo:textures/blocks/hatch_q1.png" },
+      { "content": "fluid", "minFillRatio": 0.50, "texture": "demo:textures/blocks/hatch_q2.png" },
+      { "content": "fluid", "minFillRatio": 0.75, "texture": "demo:textures/blocks/hatch_q3.png" },
+      { "content": "fluid", "minFillRatio": 1.00, "texture": "demo:textures/blocks/hatch_full.png" }
+    ]
+  }
+}
+```
+
 ```json
 {
   "mmce_gui_ext": {

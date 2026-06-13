@@ -32,6 +32,7 @@ public final class CustomHatchRegistry {
     private static final int MAX_TEXTS = 512;
     private static final int MAX_GUI_COMPONENTS = 4096;
     private static final int MAX_MACHINE_COMPONENTS = 256;
+    private static final int MAX_BLOCK_TEXTURE_LEVELS = 256;
     private static final int MAX_COMPONENT_SIZE = 4096;
     private static final int MAX_SLOT_SPACING = 256;
     private static final long MAX_HATCH_CAPACITY = Long.MAX_VALUE;
@@ -122,6 +123,7 @@ public final class CustomHatchRegistry {
             def.guiStyleFile = getString(root, "guiStyleFile");
             def.componentType = lower(getString(root, "componentType"));
             def.ioType = lower(getString(root, "ioType"));
+            def.outputSlotLock = getFirstBoolean(root, true, "outputSlotLock", "output_slot_lock", "lockOutputSlots", "lock_output_slots");
             def.machineComponents = parseMachineComponents(getArray(root, "components"));
             def.capacity = clampLong(getLong(root, "capacity", 1000L), 1L, MAX_HATCH_CAPACITY);
             def.fluidCapacity = clampLong(getLong(root, "fluidCapacity", def.capacity), 1L, MAX_HATCH_CAPACITY);
@@ -158,6 +160,7 @@ public final class CustomHatchRegistry {
         BlockDef block = new BlockDef();
         JsonObject obj = getObject(root, "block");
         block.model = getString(obj, root, "model", getString(root, "blockModel"));
+        block.texture = getString(obj, root, "texture", getString(root, "blockTexture"));
         block.material = getString(obj, root, "material", block.material);
         block.hardness = getFloat(obj, root, "hardness", block.hardness);
         block.resistance = getFloat(obj, root, "resistance", block.resistance);
@@ -168,7 +171,55 @@ public final class CustomHatchRegistry {
         block.lightOpacity = getInt(obj, root, "lightOpacity", block.lightOpacity);
         block.slipperiness = getFloat(obj, root, "slipperiness", block.slipperiness);
         block.unbreakable = getBoolean(obj, root, "unbreakable", block.unbreakable);
+        String defaultTextureContent = lower(getFirstString(obj, "textureContent", "texture_content", "content"));
+        if (defaultTextureContent == null || defaultTextureContent.trim().isEmpty()) {
+            defaultTextureContent = lower(getFirstString(root, "blockTextureContent", "block_texture_content", "textureContent", "texture_content"));
+        }
+        if (defaultTextureContent == null || defaultTextureContent.trim().isEmpty()) {
+            defaultTextureContent = "fluid";
+        }
+        block.textureLevels = parseBlockTextureLevels(firstArray(
+            getArray(obj, "textureLevels"),
+            getArray(obj, "texture_levels"),
+            getArray(root, "blockTextureLevels"),
+            getArray(root, "block_texture_levels"),
+            getArray(root, "blockTextures")
+        ), defaultTextureContent);
         return block;
+    }
+
+    private static List<BlockTextureLevelDef> parseBlockTextureLevels(@Nullable JsonArray array, @Nullable String defaultContent) {
+        if (array == null || array.size() == 0) {
+            return Collections.emptyList();
+        }
+        List<BlockTextureLevelDef> out = new ArrayList<BlockTextureLevelDef>();
+        int limit = Math.min(array.size(), MAX_BLOCK_TEXTURE_LEVELS);
+        if (array.size() > MAX_BLOCK_TEXTURE_LEVELS) {
+            LOGGER.warn("Skipping {} extra custom hatch block texture levels; max is {}", array.size() - MAX_BLOCK_TEXTURE_LEVELS, MAX_BLOCK_TEXTURE_LEVELS);
+        }
+        for (int i = 0; i < limit; i++) {
+            JsonElement element = array.get(i);
+            BlockTextureLevelDef def = new BlockTextureLevelDef();
+            if (element != null && element.isJsonObject()) {
+                JsonObject level = element.getAsJsonObject();
+                def.content = lower(getFirstString(level, "content", "resource", "source", "type", "storage"));
+                def.texture = getFirstString(level, "texture", "blockTexture", "block_texture");
+                def.model = getFirstString(level, "model", "blockModel", "block_model");
+                def.minFillRatio = normalizeFillRatio(getFirstDouble(level, "minFillRatio", "min_fill_ratio", "minRatio", "min_ratio", "ratio", "threshold", "min", "from", "level", "percent"));
+            } else {
+                def.texture = asString(element, null);
+                def.minFillRatio = limit <= 1 ? 0.0D : ((double) i / (double) (limit - 1));
+            }
+            if (def.content == null || def.content.trim().isEmpty()) {
+                def.content = defaultContent;
+            }
+            if (def.texture == null && def.model == null) {
+                continue;
+            }
+            out.add(def);
+        }
+        out.sort((a, b) -> Double.compare(a.minFillRatio, b.minFillRatio));
+        return out.isEmpty() ? Collections.<BlockTextureLevelDef>emptyList() : out;
     }
 
     private static TankDef parseTank(@Nullable JsonObject obj) {
@@ -613,6 +664,9 @@ public final class CustomHatchRegistry {
 
     @Nullable
     private static String getFirstString(JsonObject obj, String... keys) {
+        if (obj == null) {
+            return null;
+        }
         for (String key : keys) {
             JsonElement e = obj.get(key);
             if (e != null && !e.isJsonNull()) {
@@ -626,6 +680,20 @@ public final class CustomHatchRegistry {
     private static Boolean getBoolean(JsonObject obj, String key) {
         JsonElement e = obj.get(key);
         return asBoolean(e, null);
+    }
+
+    private static boolean getFirstBoolean(JsonObject obj, boolean fallback, String... keys) {
+        if (obj == null) {
+            return fallback;
+        }
+        for (String key : keys) {
+            JsonElement e = obj.get(key);
+            if (e != null && !e.isJsonNull()) {
+                Boolean value = asBoolean(e, null);
+                return value == null ? fallback : value.booleanValue();
+            }
+        }
+        return fallback;
     }
 
     private static boolean getBoolean(@Nullable JsonObject primary, JsonObject fallbackObj, String key, boolean fallback) {
@@ -649,6 +717,33 @@ public final class CustomHatchRegistry {
             JsonElement e = obj.get(key);
             if (e != null && !e.isJsonNull()) {
                 return asFloat(e, null);
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Double getFirstDouble(JsonObject obj, String... keys) {
+        if (obj == null) {
+            return null;
+        }
+        for (String key : keys) {
+            JsonElement e = obj.get(key);
+            if (e != null && !e.isJsonNull()) {
+                return asDouble(e, null);
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static JsonArray firstArray(@Nullable JsonArray... arrays) {
+        if (arrays == null) {
+            return null;
+        }
+        for (JsonArray array : arrays) {
+            if (array != null) {
+                return array;
             }
         }
         return null;
@@ -698,6 +793,18 @@ public final class CustomHatchRegistry {
     }
 
     @Nullable
+    private static Double asDouble(@Nullable JsonElement e, @Nullable Double fallback) {
+        if (e == null || e.isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return Double.valueOf(e.getAsDouble());
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
+    }
+
+    @Nullable
     private static Boolean asBoolean(@Nullable JsonElement e, @Nullable Boolean fallback) {
         if (e == null || e.isJsonNull()) {
             return fallback;
@@ -739,6 +846,7 @@ public final class CustomHatchRegistry {
         public String guiStyleFile;
         public String componentType = "fluid";
         public String ioType = "input";
+        public boolean outputSlotLock = true;
         public List<MachineComponentDef> machineComponents = Collections.emptyList();
         public long capacity;
         public long fluidCapacity;
@@ -756,6 +864,8 @@ public final class CustomHatchRegistry {
     public static class BlockDef {
         @Nullable
         public String model;
+        @Nullable
+        public String texture;
         public String material = "iron";
         public float hardness = 2.0F;
         public float resistance = 10.0F;
@@ -766,6 +876,17 @@ public final class CustomHatchRegistry {
         public int lightOpacity = 255;
         public float slipperiness = 0.6F;
         public boolean unbreakable = false;
+        public List<BlockTextureLevelDef> textureLevels = Collections.emptyList();
+    }
+
+    public static class BlockTextureLevelDef {
+        @Nullable
+        public String content;
+        @Nullable
+        public String texture;
+        @Nullable
+        public String model;
+        public double minFillRatio;
     }
 
     public static class GuiDef {
@@ -902,6 +1023,23 @@ public final class CustomHatchRegistry {
 
     private static String normalizeId(@Nullable String value) {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static double normalizeFillRatio(@Nullable Double value) {
+        if (value == null) {
+            return 0.0D;
+        }
+        double ratio = value.doubleValue();
+        if (Double.isNaN(ratio) || Double.isInfinite(ratio)) {
+            return 0.0D;
+        }
+        if (ratio < 0.0D) {
+            return 0.0D;
+        }
+        if (ratio > 1.0D) {
+            return 1.0D;
+        }
+        return ratio;
     }
 
     public static final class BlockSpec {
