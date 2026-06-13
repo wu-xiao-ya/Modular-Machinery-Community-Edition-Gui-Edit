@@ -8,6 +8,9 @@ import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import github.kasuminova.mmce.common.util.InfItemFluidHandler;
 import github.kasuminova.mmce.common.util.IExtendedGasHandler;
 import github.kasuminova.mmce.common.util.concurrent.ReadWriteLockProvider;
+import gregtech.api.capability.GregtechCapabilities;
+import gregtech.api.capability.IEnergyContainer;
+import hellfirepvp.modularmachinery.common.base.Mods;
 import hellfirepvp.modularmachinery.common.crafting.ComponentType;
 import hellfirepvp.modularmachinery.common.lib.ComponentTypesMM;
 import hellfirepvp.modularmachinery.common.machine.IOType;
@@ -64,6 +67,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class TileCustomHatch extends TileEntityRestrictedTick implements MachineComponentTile, github.kasuminova.mmce.common.tile.base.MachineCombinationComponent, SelectiveUpdateTileEntity, ReadWriteLockProvider, IGasHandler, ITubeConnection {
     public static final int INPUT_SLOT = 0;
     public static final int OUTPUT_SLOT = 1;
+    private static final long GT_ENERGY_MULTIPLIER = 4L;
     private static final int MAX_DYNAMIC_SLOT_INDEX = 4095;
     private static final long MAX_HATCH_CAPACITY = Long.MAX_VALUE;
     private static final long MAX_ENERGY_CAPACITY = Long.MAX_VALUE;
@@ -93,6 +97,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     private final ExternalGasHandler outputGasCapability = new ExternalGasHandler(false, true);
     private final ExternalGasHandler bidirectionalGasCapability = new ExternalGasHandler(true, true);
     private final EnergyHandler energyHandler = new EnergyHandler();
+    private final GTEnergyContainer gtEnergyContainer = new GTEnergyContainer();
     private String hatchId = "";
     private String inventorySignature = "";
 
@@ -923,6 +928,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         return capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY && supportsExternalCapability(ExternalAccessKind.ITEM)
             || capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY && supportsExternalCapability(ExternalAccessKind.FLUID)
             || capability == CapabilityEnergy.ENERGY && supportsExternalCapability(ExternalAccessKind.ENERGY)
+            || isGregTechEnergyCapability(capability)
             || isMekanismGasCapability(capability) && supportsExternalCapability(ExternalAccessKind.GAS)
             || super.hasCapability(capability, facing);
     }
@@ -939,6 +945,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         if (capability == CapabilityEnergy.ENERGY) {
             return supportsExternalCapability(ExternalAccessKind.ENERGY) ? (T) this.energyHandler : super.getCapability(capability, facing);
         }
+        if (isGregTechEnergyCapability(capability)) {
+            return (T) this.gtEnergyContainer;
+        }
         if (isMekanismGasHandlerCapability(capability)) {
             return supportsExternalCapability(ExternalAccessKind.GAS) ? (T) getExternalGasCapability() : super.getCapability(capability, facing);
         }
@@ -946,6 +955,17 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return supportsExternalCapability(ExternalAccessKind.GAS) ? (T) this : super.getCapability(capability, facing);
         }
         return super.getCapability(capability, facing);
+    }
+
+    private boolean isGregTechEnergyCapability(@Nonnull Capability<?> capability) {
+        return Mods.GREGTECH.isPresent()
+            && supportsExternalCapability(ExternalAccessKind.ENERGY)
+            && capability == getGTEnergyCapability();
+    }
+
+    @Optional.Method(modid = "gregtech")
+    private static Capability<?> getGTEnergyCapability() {
+        return GregtechCapabilities.CAPABILITY_ENERGY_CONTAINER;
     }
 
     private boolean supportsExternalCapability(ExternalAccessKind kind) {
@@ -1840,6 +1860,157 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
 
     private static int downcastAmount(long value) {
         return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, value);
+    }
+
+    private static long gtEuToFe(long value) {
+        if (value <= 0L) {
+            return 0L;
+        }
+        if (value > Long.MAX_VALUE / GT_ENERGY_MULTIPLIER) {
+            return Long.MAX_VALUE;
+        }
+        return value * GT_ENERGY_MULTIPLIER;
+    }
+
+    private static long gtFeToEu(long value) {
+        return value <= 0L ? 0L : value / GT_ENERGY_MULTIPLIER;
+    }
+
+    private static long saturatedMultiply(long left, long right) {
+        if (left <= 0L || right <= 0L) {
+            return 0L;
+        }
+        if (left > Long.MAX_VALUE / right) {
+            return Long.MAX_VALUE;
+        }
+        return left * right;
+    }
+
+    @Optional.Interface(iface = "gregtech.api.capability.IEnergyContainer", modid = "gregtech")
+    private class GTEnergyContainer implements IEnergyContainer {
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public synchronized long acceptEnergyFromNetwork(EnumFacing side, long voltage, long amperage) {
+            if (!inputsEnergy(side) || voltage <= 0L || amperage <= 0L) {
+                return 0L;
+            }
+            long spaceEu = gtFeToEu(Math.max(0L, energyCapacity - energy));
+            long transferEu = getTransferEu();
+            long maxReceiveEu = Math.min(spaceEu, transferEu);
+            if (maxReceiveEu < voltage) {
+                return 0L;
+            }
+            long acceptedAmperage = Math.min(amperage, maxReceiveEu / voltage);
+            if (acceptedAmperage <= 0L) {
+                return 0L;
+            }
+            long acceptedEu = saturatedMultiply(acceptedAmperage, voltage);
+            long acceptedFe = Math.min(gtEuToFe(acceptedEu), energyCapacity - energy);
+            if (acceptedFe <= 0L) {
+                return 0L;
+            }
+            energy += acceptedFe;
+            markNoUpdateSync();
+            return acceptedAmperage;
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public boolean inputsEnergy(EnumFacing side) {
+            return resolveExternalAccess(ExternalAccessKind.ENERGY).input;
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public boolean outputsEnergy(EnumFacing side) {
+            return resolveExternalAccess(ExternalAccessKind.ENERGY).output;
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public synchronized long changeEnergy(long differenceAmount) {
+            if (differenceAmount == 0L) {
+                return 0L;
+            }
+            if (differenceAmount > 0L) {
+                return addEnergy(differenceAmount);
+            }
+            long requested = differenceAmount == Long.MIN_VALUE ? Long.MAX_VALUE : -differenceAmount;
+            return -removeEnergy(requested);
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public synchronized long addEnergy(long energyToAdd) {
+            if (!inputsEnergy(null) || energyToAdd <= 0L) {
+                return 0L;
+            }
+            long acceptedEu = Math.min(energyToAdd, gtFeToEu(Math.max(0L, energyCapacity - energy)));
+            long acceptedFe = Math.min(gtEuToFe(acceptedEu), energyCapacity - energy);
+            if (acceptedFe <= 0L) {
+                return 0L;
+            }
+            energy += acceptedFe;
+            markNoUpdateSync();
+            return acceptedEu;
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public synchronized long removeEnergy(long energyToRemove) {
+            if (!outputsEnergy(null) || energyToRemove <= 0L) {
+                return 0L;
+            }
+            long removedEu = Math.min(energyToRemove, gtFeToEu(energy));
+            long removedFe = Math.min(gtEuToFe(removedEu), energy);
+            if (removedFe <= 0L) {
+                return 0L;
+            }
+            energy -= removedFe;
+            markNoUpdateSync();
+            return removedEu;
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public synchronized long getEnergyStored() {
+            return gtFeToEu(energy);
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public synchronized long getEnergyCapacity() {
+            return gtFeToEu(energyCapacity);
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public long getOutputAmperage() {
+            return outputsEnergy(null) ? 1L : 0L;
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public long getOutputVoltage() {
+            return outputsEnergy(null) ? getTransferEu() : 0L;
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public long getInputAmperage() {
+            return inputsEnergy(null) ? 1L : 0L;
+        }
+
+        @Override
+        @Optional.Method(modid = "gregtech")
+        public long getInputVoltage() {
+            return inputsEnergy(null) ? getTransferEu() : 0L;
+        }
+
+        @Optional.Method(modid = "gregtech")
+        private long getTransferEu() {
+            return Math.max(1L, gtFeToEu(energyTransfer));
+        }
     }
 
     private class EnergyHandler implements IEnergyStorage, IEnergyHandlerAsync {

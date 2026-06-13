@@ -78,6 +78,14 @@ dependencies {
     compileOnly(rfg.deobf("curse.maven:Mekanism-268560:2835175"))
     compileOnly(rfg.deobf("curse.maven:mekanism-energistics-1027681:5408319"))
     compileOnly(rfg.deobf("curse.maven:had-enough-items-557549:4810661"))
+    val localGregTech = fileTree("${System.getProperty("user.home")}/.gradle/caches/modules-2/files-2.1/curse.maven/gregtech-ce-unofficial-557242/5322654") {
+        include("**/gregtech-ce-unofficial-557242-5322654.jar")
+    }.files.firstOrNull()
+    if (localGregTech != null) {
+        compileOnly(files(localGregTech))
+    } else {
+        compileOnly(rfg.deobf("curse.maven:gregtech-ce-unofficial-557242:5322654"))
+    }
     compileOnly("software.bernie.geckolib:geckolib-forge-1.12.2:3.0.31")
 
     testImplementation("junit:junit:4.13.2")
