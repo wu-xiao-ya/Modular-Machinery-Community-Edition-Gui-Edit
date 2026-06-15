@@ -83,6 +83,13 @@ public class MachineGuiStyleParserTest {
                 "      \"guiHeight\": 240,\n" +
                 "      \"enableRightExtension\": false,\n" +
                 "      \"specialThreadBgColor\": \"7DD3FC\",\n" +
+                "      \"threadQueueX\": 12,\n" +
+                "      \"threadQueueY\": 14,\n" +
+                "      \"threadScrollbarX\": 98,\n" +
+                "      \"threadScrollbarY\": 22,\n" +
+                "      \"threadVisibleRows\": 7,\n" +
+                "      \"threadRowWidth\": 90,\n" +
+                "      \"threadRowHeight\": 34,\n" +
                 "      \"smartInterfaceEditors\": [\n" +
                 "        {\"x\": 30, \"y\": 40, \"virtualKey\": \"factory_key\", \"showTitle\": false}\n" +
                 "      ],\n" +
@@ -102,6 +109,13 @@ public class MachineGuiStyleParserTest {
         assertEquals(Integer.valueOf(240), result.factoryStyle.guiHeight);
         assertEquals(Boolean.TRUE, result.factoryStyle.disableRightExtension);
         assertEquals(Integer.valueOf(0xFF7DD3FC), result.factoryStyle.specialThreadBackgroundColor);
+        assertEquals(Integer.valueOf(12), result.factoryStyle.threadQueueX);
+        assertEquals(Integer.valueOf(14), result.factoryStyle.threadQueueY);
+        assertEquals(Integer.valueOf(98), result.factoryStyle.threadScrollbarX);
+        assertEquals(Integer.valueOf(22), result.factoryStyle.threadScrollbarY);
+        assertEquals(Integer.valueOf(7), result.factoryStyle.threadVisibleRows);
+        assertEquals(Integer.valueOf(90), result.factoryStyle.threadRowWidth);
+        assertEquals(Integer.valueOf(34), result.factoryStyle.threadRowHeight);
         assertNotNull(result.factoryStyle.smartInterfaceEditors);
         assertEquals(1, result.factoryStyle.smartInterfaceEditors.size());
         assertEquals(Boolean.FALSE, result.factoryStyle.smartInterfaceEditors.get(0).showTitle);
@@ -109,6 +123,103 @@ public class MachineGuiStyleParserTest {
         assertEquals(1, result.factoryStyle.textureLayers.size());
         assertNull(result.factoryStyle.textureLayers.get(0).foreground);
         assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonAppliesThreadQueueAliasesAndDefaults() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "thread-layout.json",
+            "{\n" +
+                "  \"registryname\": \"demo:thread_layout_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"factoryController\": {\n" +
+                "      \"queueX\": 16,\n" +
+                "      \"queueY\": 18,\n" +
+                "      \"queueScrollbarX\": 102,\n" +
+                "      \"queueScrollbarY\": 24,\n" +
+                "      \"visibleRows\": 9,\n" +
+                "      \"queueRowWidth\": 88,\n" +
+                "      \"queueRowHeight\": 36\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertEquals(Integer.valueOf(16), result.factoryStyle.threadQueueX);
+        assertEquals(Integer.valueOf(18), result.factoryStyle.threadQueueY);
+        assertEquals(Integer.valueOf(102), result.factoryStyle.threadScrollbarX);
+        assertEquals(Integer.valueOf(24), result.factoryStyle.threadScrollbarY);
+        assertEquals(Integer.valueOf(9), result.factoryStyle.threadVisibleRows);
+        assertEquals(Integer.valueOf(88), result.factoryStyle.threadRowWidth);
+        assertEquals(Integer.valueOf(36), result.factoryStyle.threadRowHeight);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonLeavesThreadQueueFieldsUnsetWhenOmitted() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "thread-layout-defaults.json",
+            "{\n" +
+                "  \"registryname\": \"demo:thread_layout_defaults\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"factoryController\": {\n" +
+                "      \"backgroundTexture\": \"demo:textures/gui/factory.png\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.factoryStyle);
+        assertNull(result.factoryStyle.threadQueueX);
+        assertNull(result.factoryStyle.threadQueueY);
+        assertNull(result.factoryStyle.threadScrollbarX);
+        assertNull(result.factoryStyle.threadScrollbarY);
+        assertNull(result.factoryStyle.threadVisibleRows);
+        assertNull(result.factoryStyle.threadRowWidth);
+        assertNull(result.factoryStyle.threadRowHeight);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonAcceptsQueueVisibleRowsAlias() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "thread-layout-visible-rows.json",
+            "{\n" +
+                "  \"registryname\": \"demo:thread_layout_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"factoryController\": {\n" +
+                "      \"queueVisibleRows\": 8\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertEquals(Integer.valueOf(8), result.factoryStyle.threadVisibleRows);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonRejectsOutOfRangeThreadQueueSizes() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "thread-layout-invalid.json",
+            "{\n" +
+                "  \"registryname\": \"demo:thread_layout_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"factoryController\": {\n" +
+                "      \"threadVisibleRows\": 0,\n" +
+                "      \"threadRowWidth\": 23,\n" +
+                "      \"threadRowHeight\": 15\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNull(result.factoryStyle.threadVisibleRows);
+        assertNull(result.factoryStyle.threadRowWidth);
+        assertNull(result.factoryStyle.threadRowHeight);
+        assertTrue(containsWarning(result, "factoryController.threadVisibleRows must be >= 1"));
+        assertTrue(containsWarning(result, "factoryController.threadRowWidth must be >= 24"));
+        assertTrue(containsWarning(result, "factoryController.threadRowHeight must be >= 16"));
     }
 
     @Test
@@ -155,8 +266,10 @@ public class MachineGuiStyleParserTest {
                 "        {\"x\": 8, \"y\": 18, \"value\": \"B\", \"page\": \"settings\"}\n" +
                 "      ],\n" +
                 "      \"buttons\": [\n" +
-                "        {\"x\": 140, \"y\": 8, \"label\": \">\", \"action\": \"page\", \"targetPage\": \"settings\"},\n" +
-                "        {\"x\": 140, \"y\": 24, \"label\": \"+\", \"action\": \"add\", \"key\": \"pulse\", \"value\": 1.0, \"page\": \"settings\"}\n" +
+                "        {\"x\": 140, \"y\": 8, \"label\": \">\", \"action\": \"switch_state\", \"targetState\": \"settings\"},\n" +
+                "        {\"x\": 140, \"y\": 24, \"label\": \"+\", \"action\": \"data_port_add\", \"dataPortKey\": \"pulse\", \"value\": 1.0, \"state\": \"settings\"},\n" +
+                "        {\"x\": 140, \"y\": 40, \"label\": \"Reset\", \"action\": \"set\", \"key\": \"pulse\", \"value\": 0.0, \"min\": 0.0, \"max\": 10.0},\n" +
+                "        {\"x\": 140, \"y\": 56, \"label\": \"Run\", \"action\": \"event\", \"buttonId\": \"run_event\", \"visible\": false}\n" +
                 "      ]\n" +
                 "    }\n" +
                 "  }\n" +
@@ -169,13 +282,384 @@ public class MachineGuiStyleParserTest {
         assertNotNull(result.machineStyle.texts);
         assertEquals("settings", result.machineStyle.texts.get(1).page);
         assertNotNull(result.machineStyle.buttons);
-        assertEquals(2, result.machineStyle.buttons.size());
+        assertEquals(4, result.machineStyle.buttons.size());
         assertEquals("page", result.machineStyle.buttons.get(0).action);
         assertEquals("settings", result.machineStyle.buttons.get(0).targetPage);
         assertEquals("smart_add", result.machineStyle.buttons.get(1).action);
         assertEquals("pulse", result.machineStyle.buttons.get(1).key);
         assertEquals("settings", result.machineStyle.buttons.get(1).page);
+        assertEquals("smart_set", result.machineStyle.buttons.get(2).action);
+        assertEquals(Float.valueOf(0.0F), result.machineStyle.buttons.get(2).value);
+        assertEquals(Float.valueOf(0.0F), result.machineStyle.buttons.get(2).min);
+        assertEquals(Float.valueOf(10.0F), result.machineStyle.buttons.get(2).max);
+        assertEquals("event", result.machineStyle.buttons.get(3).action);
+        assertEquals("run_event", result.machineStyle.buttons.get(3).buttonId);
+        assertEquals(Boolean.FALSE, result.machineStyle.buttons.get(3).visible);
         assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonSupportsSmartSetStringValuesAndNumericAdds() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "smart-string-values.json",
+            "{\n" +
+                "  \"registryname\": \"demo:smart_values_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 12, \"y\": 8, \"label\": \"Set Text\", \"action\": \"smart_set\", \"key\": \"status\", \"value\": \"ready\"},\n" +
+                "        {\"x\": 12, \"y\": 24, \"label\": \"+1\", \"action\": \"smart_add\", \"key\": \"count\", \"value\": 1.5}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.machineStyle);
+        assertNotNull(result.machineStyle.buttons);
+        assertEquals(2, result.machineStyle.buttons.size());
+        assertEquals("smart_set", result.machineStyle.buttons.get(0).action);
+        assertEquals("status", result.machineStyle.buttons.get(0).key);
+        assertNull(result.machineStyle.buttons.get(0).value);
+        assertEquals("ready", result.machineStyle.buttons.get(0).stringValue);
+        assertEquals("smart_add", result.machineStyle.buttons.get(1).action);
+        assertEquals("count", result.machineStyle.buttons.get(1).key);
+        assertEquals(Float.valueOf(1.5F), result.machineStyle.buttons.get(1).value);
+        assertNull(result.machineStyle.buttons.get(1).stringValue);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonSupportsSmartSetStringValueAliasesAndEventButtons() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "smart-string-value-aliases.json",
+            "{\n" +
+                "  \"registryname\": \"demo:smart_value_aliases_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 12, \"y\": 8, \"label\": \"Set Text\", \"action\": \"smart_set\", \"key\": \"status\", \"stringValue\": \"ready\"},\n" +
+                "        {\"x\": 12, \"y\": 24, \"label\": \"Ping\", \"action\": \"event\", \"buttonId\": \"evt_ping\"}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.machineStyle);
+        assertNotNull(result.machineStyle.buttons);
+        assertEquals(2, result.machineStyle.buttons.size());
+        assertEquals("smart_set", result.machineStyle.buttons.get(0).action);
+        assertEquals("status", result.machineStyle.buttons.get(0).key);
+        assertEquals("ready", result.machineStyle.buttons.get(0).stringValue);
+        assertEquals("event", result.machineStyle.buttons.get(1).action);
+        assertEquals("evt_ping", result.machineStyle.buttons.get(1).buttonId);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonSupportsNetworksBButtonFieldCombination() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "networks-b-buttons.json",
+            "{\n" +
+                "  \"registryname\": \"networks-B\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"factoryController\": {\n" +
+                "      \"buttons\": [\n" +
+                "        {\"id\": \"open_modal_settings\", \"x\": 8, \"y\": 138, \"label\": \"Modal\", \"action\": \"subgui\", \"targetSubGui\": \"settings_modal\", \"openMode\": \"modal\"},\n" +
+                "        {\"id\": \"event_ping\", \"buttonId\": \"event_ping\", \"x\": 128, \"y\": 138, \"label\": \"Evt+1\", \"action\": \"event\"},\n" +
+                "        {\"id\": \"smart_count_add\", \"x\": 8, \"y\": 162, \"label\": \"Count+1\", \"action\": \"smart_add\", \"key\": \"test_count\", \"value\": 1},\n" +
+                "        {\"id\": \"smart_text_ready\", \"x\": 68, \"y\": 162, \"label\": \"Set Text\", \"action\": \"smart_set\", \"key\": \"test_status\", \"value\": \"ready\"},\n" +
+                "        {\"id\": \"modal_speed_plus\", \"x\": 40, \"y\": 124, \"label\": \"+1\", \"action\": \"data_port_add\", \"dataPortKey\": \"speed\", \"value\": 1.0, \"min\": 0.0, \"max\": 10.0}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.factoryStyle);
+        assertNotNull(result.factoryStyle.buttons);
+        assertEquals(5, result.factoryStyle.buttons.size());
+        assertEquals("subgui", result.factoryStyle.buttons.get(0).action);
+        assertEquals("settings_modal", result.factoryStyle.buttons.get(0).targetSubGui);
+        assertEquals("modal", result.factoryStyle.buttons.get(0).openMode);
+        assertEquals("event", result.factoryStyle.buttons.get(1).action);
+        assertEquals("event_ping", result.factoryStyle.buttons.get(1).buttonId);
+        assertEquals("smart_add", result.factoryStyle.buttons.get(2).action);
+        assertEquals("test_count", result.factoryStyle.buttons.get(2).key);
+        assertEquals(Float.valueOf(1.0F), result.factoryStyle.buttons.get(2).value);
+        assertEquals("smart_set", result.factoryStyle.buttons.get(3).action);
+        assertEquals("test_status", result.factoryStyle.buttons.get(3).key);
+        assertEquals("ready", result.factoryStyle.buttons.get(3).stringValue);
+        assertEquals("smart_add", result.factoryStyle.buttons.get(4).action);
+        assertEquals("speed", result.factoryStyle.buttons.get(4).key);
+        assertEquals(Float.valueOf(0.0F), result.factoryStyle.buttons.get(4).min);
+        assertEquals(Float.valueOf(10.0F), result.factoryStyle.buttons.get(4).max);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonRejectsSmartAddStringValuesAndEmptySmartSetValues() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "smart-invalid-values.json",
+            "{\n" +
+                "  \"registryname\": \"demo:smart_invalid_values_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 12, \"y\": 8, \"label\": \"Bad Add\", \"action\": \"smart_add\", \"key\": \"count\", \"value\": \"oops\"},\n" +
+                "        {\"x\": 12, \"y\": 24, \"label\": \"Bad Set\", \"action\": \"smart_set\", \"key\": \"status\"}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.machineStyle);
+        assertNull(result.machineStyle.buttons);
+        assertTrue(containsWarning(result, "smart_add action requires numeric value."));
+        assertTrue(containsWarning(result, "smart_set action requires value."));
+    }
+
+    @Test
+    public void parseSubGuiJsonCanBeMergedWithBaseStyleWithoutBreakingPageTargets() {
+        MachineGuiStyleParser.MachineFileParseResult base = MachineGuiStyleParser.parseMachineJson(
+            "base.json",
+            "{\n" +
+                "  \"registryname\": \"demo:dual_source_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"defaultPageId\": \"main\",\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 8, \"y\": 8, \"label\": \"Go\", \"action\": \"page\", \"targetPage\": \"settings\"}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+        MachineGuiStyleParser.MachineFileParseResult sub = SubGuiConfigLoader.parseSubGuiJson(
+            "subgui.json",
+            "{\n" +
+                "  \"registryname\": \"demo:dual_source_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"texts\": [\n" +
+                "        {\"x\": 12, \"y\": 12, \"value\": \"Sub page\", \"page\": \"settings\"}\n" +
+                "      ],\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 28, \"y\": 8, \"label\": \"Back\", \"action\": \"page\", \"targetPage\": \"main\", \"page\": \"settings\"}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        MachineGuiStyleManager.ControllerStyle merged = MachineGuiStyleManager.ControllerStyle
+            .copyOf(base.machineStyle)
+            .mergeFrom(sub.machineStyle);
+
+        assertEquals("main", merged.defaultPageId);
+        assertNotNull(merged.texts);
+        assertEquals(1, merged.texts.size());
+        assertEquals("settings", merged.texts.get(0).page);
+        assertNotNull(merged.buttons);
+        assertEquals(2, merged.buttons.size());
+        assertEquals("page", merged.buttons.get(0).action);
+        assertEquals("settings", merged.buttons.get(0).targetPage);
+        assertEquals("main", merged.buttons.get(1).targetPage);
+        assertEquals("settings", merged.buttons.get(1).page);
+        assertTrue(base.warnings.isEmpty());
+        assertTrue(sub.warnings.isEmpty());
+    }
+
+    @Test
+    public void multipleSubGuiJsonOverlaysAppendInsteadOfReplacingExistingEntries() {
+        MachineGuiStyleParser.MachineFileParseResult base = MachineGuiStyleParser.parseMachineJson(
+            "base.json",
+            "{\n" +
+                "  \"registryname\": \"demo:multi_subgui_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"factoryController\": {\n" +
+                "      \"defaultPageId\": \"main\",\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 8, \"y\": 8, \"label\": \"A\", \"action\": \"page\", \"targetPage\": \"a\"}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+        MachineGuiStyleParser.MachineFileParseResult subA = SubGuiConfigLoader.parseSubGuiJson(
+            "sub-a.json",
+            "{\n" +
+                "  \"registryname\": \"demo:multi_subgui_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"factoryController\": {\n" +
+                "      \"texts\": [\n" +
+                "        {\"x\": 8, \"y\": 20, \"value\": \"Sub A\", \"page\": \"a\"}\n" +
+                "      ],\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 8, \"y\": 32, \"label\": \"B\", \"action\": \"page\", \"targetPage\": \"b\", \"page\": \"a\"}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+        MachineGuiStyleParser.MachineFileParseResult subB = SubGuiConfigLoader.parseSubGuiJson(
+            "sub-b.json",
+            "{\n" +
+                "  \"registryname\": \"demo:multi_subgui_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"factoryController\": {\n" +
+                "      \"texts\": [\n" +
+                "        {\"x\": 8, \"y\": 20, \"value\": \"Sub B\", \"page\": \"b\"}\n" +
+                "      ],\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 8, \"y\": 32, \"label\": \"Main\", \"action\": \"page\", \"targetPage\": \"main\", \"page\": \"b\"}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        MachineGuiStyleManager.ControllerStyle merged = MachineGuiStyleManager.ControllerStyle
+            .copyOf(base.factoryStyle)
+            .mergeFrom(subA.factoryStyle)
+            .mergeFrom(subB.factoryStyle);
+
+        assertEquals("main", merged.defaultPageId);
+        assertNotNull(merged.texts);
+        assertEquals(2, merged.texts.size());
+        assertEquals("a", merged.texts.get(0).page);
+        assertEquals("b", merged.texts.get(1).page);
+        assertNotNull(merged.buttons);
+        assertEquals(3, merged.buttons.size());
+        assertEquals("a", merged.buttons.get(0).targetPage);
+        assertEquals("b", merged.buttons.get(1).targetPage);
+        assertEquals("main", merged.buttons.get(2).targetPage);
+        assertTrue(base.warnings.isEmpty());
+        assertTrue(subA.warnings.isEmpty());
+        assertTrue(subB.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonParsesEmbeddedSubGuisAndButtonTargets() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "embedded-subguis.json",
+            "{\n" +
+                "  \"registryname\": \"demo:controller_with_subgui\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 8, \"y\": 8, \"label\": \"Open\", \"action\": \"subgui\", \"targetSubGui\": \"details\", \"openMode\": \"modal\"},\n" +
+                "        {\"x\": 8, \"y\": 24, \"label\": \"Close\", \"action\": \"close_subgui\"}\n" +
+                "      ],\n" +
+                "      \"subGuis\": [\n" +
+                "        {\n" +
+                "          \"id\": \"details\",\n" +
+                "          \"mode\": \"replace\",\n" +
+                "          \"x\": 12,\n" +
+                "          \"y\": 16,\n" +
+                "          \"width\": 120,\n" +
+                "          \"height\": 80,\n" +
+                "          \"backgroundTexture\": \"demo:textures/gui/sub.png\",\n" +
+                "          \"defaultPageId\": \"main\",\n" +
+                "          \"texts\": [\n" +
+                "            {\"x\": 4, \"y\": 4, \"value\": \"Sub\"}\n" +
+                "          ],\n" +
+                "          \"buttons\": [\n" +
+                "            {\"x\": 90, \"y\": 4, \"label\": \"X\", \"action\": \"close_subgui\"}\n" +
+                "          ]\n" +
+                "        }\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.machineStyle);
+        assertNotNull(result.machineStyle.buttons);
+        assertEquals("subgui", result.machineStyle.buttons.get(0).action);
+        assertEquals("details", result.machineStyle.buttons.get(0).targetSubGui);
+        assertEquals("modal", result.machineStyle.buttons.get(0).openMode);
+        assertEquals("close_subgui", result.machineStyle.buttons.get(1).action);
+        assertNotNull(result.machineStyle.subGuis);
+        assertEquals(1, result.machineStyle.subGuis.size());
+        MachineGuiStyleManager.SubGuiStyle subGui = result.machineStyle.subGuis.get(0);
+        assertEquals("details", subGui.id);
+        assertEquals("replace", subGui.mode);
+        assertEquals(Integer.valueOf(12), subGui.x);
+        assertEquals(Integer.valueOf(16), subGui.y);
+        assertEquals(Integer.valueOf(120), subGui.width);
+        assertEquals(Integer.valueOf(80), subGui.height);
+        assertNotNull(subGui.style);
+        assertEquals("demo:textures/gui/sub.png", subGui.style.backgroundTexture);
+        assertEquals(Integer.valueOf(120), subGui.style.guiWidth);
+        assertEquals(Integer.valueOf(80), subGui.style.guiHeight);
+        assertEquals("main", subGui.style.defaultPageId);
+        assertNotNull(subGui.style.texts);
+        assertEquals("Sub", subGui.style.texts.get(0).value);
+        assertNotNull(subGui.style.buttons);
+        assertEquals("close_subgui", subGui.style.buttons.get(0).action);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseStandaloneSubGuiJsonMergesWithBaseControllerStyle() {
+        MachineGuiStyleParser.MachineFileParseResult base = MachineGuiStyleParser.parseMachineJson(
+            "base-controller.json",
+            "{\n" +
+                "  \"registryname\": \"demo:standalone_subgui_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"factoryController\": {\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 6, \"y\": 6, \"label\": \"Cfg\", \"action\": \"subgui\", \"targetSubGui\": \"cfg\", \"openMode\": \"replace\"}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+        MachineGuiStyleParser.MachineFileParseResult sub = SubGuiConfigLoader.parseSubGuiJson(
+            "standalone-subgui.json",
+            "{\n" +
+                "  \"registryname\": \"demo:standalone_subgui_machine\",\n" +
+                "  \"controller\": \"factory\",\n" +
+                "  \"id\": \"cfg\",\n" +
+                "  \"mode\": \"modal\",\n" +
+                "  \"x\": 18,\n" +
+                "  \"y\": 20,\n" +
+                "  \"backgroundTexture\": \"demo:textures/gui/cfg.png\",\n" +
+                "  \"defaultPageId\": \"cfg_main\",\n" +
+                "  \"texts\": [\n" +
+                "    {\"x\": 5, \"y\": 5, \"value\": \"Config\"}\n" +
+                "  ],\n" +
+                "  \"buttons\": [\n" +
+                "    {\"x\": 90, \"y\": 5, \"label\": \"Done\", \"action\": \"close_subgui\"}\n" +
+                "  ]\n" +
+                "}"
+        );
+
+        MachineGuiStyleManager.ControllerStyle merged = MachineGuiStyleManager.ControllerStyle
+            .copyOf(base.factoryStyle)
+            .mergeFrom(sub.factoryStyle);
+
+        assertEquals("demo:standalone_subgui_machine", sub.namespacedKey);
+        assertTrue(sub.factoryNodePresent);
+        assertNotNull(merged.buttons);
+        assertEquals(1, merged.buttons.size());
+        assertNotNull(merged.subGuis);
+        assertEquals(1, merged.subGuis.size());
+        MachineGuiStyleManager.SubGuiStyle subGui = merged.subGuis.get(0);
+        assertEquals("cfg", subGui.id);
+        assertEquals("modal", subGui.mode);
+        assertEquals(Integer.valueOf(18), subGui.x);
+        assertEquals(Integer.valueOf(20), subGui.y);
+        assertNotNull(subGui.style);
+        assertEquals("demo:textures/gui/cfg.png", subGui.style.backgroundTexture);
+        assertEquals("cfg_main", subGui.style.defaultPageId);
+        assertNotNull(subGui.style.buttons);
+        assertEquals("close_subgui", subGui.style.buttons.get(0).action);
+        assertTrue(base.warnings.isEmpty());
+        assertTrue(sub.warnings.isEmpty());
     }
 
     private static boolean containsWarning(MachineGuiStyleParser.MachineFileParseResult result, String fragment) {

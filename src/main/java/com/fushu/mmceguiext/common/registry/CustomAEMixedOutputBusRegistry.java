@@ -106,6 +106,8 @@ public final class CustomAEMixedOutputBusRegistry {
             def.backgroundTextureWidth = clamp(getInt(root, "backgroundTextureWidth", def.guiWidth), 1, 4096);
             def.backgroundTextureHeight = clamp(getInt(root, "backgroundTextureHeight", def.guiHeight), 1, 4096);
             def.textureLayers = parseTextureLayers(getArray(root, "textureLayers"));
+            def.capacityCardFluidIncrement = clampLong(getLong(root, "capacityCardFluidIncrement", 0L), 0L, Long.MAX_VALUE);
+            def.capacityCardGasIncrement = clampLong(getLong(root, "capacityCardGasIncrement", def.capacityCardFluidIncrement), 0L, Long.MAX_VALUE);
             def.blockTexture = getString(root, "blockTexture");
             def.blockModel = getBlockModel(root);
             def.gui = parseGui(getObject(root, "gui"));
@@ -135,6 +137,7 @@ public final class CustomAEMixedOutputBusRegistry {
         int itemIndex = 0;
         int fluidIndex = 0;
         int gasIndex = 0;
+        int capacityCardIndex = 0;
         for (ComponentDef component : def.gui.components) {
             if (component == null) {
                 continue;
@@ -149,6 +152,18 @@ public final class CustomAEMixedOutputBusRegistry {
                         continue;
                     }
                     itemIndex = Math.max(itemIndex, component.index + 1);
+                } else if ("capacity_card".equals(role)) {
+                    if (component.index < 0) {
+                        component.index = capacityCardIndex;
+                    }
+                    if (!isValidComponentIndex(component, def)) {
+                        continue;
+                    }
+                    capacityCardIndex = Math.max(capacityCardIndex, component.index + 1);
+                    if (!ensureListSize(def.capacityCardSlots, component.index + 1)) {
+                        continue;
+                    }
+                    def.capacityCardSlots.set(component.index, toSlotPoint(component));
                 }
             } else if ("tank".equals(component.type)) {
                 if ("fluid_storage".equals(component.role)) {
@@ -341,6 +356,17 @@ public final class CustomAEMixedOutputBusRegistry {
         }
     }
 
+    private static long getLong(@Nullable JsonObject obj, String key, long fallback) {
+        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return obj.get(key).getAsLong();
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
+    }
+
     private static boolean getBoolean(@Nullable JsonObject obj, String key, boolean fallback) {
         if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
             return fallback;
@@ -354,6 +380,27 @@ public final class CustomAEMixedOutputBusRegistry {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static long clampLong(long value, long min, long max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static boolean ensureListSize(List<SlotPoint> list, int targetSize) {
+        if (targetSize < 0 || targetSize > MAX_COMPONENT_INDEX + 1) {
+            return false;
+        }
+        while (list.size() < targetSize) {
+            list.add(null);
+        }
+        return true;
+    }
+
+    private static SlotPoint toSlotPoint(ComponentDef component) {
+        SlotPoint point = new SlotPoint();
+        point.x = component.x;
+        point.y = component.y;
+        return point;
     }
 
     @Nullable
@@ -385,7 +432,15 @@ public final class CustomAEMixedOutputBusRegistry {
         public String blockTexture;
         public String blockModel;
         public List<TextureLayerDef> textureLayers = Collections.emptyList();
+        public List<SlotPoint> capacityCardSlots = Collections.emptyList();
+        public long capacityCardFluidIncrement;
+        public long capacityCardGasIncrement;
         public GuiDef gui = new GuiDef();
+    }
+
+    public static class SlotPoint {
+        public int x;
+        public int y;
     }
 
     public static class GuiDef {

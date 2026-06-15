@@ -5,19 +5,18 @@ import appeng.container.slot.SlotDisabled;
 import appeng.container.slot.SlotFake;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedInputBus;
+import com.fushu.mmceguiext.common.util.AECapacityCardSupport;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
-import net.minecraft.inventory.Slot;
 import net.minecraftforge.items.IItemHandlerModifiable;
-
-import javax.annotation.Nonnull;
 
 public class ContainerCustomAEMixedInputBus extends AEBaseContainer {
     private final TileCustomAEMixedInputBus owner;
+    private final IItemHandlerModifiable capacityCardGuiInventory;
 
     public ContainerCustomAEMixedInputBus(TileCustomAEMixedInputBus owner, EntityPlayer opening) {
         super(opening.inventory, owner);
         this.owner = owner;
+        this.capacityCardGuiInventory = this.owner.getCapacityCardInventory().asGUIAccess();
         CustomAEMixedInputBusRegistry.Def def = this.owner.getDefinition();
         CustomAEMixedInputBusRegistry.ComponentDef playerInv = findComponent(def, "player_inventory", null);
         int playerInventoryX = playerInv == null ? (def == null ? 8 : def.playerInventoryX) : playerInv.x;
@@ -70,6 +69,24 @@ public class ContainerCustomAEMixedInputBus extends AEBaseContainer {
             }
             this.addSlotToContainer(new SlotFake(config, i, x, y));
         }
+
+        int activeCapacityCards = Math.min(this.capacityCardGuiInventory.getSlots(), this.owner.getActiveCapacityCardSlots());
+        for (int i = 0; i < activeCapacityCards; i++) {
+            CustomAEMixedInputBusRegistry.ComponentDef component = findIndexedComponent(def, "slot", "capacity_card", i);
+            int x = -10000;
+            int y = -10000;
+            if (component != null) {
+                x = component.x;
+                y = component.y;
+            } else if (def != null && i < def.capacityCardSlots.size()) {
+                CustomAEMixedInputBusRegistry.SlotPoint point = def.capacityCardSlots.get(i);
+                if (point != null) {
+                    x = point.x;
+                    y = point.y;
+                }
+            }
+            this.addSlotToContainer(new SlotAEMixedCapacityCard(this.capacityCardGuiInventory, i, x, y));
+        }
     }
 
     @Override
@@ -83,12 +100,6 @@ public class ContainerCustomAEMixedInputBus extends AEBaseContainer {
 
     public TileCustomAEMixedInputBus getOwner() {
         return this.owner;
-    }
-
-    @Nonnull
-    @Override
-    public ItemStack transferStackInSlot(@Nonnull EntityPlayer playerIn, int index) {
-        return ItemStack.EMPTY;
     }
 
     private static CustomAEMixedInputBusRegistry.ComponentDef findIndexedComponent(CustomAEMixedInputBusRegistry.Def def, String type, String role, int index) {

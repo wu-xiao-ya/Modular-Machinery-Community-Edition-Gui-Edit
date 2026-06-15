@@ -219,9 +219,33 @@ public class MMCEGuiExtConfig {
         @Config.Comment("Special/core thread background tint color. Hex RGB or ARGB, e.g. B2E5FF or FFB2E5FF.")
         public String specialThreadBackgroundColor = "B2E5FF";
 
+        @Config.Comment("线程队列左上角 X / Thread queue top-left X.")
+        @Config.RangeInt(min = 0, max = 2048)
+        public int threadQueueX = 8;
+
+        @Config.Comment("线程队列左上角 Y / Thread queue top-left Y.")
+        @Config.RangeInt(min = 0, max = 2048)
+        public int threadQueueY = 8;
+
+        @Config.Comment("线程队列滚动条左侧 X / Thread queue scrollbar X.")
+        @Config.RangeInt(min = 0, max = 2048)
+        public int threadScrollbarX = 94;
+
+        @Config.Comment("线程队列滚动条顶部 Y / Thread queue scrollbar Y.")
+        @Config.RangeInt(min = 0, max = 2048)
+        public int threadScrollbarY = 8;
+
         @Config.Comment("Visible recipe queue rows on the left panel.")
         @Config.RangeInt(min = 1, max = 20)
         public int queueVisibleRows = 6;
+
+        @Config.Comment("线程队列每行宽度 / Thread queue row width.")
+        @Config.RangeInt(min = 24, max = 2048)
+        public int threadRowWidth = 86;
+
+        @Config.Comment("线程队列每行高度 / Thread queue row height.")
+        @Config.RangeInt(min = 16, max = 2048)
+        public int threadRowHeight = 32;
 
         @Config.Comment("Enable Smart Interface editor in factory GUI.")
         public boolean enableSmartInterfaceEditor = true;

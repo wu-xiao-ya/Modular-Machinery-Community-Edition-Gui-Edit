@@ -42,6 +42,25 @@ public class ContainerCustomAEMixedOutputBus extends AEBaseContainer {
             }
             this.addSlotToContainer(new SlotDisabled(internal, i, x, y));
         }
+
+        IItemHandlerModifiable capacityCards = this.owner.getCapacityCardInventory().asGUIAccess();
+        int activeCapacityCards = Math.min(capacityCards.getSlots(), this.owner.getActiveCapacityCardSlots());
+        for (int i = 0; i < activeCapacityCards; i++) {
+            CustomAEMixedOutputBusRegistry.ComponentDef component = findIndexedComponent(def, "slot", "capacity_card", i);
+            int x = -10000;
+            int y = -10000;
+            if (component != null) {
+                x = component.x;
+                y = component.y;
+            } else if (def != null && i < def.capacityCardSlots.size()) {
+                CustomAEMixedOutputBusRegistry.SlotPoint point = def.capacityCardSlots.get(i);
+                if (point != null) {
+                    x = point.x;
+                    y = point.y;
+                }
+            }
+            this.addSlotToContainer(new SlotAEMixedCapacityCard(capacityCards, i, x, y));
+        }
     }
 
     public TileCustomAEMixedOutputBus getOwner() {

@@ -109,6 +109,9 @@ public final class CustomAEMixedInputBusRegistry {
             def.playerInventoryX = getInt(root, "playerInventoryX", 8);
             def.playerInventoryY = getInt(root, "playerInventoryY", 141);
             def.playerHotbarY = getInt(root, "playerHotbarY", 199);
+            def.capacityCardSlots = new ArrayList<SlotPoint>(parseSlotPoints(getArray(root, "capacityCardSlots")));
+            def.capacityCardFluidIncrement = clampLong(getLong(root, "capacityCardFluidIncrement", 0L), 0L, Long.MAX_VALUE);
+            def.capacityCardGasIncrement = clampLong(getLong(root, "capacityCardGasIncrement", def.capacityCardFluidIncrement), 0L, Long.MAX_VALUE);
             def.configSlots = new ArrayList<SlotPoint>(parseSlotPoints(getArray(root, "configSlots")));
             def.storageSlots = new ArrayList<SlotPoint>(parseSlotPoints(getArray(root, "storageSlots")));
             def.fluidConfigSlot = parseSlotPoint(getObject(root, "fluidConfigSlot"));
@@ -282,6 +285,7 @@ public final class CustomAEMixedInputBusRegistry {
         int fluidStorageIndex = 0;
         int gasConfigIndex = 0;
         int gasStorageIndex = 0;
+        int capacityCardIndex = 0;
         for (ComponentDef component : def.gui.components) {
             if (component == null || component.type == null) {
                 continue;
@@ -341,6 +345,18 @@ public final class CustomAEMixedInputBusRegistry {
                         def.gasConfigSlot = toSlotPoint(component);
                         def.gasConfigTank = toTankRect(component);
                     }
+                } else if ("capacity_card".equals(component.role)) {
+                    if (component.index < 0) {
+                        component.index = capacityCardIndex;
+                    }
+                    if (!isValidComponentIndex(component, def)) {
+                        continue;
+                    }
+                    capacityCardIndex = Math.max(capacityCardIndex, component.index + 1);
+                    if (!ensureListSize(def.capacityCardSlots, component.index + 1)) {
+                        continue;
+                    }
+                    def.capacityCardSlots.set(component.index, toSlotPoint(component));
                 }
             } else if ("tank".equals(component.type)) {
                 if ("fluid_storage".equals(component.role)) {
@@ -413,6 +429,21 @@ public final class CustomAEMixedInputBusRegistry {
             component.width = 16;
             component.height = 16;
             components.add(component);
+        }
+        if (def.gui != null && def.gui.components != null) {
+            for (ComponentDef existing : def.gui.components) {
+                if (existing != null && "slot".equals(existing.type) && "capacity_card".equals(existing.role)) {
+                    ComponentDef component = new ComponentDef();
+                    component.type = "slot";
+                    component.role = "capacity_card";
+                    component.index = existing.index;
+                    component.x = existing.x;
+                    component.y = existing.y;
+                    component.width = existing.width;
+                    component.height = existing.height;
+                    components.add(component);
+                }
+            }
         }
         if (def.fluidConfigTank != null) {
             for (int i = 0; i < def.fluidConfigTanks.size(); i++) {
@@ -641,6 +672,17 @@ public final class CustomAEMixedInputBusRegistry {
         }
     }
 
+    private static long getLong(@Nullable JsonObject obj, String key, long fallback) {
+        if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return obj.get(key).getAsLong();
+        } catch (RuntimeException ex) {
+            return fallback;
+        }
+    }
+
     private static boolean getBoolean(@Nullable JsonObject obj, String key, boolean fallback) {
         if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) {
             return fallback;
@@ -653,6 +695,10 @@ public final class CustomAEMixedInputBusRegistry {
     }
 
     private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static long clampLong(long value, long min, long max) {
         return Math.max(min, Math.min(max, value));
     }
 
@@ -686,6 +732,9 @@ public final class CustomAEMixedInputBusRegistry {
         public int playerInventoryX = 8;
         public int playerInventoryY = 141;
         public int playerHotbarY = 199;
+        public List<SlotPoint> capacityCardSlots = Collections.emptyList();
+        public long capacityCardFluidIncrement;
+        public long capacityCardGasIncrement;
         public List<SlotPoint> configSlots = Collections.emptyList();
         public List<SlotPoint> storageSlots = Collections.emptyList();
         public SlotPoint fluidConfigSlot;

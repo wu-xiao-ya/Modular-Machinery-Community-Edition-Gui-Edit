@@ -7,12 +7,15 @@ import com.fushu.mmceguiext.common.block.BlockCustomMEItemInputBus;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry;
 import com.fushu.mmceguiext.common.registry.CustomAEItemInputBusRegistry;
+import com.fushu.mmceguiext.common.registry.CustomCapacityCardRegistry;
 import com.fushu.mmceguiext.common.container.ContainerCustomMEItemInputBus;
 import com.fushu.mmceguiext.common.container.ContainerCustomAEMixedInputBus;
 import com.fushu.mmceguiext.common.container.ContainerCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.container.ContainerFluidProcessorHatchCustom;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
+import com.fushu.mmceguiext.common.integration.crafttweaker.MMCEGEEvents;
 import com.fushu.mmceguiext.common.network.PktControllerButtonAction;
+import com.fushu.mmceguiext.common.network.PktControllerCustomDataSync;
 import com.fushu.mmceguiext.common.network.PktCustomAEMixedSlotUpdate;
 import com.fushu.mmceguiext.common.network.PktCustomHatchEnergySync;
 import com.fushu.mmceguiext.common.network.PktCustomMEItemInputBusInvAction;
@@ -28,6 +31,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.network.IGuiHandler;
@@ -89,10 +93,17 @@ public class MMCEGuiExt {
             nextPacketId++,
             Side.CLIENT
         );
+        NET_CHANNEL.registerMessage(
+            PktControllerCustomDataSync.class,
+            PktControllerCustomDataSync.class,
+            nextPacketId++,
+            Side.CLIENT
+        );
         CustomHatchRegistry.loadAll();
         CustomAEItemInputBusRegistry.loadAll();
         CustomAEMixedInputBusRegistry.loadAll();
         CustomAEMixedOutputBusRegistry.loadAll();
+        CustomCapacityCardRegistry.loadAll();
         if (event.getSide().isClient()) {
             preloadClientStyleCache();
             registerClientGuiEventHandler();
@@ -105,6 +116,17 @@ public class MMCEGuiExt {
         if (Mods.TOP.isPresent()) {
             registerTopProvider();
         }
+    }
+
+    @Mod.EventHandler
+    public void postInit(FMLPostInitializationEvent event) {
+        if (Mods.CRAFTTWEAKER.isPresent()) {
+            registerCraftTweakerEventBridge();
+        }
+    }
+
+    public static Logger logger() {
+        return LOGGER;
     }
 
     private static class GuiHandler implements IGuiHandler {
@@ -129,7 +151,11 @@ public class MMCEGuiExt {
                 }
                 TileCustomAEMixedInputBus tile = (TileCustomAEMixedInputBus) tileEntity;
                 com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def def = resolveMixedInputBusDef(world, pos, tile);
-                return def == null ? null : new ContainerCustomAEMixedInputBus(tile, player);
+                if (def == null) {
+                    LOGGER.warn("Falling back to a safe mixed input GUI layout at {} because the definition could not be resolved.", pos);
+                    def = buildFallbackMixedInputBusDef(tile);
+                }
+                return new ContainerCustomAEMixedInputBus(tile, player);
             }
             if (id == GUI_CUSTOM_AE_MIXED_OUTPUT) {
                 if (!(tileEntity instanceof TileCustomAEMixedOutputBus)) {
@@ -180,7 +206,11 @@ public class MMCEGuiExt {
                 }
                 TileCustomAEMixedInputBus tile = (TileCustomAEMixedInputBus) tileEntity;
                 com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def def = resolveMixedInputBusDef(world, pos, tile);
-                return def == null ? null : createClientGui(
+                if (def == null) {
+                    LOGGER.warn("Falling back to a safe mixed input client GUI at {} because the definition could not be resolved.", pos);
+                    def = buildFallbackMixedInputBusDef(tile);
+                }
+                return createClientGui(
                     "com.fushu.mmceguiext.client.gui.GuiCustomAEMixedInputBus",
                     new Class<?>[]{TileCustomAEMixedInputBus.class, EntityPlayer.class, com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def.class},
                     tile,
@@ -297,6 +327,42 @@ public class MMCEGuiExt {
             }
             return null;
         }
+
+        private com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def buildFallbackMixedInputBusDef(TileCustomAEMixedInputBus tile) {
+            com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def def = new com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.Def();
+            def.id = tile.getDefinitionId();
+            def.playerInventoryX = 8;
+            def.playerInventoryY = 141;
+            def.guiWidth = 176;
+            def.guiHeight = 235;
+            def.backgroundTextureWidth = 176;
+            def.backgroundTextureHeight = 235;
+            def.configSlots = buildFallbackSlotPoints(tile.getConfigInventory().getSlots(), 8, 17, 18);
+            def.storageSlots = buildFallbackSlotPoints(tile.getInternalInventory().getSlots(), 8, 53, 18);
+            def.capacityCardSlots = buildFallbackSlotPoints(tile.getCapacityCardInventory().getSlots(), 8, 89, 18);
+            def.fluidConfigTanks = java.util.Collections.emptyList();
+            def.gasConfigTanks = java.util.Collections.emptyList();
+            def.fluidStorageTanks = java.util.Collections.emptyList();
+            def.gasStorageTanks = java.util.Collections.emptyList();
+            def.gui = new com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.GuiDef();
+            def.gui.width = def.guiWidth;
+            def.gui.height = def.guiHeight;
+            def.gui.components = java.util.Collections.emptyList();
+            return def;
+        }
+
+        private java.util.List<com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.SlotPoint> buildFallbackSlotPoints(int slotCount, int startX, int startY, int spacingX) {
+            java.util.List<com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.SlotPoint> points =
+                new java.util.ArrayList<com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.SlotPoint>(Math.max(0, slotCount));
+            for (int i = 0; i < slotCount; i++) {
+                com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.SlotPoint point =
+                    new com.fushu.mmceguiext.common.registry.CustomAEMixedInputBusRegistry.SlotPoint();
+                point.x = startX + i * spacingX;
+                point.y = startY;
+                points.add(point);
+            }
+            return points;
+        }
     }
 
     private static void preloadClientStyleCache() {
@@ -324,6 +390,13 @@ public class MMCEGuiExt {
             top.getClass()
                 .getMethod("registerProvider", Class.forName("mcjty.theoneprobe.api.IProbeInfoProvider"))
                 .invoke(top, Class.forName("com.fushu.mmceguiext.common.integration.theoneprobe.CustomHatchInfoProvider").newInstance());
+        } catch (Exception | LinkageError ignored) {
+        }
+    }
+
+    private static void registerCraftTweakerEventBridge() {
+        try {
+            MinecraftForge.EVENT_BUS.register(MMCEGEEvents.instance());
         } catch (Exception | LinkageError ignored) {
         }
     }

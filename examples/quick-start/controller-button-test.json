@@ -1,0 +1,166 @@
+{
+  "registryname": "mmcege_controller_button_test",
+  "localizedname": "MMCEGE Controller Button Test",
+  "requires-blueprint": false,
+  "parts": [
+    {
+      "x": 0,
+      "y": -1,
+      "z": 0,
+      "elements": "minecraft:iron_block"
+    }
+  ],
+  "mmce_gui_ext": {
+    "machineController": {
+      "backgroundTexture": "modularmachinery:textures/gui/guicontroller.png",
+      "guiWidth": 300,
+      "guiHeight": 213,
+      "defaultPageId": "main",
+      "customPanels": [
+        "main,180,8,112,116,main",
+        "settings,180,8,112,116,settings"
+      ],
+      "texts": [
+        {
+          "x": 186,
+          "y": 14,
+          "value": "Button Test",
+          "page": "main"
+        },
+        {
+          "x": 186,
+          "y": 28,
+          "value": "Open settings to test DataPort buttons.",
+          "scale": 0.7,
+          "page": "main"
+        },
+        {
+          "x": 186,
+          "y": 14,
+          "value": "Settings",
+          "page": "settings"
+        },
+        {
+          "x": 186,
+          "y": 28,
+          "value": "dataPortKey=speed, range 0..10",
+          "scale": 0.7,
+          "page": "settings"
+        },
+        {
+          "x": 186,
+          "y": 40,
+          "value": "status = ready / working / done",
+          "scale": 0.7,
+          "page": "settings"
+        },
+        {
+          "x": 186,
+          "y": 52,
+          "value": "event_ping_count updates on Ping.",
+          "scale": 0.7,
+          "page": "main"
+        }
+      ],
+      "buttons": [
+        {
+          "id": "open_settings",
+          "x": 186,
+          "y": 96,
+          "width": 64,
+          "height": 20,
+          "label": "Settings",
+          "action": "switch_state",
+          "targetState": "settings",
+          "page": "main"
+        },
+        {
+          "id": "event_ping",
+          "buttonId": "event_ping",
+          "x": 254,
+          "y": 96,
+          "width": 32,
+          "height": 20,
+          "label": "Ping",
+          "action": "event",
+          "page": "main"
+        },
+        {
+          "id": "status_set_ready",
+          "x": 186,
+          "y": 74,
+          "width": 50,
+          "height": 20,
+          "label": "Ready",
+          "action": "smart_set",
+          "key": "status",
+          "value": "ready",
+          "page": "settings"
+        },
+        {
+          "id": "status_set_working",
+          "x": 240,
+          "y": 74,
+          "width": 54,
+          "height": 20,
+          "label": "Working",
+          "action": "smart_set",
+          "key": "status",
+          "value": "working",
+          "page": "settings"
+        },
+        {
+          "id": "speed_minus",
+          "x": 186,
+          "y": 96,
+          "width": 32,
+          "height": 20,
+          "label": "-1",
+          "action": "data_port_add",
+          "dataPortKey": "speed",
+          "value": -1.0,
+          "min": 0.0,
+          "max": 10.0,
+          "page": "settings"
+        },
+        {
+          "id": "speed_plus",
+          "x": 222,
+          "y": 96,
+          "width": 32,
+          "height": 20,
+          "label": "+1",
+          "action": "data_port_add",
+          "dataPortKey": "speed",
+          "value": 1.0,
+          "min": 0.0,
+          "max": 10.0,
+          "page": "settings"
+        },
+        {
+          "id": "speed_reset",
+          "x": 258,
+          "y": 96,
+          "width": 32,
+          "height": 20,
+          "label": "0",
+          "action": "data_port_set",
+          "dataPortKey": "speed",
+          "value": 0.0,
+          "page": "settings"
+        },
+        {
+          "id": "back_main",
+          "x": 186,
+          "y": 120,
+          "width": 48,
+          "height": 20,
+          "label": "Back",
+          "action": "page",
+          "targetPage": "main",
+          "page": "settings"
+        }
+      ]
+    }
+  }
+}

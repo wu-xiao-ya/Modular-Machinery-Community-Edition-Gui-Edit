@@ -58,6 +58,10 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -101,6 +105,8 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     private final ExternalGasHandler bidirectionalGasCapability = new ExternalGasHandler(true, true);
     private final EnergyHandler energyHandler = new EnergyHandler();
     private final GTEnergyContainer gtEnergyContainer = new GTEnergyContainer();
+    @Nullable
+    private final Object opStorageHandler = createOPStorageHandler();
     private String hatchId = "";
     private String inventorySignature = "";
 
@@ -1087,6 +1093,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             || capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY && supportsExternalCapability(ExternalAccessKind.FLUID)
             || capability == CapabilityEnergy.ENERGY && supportsExternalCapability(ExternalAccessKind.ENERGY)
             || isGregTechEnergyCapability(capability)
+            || isDraconicOPCapability(capability)
             || isMekanismGasCapability(capability) && supportsExternalCapability(ExternalAccessKind.GAS)
             || super.hasCapability(capability, facing);
     }
@@ -1106,6 +1113,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         if (isGregTechEnergyCapability(capability)) {
             return (T) this.gtEnergyContainer;
         }
+        if (isDraconicOPCapability(capability)) {
+            return (T) this.opStorageHandler;
+        }
         if (isMekanismGasHandlerCapability(capability)) {
             return supportsExternalCapability(ExternalAccessKind.GAS) ? (T) getExternalGasCapability() : super.getCapability(capability, facing);
         }
@@ -1124,6 +1134,19 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
     @Optional.Method(modid = "gregtech")
     private static Capability<?> getGTEnergyCapability() {
         return GregtechCapabilities.CAPABILITY_ENERGY_CONTAINER;
+    }
+
+    private boolean isDraconicOPCapability(@Nonnull Capability<?> capability) {
+        Capability<?> opCapability = getOPCapability();
+        return opCapability != null
+            && this.opStorageHandler != null
+            && supportsExternalCapability(ExternalAccessKind.ENERGY)
+            && capability == opCapability;
+    }
+
+    @Nullable
+    private static Capability<?> getOPCapability() {
+        return OptionalOPBridge.OP_CAPABILITY;
     }
 
     private boolean supportsExternalCapability(ExternalAccessKind kind) {
@@ -2016,6 +2039,63 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, value);
     }
 
+    private static long firstLongArg(@Nullable Object[] args) {
+        if (args == null || args.length == 0 || !(args[0] instanceof Number)) {
+            return 0L;
+        }
+        return ((Number) args[0]).longValue();
+    }
+
+    private static boolean secondBooleanArg(@Nullable Object[] args) {
+        return args != null && args.length > 1 && args[1] instanceof Boolean && (Boolean) args[1];
+    }
+
+    @Nullable
+    private Object coerceEnergyReturn(long value, Class<?> returnType) {
+        if (returnType == Long.TYPE || returnType == Long.class) {
+            return value;
+        }
+        if (returnType == Integer.TYPE || returnType == Integer.class) {
+            return downcastEnergy(value);
+        }
+        if (returnType == Boolean.TYPE || returnType == Boolean.class) {
+            return value != 0L;
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Object defaultReturnValue(Class<?> returnType) {
+        if (returnType == Void.TYPE) {
+            return null;
+        }
+        if (returnType == Boolean.TYPE) {
+            return false;
+        }
+        if (returnType == Byte.TYPE) {
+            return (byte) 0;
+        }
+        if (returnType == Short.TYPE) {
+            return (short) 0;
+        }
+        if (returnType == Integer.TYPE) {
+            return 0;
+        }
+        if (returnType == Long.TYPE) {
+            return 0L;
+        }
+        if (returnType == Float.TYPE) {
+            return 0.0F;
+        }
+        if (returnType == Double.TYPE) {
+            return 0.0D;
+        }
+        if (returnType == Character.TYPE) {
+            return (char) 0;
+        }
+        return null;
+    }
+
     private static double fillRatio(long amount, long capacity) {
         if (capacity <= 0L || amount <= 0L) {
             return 0.0D;
@@ -2052,6 +2132,16 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return Long.MAX_VALUE;
         }
         return left * right;
+    }
+
+    private static long saturatedAdd(long left, long right) {
+        if (right > 0L && left > Long.MAX_VALUE - right) {
+            return Long.MAX_VALUE;
+        }
+        if (right < 0L && left < Long.MIN_VALUE - right) {
+            return Long.MIN_VALUE;
+        }
+        return left + right;
     }
 
     @Optional.Interface(iface = "gregtech.api.capability.IEnergyContainer", modid = "gregtech")
@@ -2178,6 +2268,111 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         @Optional.Method(modid = "gregtech")
         private long getTransferEu() {
             return Math.max(1L, gtFeToEu(energyTransfer));
+        }
+    }
+
+    @Nullable
+    private Object createOPStorageHandler() {
+        Class<?> storageClass = OptionalOPBridge.OP_STORAGE_CLASS;
+        if (storageClass == null || OptionalOPBridge.OP_CAPABILITY == null) {
+            return null;
+        }
+        return Proxy.newProxyInstance(
+            storageClass.getClassLoader(),
+            new Class<?>[]{storageClass},
+            new OPStorageInvocationHandler()
+        );
+    }
+
+    private synchronized long receiveOP(long maxReceive, boolean simulate) {
+        if (maxReceive <= 0L || !resolveExternalAccess(ExternalAccessKind.ENERGY).input) {
+            return 0L;
+        }
+        long accepted = Math.min(Math.min(maxReceive, energyTransfer), energyCapacity - energy);
+        if (accepted <= 0L) {
+            return 0L;
+        }
+        if (!simulate) {
+            energy += accepted;
+            markNoUpdateSync();
+        }
+        return accepted;
+    }
+
+    private synchronized long extractOP(long maxExtract, boolean simulate) {
+        if (maxExtract <= 0L || !resolveExternalAccess(ExternalAccessKind.ENERGY).output) {
+            return 0L;
+        }
+        long extracted = Math.min(Math.min(maxExtract, energyTransfer), energy);
+        if (extracted <= 0L) {
+            return 0L;
+        }
+        if (!simulate) {
+            energy -= extracted;
+            markNoUpdateSync();
+        }
+        return extracted;
+    }
+
+    private synchronized long modifyEnergyStored(long amount) {
+        long before = energy;
+        energy = clampEnergy(saturatedAdd(energy, amount));
+        long changed = energy - before;
+        if (changed != 0L) {
+            markNoUpdateSync();
+        }
+        return changed;
+    }
+
+    /**
+     * Runtime bridge for newer BrandonsCore / Draconic Evolution OP APIs. The 1.12.2 jars used by
+     * this project do not ship IOPStorage or CapabilityOP, so this must stay reflection-only.
+     */
+    private class OPStorageInvocationHandler implements InvocationHandler {
+        @Override
+        public Object invoke(Object proxy, Method method, @Nullable Object[] args) {
+            String name = method.getName();
+            if (method.getDeclaringClass() == Object.class) {
+                return invokeObjectMethod(proxy, method, args);
+            }
+            if ("getOPStored".equals(name) || "getEnergyStored".equals(name)) {
+                return coerceEnergyReturn(energy, method.getReturnType());
+            }
+            if ("getMaxOPStored".equals(name) || "getMaxEnergyStored".equals(name)) {
+                return coerceEnergyReturn(energyCapacity, method.getReturnType());
+            }
+            if ("receiveOP".equals(name) || "receiveEnergy".equals(name)) {
+                long received = receiveOP(firstLongArg(args), secondBooleanArg(args));
+                return coerceEnergyReturn(received, method.getReturnType());
+            }
+            if ("extractOP".equals(name) || "extractEnergy".equals(name)) {
+                long extracted = extractOP(firstLongArg(args), secondBooleanArg(args));
+                return coerceEnergyReturn(extracted, method.getReturnType());
+            }
+            if ("modifyEnergyStored".equals(name)) {
+                long changed = modifyEnergyStored(firstLongArg(args));
+                return coerceEnergyReturn(changed, method.getReturnType());
+            }
+            if ("canExtract".equals(name)) {
+                return resolveExternalAccess(ExternalAccessKind.ENERGY).output;
+            }
+            if ("canReceive".equals(name)) {
+                return resolveExternalAccess(ExternalAccessKind.ENERGY).input;
+            }
+            return defaultReturnValue(method.getReturnType());
+        }
+
+        private Object invokeObjectMethod(Object proxy, Method method, @Nullable Object[] args) {
+            if ("toString".equals(method.getName())) {
+                return "TileCustomHatch.OPStorage";
+            }
+            if ("hashCode".equals(method.getName())) {
+                return System.identityHashCode(proxy);
+            }
+            if ("equals".equals(method.getName())) {
+                return args != null && args.length == 1 && proxy == args[0];
+            }
+            return null;
         }
     }
 
@@ -2610,6 +2805,98 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
 
         public String signature() {
             return java.util.Arrays.toString(this.inputSlots) + "|" + java.util.Arrays.toString(this.outputSlots) + "|" + this.slotCount;
+        }
+    }
+
+    private static class OptionalOPBridge {
+        private static final String[] OP_STORAGE_CLASS_NAMES = new String[]{
+            "com.brandon3055.brandonscore.api.power.IOPStorage",
+            "com.brandon3055.draconicevolution.api.power.IOPStorage",
+            "com.brandon3055.draconicevolution.api.energy.IOPStorage"
+        };
+        private static final String[] OP_CAPABILITY_CLASS_NAMES = new String[]{
+            "com.brandon3055.brandonscore.api.power.CapabilityOP",
+            "com.brandon3055.draconicevolution.api.power.CapabilityOP",
+            "com.brandon3055.draconicevolution.api.energy.CapabilityOP"
+        };
+        private static final String[] OP_CAPABILITY_FIELD_NAMES = new String[]{"OP", "OP_STORAGE", "ENERGY"};
+
+        @Nullable
+        private static final Class<?> OP_STORAGE_CLASS = findOPStorageClass();
+        @Nullable
+        private static final Capability<?> OP_CAPABILITY = findOPCapability();
+
+        @Nullable
+        private static Class<?> findOPStorageClass() {
+            for (String className : OP_STORAGE_CLASS_NAMES) {
+                Class<?> storageClass = findClass(className);
+                if (storageClass != null && storageClass.isInterface()) {
+                    return storageClass;
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        private static Capability<?> findOPCapability() {
+            for (String className : OP_CAPABILITY_CLASS_NAMES) {
+                Class<?> capabilityClass = findClass(className);
+                Capability<?> capability = findNamedCapability(capabilityClass);
+                if (capability != null) {
+                    return capability;
+                }
+                capability = findFirstCapability(capabilityClass);
+                if (capability != null) {
+                    return capability;
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        private static Capability<?> findNamedCapability(@Nullable Class<?> capabilityClass) {
+            if (capabilityClass == null) {
+                return null;
+            }
+            for (String fieldName : OP_CAPABILITY_FIELD_NAMES) {
+                try {
+                    Field field = capabilityClass.getField(fieldName);
+                    Object value = field.get(null);
+                    if (value instanceof Capability) {
+                        return (Capability<?>) value;
+                    }
+                } catch (ReflectiveOperationException | LinkageError ignored) {
+                    // Continue probing known optional API shapes.
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        private static Capability<?> findFirstCapability(@Nullable Class<?> capabilityClass) {
+            if (capabilityClass == null) {
+                return null;
+            }
+            try {
+                for (Field field : capabilityClass.getFields()) {
+                    Object value = field.get(null);
+                    if (value instanceof Capability) {
+                        return (Capability<?>) value;
+                    }
+                }
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                return null;
+            }
+            return null;
+        }
+
+        @Nullable
+        private static Class<?> findClass(String className) {
+            try {
+                return Class.forName(className);
+            } catch (ClassNotFoundException | LinkageError ignored) {
+                return null;
+            }
         }
     }
 }

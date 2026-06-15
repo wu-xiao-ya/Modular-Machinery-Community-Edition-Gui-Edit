@@ -1,0 +1,19 @@
+{
+  "registryname": "demo:subgui_page_reference",
+  "controller": "machine",
+  "id": "overlay_note",
+  "mode": "modal",
+  "x": 190,
+  "y": 8,
+  "guiWidth": 96,
+  "guiHeight": 64,
+  "backgroundTexture": "demo:textures/gui/subgui_overlay.png",
+  "hideDefaultBackground": true,
+  "texts": [
+    { "x": 8, "y": 8, "value": "Overlay note" },
+    { "x": 8, "y": 22, "value": "Loaded from config/mmceguiext/subgui.", "scale": 0.7 }
+  ],
+  "buttons": [
+    { "x": 8, "y": 40, "width": 40, "height": 18, "label": "Close", "action": "close_subgui" }
+  ]
+}

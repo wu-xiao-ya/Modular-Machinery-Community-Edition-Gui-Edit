@@ -60,6 +60,13 @@
 - `backgroundTextureHeight`
 - `backgroundCorner`
 - `specialThreadBackgroundColor`（仅工厂控制器有意义）
+- `threadQueueX`
+- `threadQueueY`
+- `threadScrollbarX`
+- `threadScrollbarY`
+- `threadVisibleRows`
+- `threadRowWidth`
+- `threadRowHeight`
 - `enableSmartInterfaceEditor`
 - `smartInterfaceEditorX`
 - `smartInterfaceEditorY`

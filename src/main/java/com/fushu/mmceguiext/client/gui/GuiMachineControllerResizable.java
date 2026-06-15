@@ -5,6 +5,7 @@ import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import com.fushu.mmceguiext.client.config.MachineGuiStyleManager;
 import com.fushu.mmceguiext.common.network.PktControllerButtonAction;
 import com.fushu.mmceguiext.common.network.PktControllerSmartInterfaceUpdate;
+import com.fushu.mmceguiext.common.util.ControllerCustomDataAccess;
 import github.kasuminova.mmce.common.event.client.ControllerGUIRenderEvent;
 import hellfirepvp.modularmachinery.ModularMachinery;
 import hellfirepvp.modularmachinery.client.gui.GuiContainerBase;
@@ -32,6 +33,7 @@ import java.awt.Rectangle;
 import java.io.IOException;
 import java.util.IllegalFormatException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -77,6 +79,20 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     private int renderWidth = BASE_WIDTH;
     private int renderHeight = BASE_HEIGHT;
 
+    // Scheme B: opt-in logical coordinate space + uniform GL scale.
+    // When coordinateWidth/Height are set, the whole GUI is laid out in a fixed
+    // logical canvas (guiLeft/guiTop forced to 0) and rendered through an outer
+    // translate(renderOrigin)+scale(renderScale) wrapper, so layout never depends
+    // on the screen-fit clamp. Mouse input is converted back to logical space.
+    private boolean guiScaleMode = false;
+    private int logicalWidth = BASE_WIDTH;
+    private int logicalHeight = BASE_HEIGHT;
+    private float renderScale = 1.0F;
+    private int renderOriginX = 0;
+    private int renderOriginY = 0;
+    private boolean suppressDefaultBackground = false;
+    private boolean deferTooltip = false;
+
     private final Map<String, Integer> panelScroll = new HashMap<String, Integer>();
     private final Map<String, Integer> panelMaxScroll = new HashMap<String, Integer>();
     @Nullable
@@ -109,6 +125,12 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     private final Map<String, LayerRuntimeState> layerRuntimeStates = new HashMap<String, LayerRuntimeState>();
     private final Set<String> textureLayerIds = new HashSet<String>();
     private String activePageId = "main";
+    private MachineGuiStyleManager.ControllerStyle baseStyleOverride = MachineGuiStyleManager.ControllerStyle.EMPTY;
+    @Nullable
+    private RuntimeGuiState currentRuntimeState = null;
+    private final List<RuntimeGuiState> replaceSubGuiStack = new ArrayList<RuntimeGuiState>();
+    private final List<RuntimeGuiState> modalSubGuiStack = new ArrayList<RuntimeGuiState>();
+    private boolean subGuiContextSwitching = false;
 
     public GuiMachineControllerResizable(ContainerController container) {
         super(container);
@@ -117,23 +139,27 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
     @Override
     public void initGui() {
-        this.styleOverride = MachineGuiStyleManager.resolveMachineController(resolveMachine());
+        this.baseStyleOverride = MachineGuiStyleManager.resolveMachineController(resolveMachine());
+        this.replaceSubGuiStack.clear();
+        this.modalSubGuiStack.clear();
+        this.styleOverride = this.baseStyleOverride;
         this.customBackgroundTexture = resolveCustomTexture();
+        resolveGuiScaleConfig();
         super.initGui();
-        applyPlayerInventoryVisibility(MMCEGuiExtConfig.machineController);
-        initTextureLayers(MMCEGuiExtConfig.machineController);
-        this.panelScroll.clear();
-        this.panelMaxScroll.clear();
-        this.draggingPanelId = null;
-        this.infoScrollbarDragOffset = 0;
-        initSmartInterfaceEditor();
-        initCustomSmartInterfaceEditors(MMCEGuiExtConfig.machineController);
-        initCustomButtons(MMCEGuiExtConfig.machineController);
+        initializeCurrentContext(null, false, null, this.activePageId);
+        this.currentRuntimeState = captureRuntimeState(null, false);
     }
 
     @Override
     protected void setWidthHeight() {
         MMCEGuiExtConfig.MachineController cfg = MMCEGuiExtConfig.machineController;
+        if (this.guiScaleMode) {
+            this.renderWidth = this.logicalWidth;
+            this.renderHeight = this.logicalHeight;
+            this.xSize = BASE_WIDTH;
+            this.ySize = BASE_HEIGHT;
+            return;
+        }
         int baseLeft = (this.width - BASE_WIDTH) / 2;
         int baseTop = (this.height - BASE_HEIGHT) / 2;
         int maxWidth = Math.max(BASE_WIDTH, this.width - baseLeft - 8);
@@ -146,6 +172,135 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
         this.xSize = BASE_WIDTH;
         this.ySize = BASE_HEIGHT;
+    }
+
+    private void centerFullGuiIfNeeded(MMCEGuiExtConfig.MachineController cfg) {
+        if (!getCenterFullGui()) {
+            return;
+        }
+        double[] bounds = new double[] {
+            this.customBackgroundTexture == null ? 0.0D : -getBackgroundTextureOffsetX(cfg),
+            this.renderWidth
+        };
+        // Only background layers share the guiLeft-relative coordinate space used here.
+        // Foreground layers are drawn at absolute screen X (see drawConfiguredTextureLayers),
+        // so including them would corrupt the centering origin.
+        includeTextureLayerBounds(this.backgroundTextureLayers, bounds);
+        double center = (bounds[0] + bounds[1]) * 0.5D;
+        this.guiLeft = (int) Math.round(this.width * 0.5D - center);
+    }
+
+    private void includeTextureLayerBounds(List<TextureLayerDef> layers, double[] bounds) {
+        for (TextureLayerDef layer : layers) {
+            if (!isLayerVisible(layer) || !isPageVisible(layer.page)) {
+                continue;
+            }
+            int offX = resolveLayerOffsetX(layer);
+            int width = layer.width == null ? this.renderWidth : Math.max(1, layer.width.intValue());
+            int height = layer.height == null ? this.renderHeight : Math.max(1, layer.height.intValue());
+            float scaleX = Math.max(0.01F, resolveLayerScaleX(layer));
+            float scaleY = Math.max(0.01F, resolveLayerScaleY(layer));
+            double rotation = Math.toRadians(resolveLayerRotation(layer));
+            double scaledWidth = width * (double) scaleX;
+            double scaledHeight = height * (double) scaleY;
+            double boundWidth = Math.abs(Math.cos(rotation)) * scaledWidth + Math.abs(Math.sin(rotation)) * scaledHeight;
+            double layerCenterX = offX + width * 0.5D;
+            bounds[0] = Math.min(bounds[0], layerCenterX - boundWidth * 0.5D);
+            bounds[1] = Math.max(bounds[1], layerCenterX + boundWidth * 0.5D);
+        }
+    }
+
+    // ===== Scheme B: logical coordinate space + uniform scale =====
+
+    private void resolveGuiScaleConfig() {
+        this.guiScaleMode = false;
+        this.renderScale = 1.0F;
+        this.renderOriginX = 0;
+        this.renderOriginY = 0;
+        if (styleOverride.coordinateWidth != null && styleOverride.coordinateHeight != null) {
+            this.logicalWidth = Math.max(BASE_WIDTH, styleOverride.coordinateWidth.intValue());
+            this.logicalHeight = Math.max(BASE_HEIGHT, styleOverride.coordinateHeight.intValue());
+            this.guiScaleMode = true;
+        }
+    }
+
+    private void computeGuiScale() {
+        int margin = 4;
+        float availW = Math.max(1.0F, this.width - margin * 2);
+        float availH = Math.max(1.0F, this.height - margin * 2);
+        float s = Math.min(availW / this.logicalWidth, availH / this.logicalHeight);
+        if (s > 1.0F || s <= 0.0F) {
+            s = 1.0F;
+        }
+        this.renderScale = s;
+        this.renderOriginX = Math.round((this.width - this.logicalWidth * s) * 0.5F);
+        this.renderOriginY = Math.round((this.height - this.logicalHeight * s) * 0.5F);
+    }
+
+    private int toLogicalMouseX(int mouseX) {
+        if (!this.guiScaleMode) {
+            return mouseX;
+        }
+        return Math.round((mouseX - this.renderOriginX) / this.renderScale);
+    }
+
+    private int toLogicalMouseY(int mouseY) {
+        if (!this.guiScaleMode) {
+            return mouseY;
+        }
+        return Math.round((mouseY - this.renderOriginY) / this.renderScale);
+    }
+
+    // Logical GUI coords -> on-screen (this.width-space) coords, for GL scissor under the scale wrapper.
+    private int scissorScreenX(int logicalX) {
+        return this.guiScaleMode ? Math.round(this.renderOriginX + logicalX * this.renderScale) : logicalX;
+    }
+
+    private int scissorScreenY(int logicalY) {
+        return this.guiScaleMode ? Math.round(this.renderOriginY + logicalY * this.renderScale) : logicalY;
+    }
+
+    private int scissorLen(int logicalLen) {
+        return this.guiScaleMode ? Math.max(0, Math.round(logicalLen * this.renderScale)) : logicalLen;
+    }
+
+    @Override
+    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        if (!this.guiScaleMode) {
+            super.drawScreen(mouseX, mouseY, partialTicks);
+            drawActiveModalSubGui(mouseX, mouseY, partialTicks);
+            return;
+        }
+        int logicalMouseX = toLogicalMouseX(mouseX);
+        int logicalMouseY = toLogicalMouseY(mouseY);
+        this.drawDefaultBackground();
+        GlStateManager.pushMatrix();
+        GlStateManager.translate((float) this.renderOriginX, (float) this.renderOriginY, 0.0F);
+        GlStateManager.scale(this.renderScale, this.renderScale, 1.0F);
+        this.suppressDefaultBackground = true;
+        this.deferTooltip = true;
+        super.drawScreen(logicalMouseX, logicalMouseY, partialTicks);
+        this.suppressDefaultBackground = false;
+        this.deferTooltip = false;
+        GlStateManager.popMatrix();
+        super.renderHoveredToolTip(mouseX, mouseY);
+        drawActiveModalSubGui(mouseX, mouseY, partialTicks);
+    }
+
+    @Override
+    public void drawDefaultBackground() {
+        if (this.suppressDefaultBackground) {
+            return;
+        }
+        super.drawDefaultBackground();
+    }
+
+    @Override
+    protected void renderHoveredToolTip(int mouseX, int mouseY) {
+        if (this.deferTooltip) {
+            return;
+        }
+        super.renderHoveredToolTip(mouseX, mouseY);
     }
 
     @Override
@@ -172,18 +327,30 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
         if (this.customBackgroundTexture != null) {
             this.mc.getTextureManager().bindTexture(this.customBackgroundTexture);
-            int drawWidth = Math.max(1, this.renderWidth);
-            int drawHeight = Math.max(1, this.renderHeight);
-            drawResizableArea(
-                this.guiLeft - textureOffsetX,
-                this.guiTop - textureOffsetY,
-                drawWidth,
-                drawHeight,
-                useNineSlice,
-                texW,
-                texH,
-                getBackgroundCorner(cfg)
-            );
+            if (this.guiScaleMode) {
+                // Scale mode: the background fills the logical canvas 1:1; screen-fit scaling
+                // is handled by the outer GL transform, so neither the offset nor a
+                // screen-clamped width applies here (avoids texture repeat/clip on resize).
+                int sTexW = styleOverride.backgroundTextureWidth != null
+                    ? Math.max(16, styleOverride.backgroundTextureWidth.intValue()) : this.renderWidth;
+                int sTexH = styleOverride.backgroundTextureHeight != null
+                    ? Math.max(16, styleOverride.backgroundTextureHeight.intValue()) : this.renderHeight;
+                drawResizableArea(this.guiLeft, this.guiTop, this.renderWidth, this.renderHeight,
+                    useNineSlice, sTexW, sTexH, getBackgroundCorner(cfg));
+            } else {
+                int drawWidth = Math.max(1, this.renderWidth + textureOffsetX);
+                int drawHeight = Math.max(1, this.renderHeight + textureOffsetY);
+                drawResizableArea(
+                    this.guiLeft - textureOffsetX,
+                    this.guiTop - textureOffsetY,
+                    drawWidth,
+                    drawHeight,
+                    useNineSlice,
+                    texW,
+                    texH,
+                    getBackgroundCorner(cfg)
+                );
+            }
         } else {
             if (!hideDefaultBackground) {
                 this.mc.getTextureManager().bindTexture(DEFAULT_BACKGROUND);
@@ -245,7 +412,8 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                         int clipWidth = panel.rect.width - 2;
                         int clipHeight = panel.rect.height - 2;
 
-                        GuiRenderUtils.enableScissor(this.mc, clipX, clipY, clipWidth, clipHeight);
+                        GuiRenderUtils.enableScissor(this.mc, scissorScreenX(clipX), scissorScreenY(clipY),
+                            scissorLen(clipWidth), scissorLen(clipHeight));
                         GlStateManager.pushMatrix();
                         GlStateManager.scale((float) FONT_SCALE, (float) FONT_SCALE, 1.0F);
                         for (String line : lines) {
@@ -294,6 +462,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
     @Override
     public void handleMouseInput() throws IOException {
+        if (!this.subGuiContextSwitching && hasActiveModalSubGui() && handleTopModalMouseWheel()) {
+            return;
+        }
         super.handleMouseInput();
 
         int wheel = Mouse.getEventDWheel();
@@ -306,6 +477,10 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
         int mouseX = Mouse.getEventX() * this.width / this.mc.displayWidth;
         int mouseY = this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1;
+        if (this.guiScaleMode) {
+            mouseX = toLogicalMouseX(mouseX);
+            mouseY = toLogicalMouseY(mouseY);
+        }
 
         String panelId = findHoveredPanelId(mouseX, mouseY, getActivePanels(MMCEGuiExtConfig.machineController));
         if (panelId == null) {
@@ -321,19 +496,35 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
     @Override
     public void updateScreen() {
+        if (!this.subGuiContextSwitching && hasActiveModalSubGui()) {
+            withRuntimeState(getTopModalSubGui(), new Runnable() {
+                @Override
+                public void run() {
+                    updateCurrentContextScreen();
+                }
+            });
+        }
         super.updateScreen();
-        if (this.smartInterfaceEditorInput != null) {
-            this.smartInterfaceEditorInput.updateCursorCounter();
+        if (this.smartInterfaceEditorInput != null && !this.smartInterfaceEditorInput.isFocused()) {
+            syncSmartInterfaceEditorInput();
         }
         for (CustomSmartEditor editor : this.customSmartEditors) {
-            if (editor.input != null) {
-                editor.input.updateCursorCounter();
+            if (editor.input != null && !editor.input.isFocused()) {
+                syncCustomSmartEditorInput(editor);
             }
         }
+        updateCurrentContextScreen();
     }
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (SubGuiBackKeyPolicy.isBackKey(keyCode) && hasReplaceSubGui()) {
+            closeActiveSubGui();
+            return;
+        }
+        if (!this.subGuiContextSwitching && hasActiveModalSubGui() && handleTopModalKeyTyped(typedChar, keyCode)) {
+            return;
+        }
         if (handleCustomButtonKeyTyped(typedChar, keyCode)) {
             return;
         }
@@ -348,6 +539,13 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (!this.subGuiContextSwitching && hasActiveModalSubGui() && handleTopModalMouseClicked(mouseX, mouseY, mouseButton)) {
+            return;
+        }
+        if (this.guiScaleMode) {
+            mouseX = toLogicalMouseX(mouseX);
+            mouseY = toLogicalMouseY(mouseY);
+        }
         if (handleCustomButtonMouseClicked(mouseX, mouseY, mouseButton)) {
             return;
         }
@@ -378,12 +576,28 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
     @Override
     protected void mouseReleased(int mouseX, int mouseY, int state) {
+        if (!this.subGuiContextSwitching && hasActiveModalSubGui()) {
+            handleTopModalMouseReleased(mouseX, mouseY, state);
+            return;
+        }
+        if (this.guiScaleMode) {
+            mouseX = toLogicalMouseX(mouseX);
+            mouseY = toLogicalMouseY(mouseY);
+        }
         this.draggingPanelId = null;
         super.mouseReleased(mouseX, mouseY, state);
     }
 
     @Override
     protected void mouseClickMove(int mouseX, int mouseY, int clickedMouseButton, long timeSinceLastClick) {
+        if (!this.subGuiContextSwitching && hasActiveModalSubGui()) {
+            handleTopModalMouseClickMove(mouseX, mouseY, clickedMouseButton, timeSinceLastClick);
+            return;
+        }
+        if (this.guiScaleMode) {
+            mouseX = toLogicalMouseX(mouseX);
+            mouseY = toLogicalMouseY(mouseY);
+        }
         if (isUsingDefaultBackground(MMCEGuiExtConfig.machineController)) {
             super.mouseClickMove(mouseX, mouseY, clickedMouseButton, timeSinceLastClick);
             return;
@@ -1276,6 +1490,10 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         return cfg.hideDefaultBackground;
     }
 
+    private boolean getCenterFullGui() {
+        return styleOverride.centerFullGui != null && styleOverride.centerFullGui.booleanValue();
+    }
+
     private int getBackgroundTextureOffsetX(MMCEGuiExtConfig.MachineController cfg) {
         if (styleOverride.backgroundTextureOffsetX != null) {
             return Math.max(0, styleOverride.backgroundTextureOffsetX.intValue());
@@ -1546,8 +1764,442 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         return styleOverride != MachineGuiStyleManager.ControllerStyle.EMPTY;
     }
 
+    private void initializeCurrentContext(
+        @Nullable MachineGuiStyleManager.SubGuiStyle subGui,
+        boolean modal,
+        @Nullable RuntimeGuiState parentState,
+        @Nullable String existingPage
+    ) {
+        MMCEGuiExtConfig.MachineController cfg = MMCEGuiExtConfig.machineController;
+        this.customBackgroundTexture = resolveCustomTexture();
+        resolveGuiScaleConfig();
+        if (modal) {
+            this.guiScaleMode = false;
+            this.renderScale = 1.0F;
+            this.renderOriginX = 0;
+            this.renderOriginY = 0;
+        }
+
+        if (!modal) {
+            setWidthHeight();
+            this.guiLeft = (this.width - this.xSize) / 2;
+            this.guiTop = (this.height - this.ySize) / 2;
+        }
+
+        if (subGui != null) {
+            if (subGui.width != null) {
+                this.renderWidth = Math.max(BASE_WIDTH, subGui.width.intValue());
+            }
+            if (subGui.height != null) {
+                this.renderHeight = Math.max(BASE_HEIGHT, subGui.height.intValue());
+            }
+        }
+
+        if (modal) {
+            int parentLeft = parentState == null ? this.guiLeft : parentState.guiLeft;
+            int parentTop = parentState == null ? this.guiTop : parentState.guiTop;
+            int offsetX = subGui != null && subGui.x != null ? subGui.x.intValue() : Math.max(0, (BASE_WIDTH - this.renderWidth) / 2);
+            int offsetY = subGui != null && subGui.y != null ? subGui.y.intValue() : 8;
+            this.guiLeft = parentLeft + offsetX;
+            this.guiTop = parentTop + offsetY;
+        } else if (this.guiScaleMode) {
+            this.guiLeft = 0;
+            this.guiTop = 0;
+            computeGuiScale();
+        } else {
+            centerFullGuiIfNeeded(cfg);
+        }
+
+        this.panelScroll.clear();
+        this.panelMaxScroll.clear();
+        this.draggingPanelId = null;
+        this.infoScrollbarDragOffset = 0;
+        initTextureLayers(cfg);
+        this.activePageId = resolveInitialPageId(cfg, existingPage);
+        initSmartInterfaceEditor();
+        initCustomSmartInterfaceEditors(cfg);
+        initCustomButtons(cfg);
+        if (!modal) {
+            applyPlayerInventoryVisibility(cfg);
+        }
+    }
+
+    private void updateCurrentContextScreen() {
+        if (this.smartInterfaceEditorInput != null) {
+            this.smartInterfaceEditorInput.updateCursorCounter();
+        }
+        for (CustomSmartEditor editor : this.customSmartEditors) {
+            if (editor.input != null) {
+                editor.input.updateCursorCounter();
+            }
+        }
+    }
+
+    private void drawActiveModalSubGui(int mouseX, int mouseY, float partialTicks) {
+        if (!hasActiveModalSubGui()) {
+            return;
+        }
+        final RuntimeGuiState modalState = getTopModalSubGui();
+        drawGradientRect(0, 0, this.width, this.height, 0x60000000, 0x60000000);
+        withRuntimeState(modalState, new Runnable() {
+            @Override
+            public void run() {
+                int localMouseX = mouseX - guiLeft;
+                int localMouseY = mouseY - guiTop;
+                drawGuiContainerBackgroundLayer(partialTicks, localMouseX, localMouseY);
+                drawGuiContainerForegroundLayer(localMouseX, localMouseY);
+            }
+        });
+    }
+
+    private boolean handleTopModalMouseWheel() {
+        final int wheel = Mouse.getEventDWheel();
+        if (wheel == 0) {
+            return false;
+        }
+        withRuntimeState(getTopModalSubGui(), new Runnable() {
+            @Override
+            public void run() {
+                if (isUsingDefaultBackground(MMCEGuiExtConfig.machineController)) {
+                    return;
+                }
+                int mouseX = Mouse.getEventX() * width / mc.displayWidth;
+                int mouseY = height - Mouse.getEventY() * height / mc.displayHeight - 1;
+                String panelId = findHoveredPanelId(mouseX, mouseY, getActivePanels(MMCEGuiExtConfig.machineController));
+                if (panelId == null) {
+                    return;
+                }
+                int step = Math.max(2, MMCEGuiExtConfig.wheelStep);
+                int delta = wheel > 0 ? -step : step;
+                int newScroll = getPanelScroll(panelId) + delta;
+                int max = getPanelMaxScroll(panelId);
+                panelScroll.put(panelId, MathHelper.clamp(newScroll, 0, max));
+            }
+        });
+        return true;
+    }
+
+    private boolean handleTopModalMouseClicked(final int mouseX, final int mouseY, final int mouseButton) {
+        final boolean[] handled = new boolean[] {true};
+        withRuntimeState(getTopModalSubGui(), new Runnable() {
+            @Override
+            public void run() {
+                if (handleCustomButtonMouseClicked(mouseX, mouseY, mouseButton)) {
+                    return;
+                }
+                if (handleCustomSmartInterfaceMouseClicked(mouseX, mouseY, mouseButton)) {
+                    return;
+                }
+                if (handleSmartInterfaceMouseClicked(mouseX, mouseY, mouseButton)) {
+                    return;
+                }
+                if (!isUsingDefaultBackground(MMCEGuiExtConfig.machineController) && mouseButton == 0) {
+                    int localX = mouseX - guiLeft;
+                    int localY = mouseY - guiTop;
+                    for (PanelDef panel : getActivePanels(MMCEGuiExtConfig.machineController)) {
+                        if (isOnPanelThumb(localX, localY, panel)) {
+                            draggingPanelId = panel.id;
+                            infoScrollbarDragOffset = localY - getPanelThumbY(panel.id, panel.rect);
+                            return;
+                        }
+                    }
+                }
+            }
+        });
+        return handled[0];
+    }
+
+    private boolean handleTopModalKeyTyped(final char typedChar, final int keyCode) {
+        final boolean[] handled = new boolean[] {false};
+        withRuntimeState(getTopModalSubGui(), new Runnable() {
+            @Override
+            public void run() {
+                if (SubGuiBackKeyPolicy.isBackKey(keyCode)) {
+                    handled[0] = closeActiveModalSubGui();
+                    return;
+                }
+                if (handleCustomButtonKeyTyped(typedChar, keyCode)
+                    || handleCustomSmartInterfaceKeyTyped(typedChar, keyCode)
+                    || handleSmartInterfaceKeyTyped(typedChar, keyCode)) {
+                    handled[0] = true;
+                    return;
+                }
+            }
+        });
+        return handled[0];
+    }
+
+    private void handleTopModalMouseReleased(final int mouseX, final int mouseY, final int state) {
+        withRuntimeState(getTopModalSubGui(), new Runnable() {
+            @Override
+            public void run() {
+                draggingPanelId = null;
+            }
+        });
+    }
+
+    private void handleTopModalMouseClickMove(final int mouseX, final int mouseY, final int clickedMouseButton, final long timeSinceLastClick) {
+        withRuntimeState(getTopModalSubGui(), new Runnable() {
+            @Override
+            public void run() {
+                if (isUsingDefaultBackground(MMCEGuiExtConfig.machineController)) {
+                    return;
+                }
+                if (clickedMouseButton == 0 && draggingPanelId != null) {
+                    PanelDef panel = findPanelById(draggingPanelId, getActivePanels(MMCEGuiExtConfig.machineController));
+                    if (panel != null) {
+                        int localY = mouseY - guiTop;
+                        updatePanelScrollFromMouse(panel.id, panel.rect, localY);
+                    }
+                }
+            }
+        });
+    }
+
+    private void openSubGui(@Nullable String targetSubGui, @Nullable String requestedMode) {
+        MachineGuiStyleManager.SubGuiStyle subGui = findSubGuiStyle(targetSubGui);
+        if (subGui == null) {
+            return;
+        }
+        String mode = normalizeSubGuiOpenMode(requestedMode);
+        if ("replace".equals(mode)) {
+            storeCurrentRuntimeState();
+            RuntimeGuiState previous = this.currentRuntimeState;
+            if (previous != null) {
+                this.replaceSubGuiStack.add(previous);
+            }
+            RuntimeGuiState nextState = buildRuntimeState(subGui, false, previous, null);
+            applyRuntimeState(nextState);
+            this.currentRuntimeState = nextState;
+            return;
+        }
+        if (hasActiveModalSubGui()) {
+            storeRuntimeState(getTopModalSubGui());
+        } else {
+            storeCurrentRuntimeState();
+        }
+        RuntimeGuiState parent = hasActiveModalSubGui() ? getTopModalSubGui() : this.currentRuntimeState;
+        this.modalSubGuiStack.add(buildRuntimeState(subGui, true, parent, null));
+    }
+
+    private void closeActiveSubGui() {
+        if (closeActiveModalSubGui()) {
+            return;
+        }
+        if (this.replaceSubGuiStack.isEmpty()) {
+            return;
+        }
+        RuntimeGuiState previous = this.replaceSubGuiStack.remove(this.replaceSubGuiStack.size() - 1);
+        applyRuntimeState(previous);
+        this.currentRuntimeState = previous;
+    }
+
+    private boolean closeActiveModalSubGui() {
+        if (this.modalSubGuiStack.isEmpty()) {
+            return false;
+        }
+        this.modalSubGuiStack.remove(this.modalSubGuiStack.size() - 1);
+        return true;
+    }
+
+    @Nullable
+    private MachineGuiStyleManager.SubGuiStyle findSubGuiStyle(@Nullable String targetSubGui) {
+        String targetId = normalizeSubGuiId(targetSubGui);
+        if (targetId.isEmpty() || this.baseStyleOverride.subGuis == null) {
+            return null;
+        }
+        for (MachineGuiStyleManager.SubGuiStyle subGui : this.baseStyleOverride.subGuis) {
+            if (subGui == null) {
+                continue;
+            }
+            if (normalizeSubGuiId(subGui.id).equals(targetId)) {
+                return subGui;
+            }
+        }
+        return null;
+    }
+
+    private RuntimeGuiState buildRuntimeState(
+        MachineGuiStyleManager.SubGuiStyle subGui,
+        boolean modal,
+        @Nullable RuntimeGuiState parentState,
+        @Nullable String existingPage
+    ) {
+        RuntimeGuiState previous = captureRuntimeState(null, false);
+        MachineGuiStyleManager.ControllerStyle nextStyle = subGui.style == null
+            ? new MachineGuiStyleManager.ControllerStyle()
+            : MachineGuiStyleManager.ControllerStyle.copyOf(subGui.style);
+        if ((nextStyle.subGuis == null || nextStyle.subGuis.isEmpty()) && this.baseStyleOverride.subGuis != null) {
+            nextStyle.subGuis = this.baseStyleOverride.subGuis;
+        }
+        this.styleOverride = nextStyle;
+        initializeCurrentContext(subGui, modal, parentState, existingPage);
+        RuntimeGuiState built = captureRuntimeState(normalizeSubGuiId(subGui.id), modal);
+        applyRuntimeState(previous);
+        return built;
+    }
+
+    private void withRuntimeState(RuntimeGuiState state, Runnable action) {
+        RuntimeGuiState previous = captureRuntimeState(null, false);
+        this.subGuiContextSwitching = true;
+        applyRuntimeState(state);
+        try {
+            action.run();
+            storeRuntimeState(state);
+        } finally {
+            applyRuntimeState(previous);
+            this.subGuiContextSwitching = false;
+        }
+    }
+
+    private void storeCurrentRuntimeState() {
+        if (this.currentRuntimeState != null) {
+            storeRuntimeState(this.currentRuntimeState);
+        }
+    }
+
+    private void storeRuntimeState(RuntimeGuiState state) {
+        state.styleOverride = this.styleOverride;
+        state.customBackgroundTexture = this.customBackgroundTexture;
+        state.renderWidth = this.renderWidth;
+        state.renderHeight = this.renderHeight;
+        state.guiScaleMode = this.guiScaleMode;
+        state.logicalWidth = this.logicalWidth;
+        state.logicalHeight = this.logicalHeight;
+        state.renderScale = this.renderScale;
+        state.renderOriginX = this.renderOriginX;
+        state.renderOriginY = this.renderOriginY;
+        state.panelScroll = new HashMap<String, Integer>(this.panelScroll);
+        state.panelMaxScroll = new HashMap<String, Integer>(this.panelMaxScroll);
+        state.draggingPanelId = this.draggingPanelId;
+        state.infoScrollbarDragOffset = this.infoScrollbarDragOffset;
+        state.smartInterfaceEditorInput = this.smartInterfaceEditorInput;
+        state.smartInterfacePrevButton = this.smartInterfacePrevButton;
+        state.smartInterfaceNextButton = this.smartInterfaceNextButton;
+        state.smartInterfaceApplyButton = this.smartInterfaceApplyButton;
+        state.smartInterfaceIndex = this.smartInterfaceIndex;
+        state.smartInterfaceEditorX = this.smartInterfaceEditorX;
+        state.smartInterfaceEditorY = this.smartInterfaceEditorY;
+        state.smartInterfaceEditorPriority = this.smartInterfaceEditorPriority;
+        state.smartInterfaceVirtualInputCache = new HashMap<String, String>(this.smartInterfaceVirtualInputCache);
+        state.smartInterfaceActiveVirtualKey = this.smartInterfaceActiveVirtualKey;
+        state.smartInterfaceHideInfoText = this.smartInterfaceHideInfoText;
+        state.smartInterfaceHideTitleText = this.smartInterfaceHideTitleText;
+        state.smartInterfaceCustomTitleText = this.smartInterfaceCustomTitleText;
+        state.hideDefaultSmartInterfaceEditor = this.hideDefaultSmartInterfaceEditor;
+        state.customSmartEditors = new ArrayList<CustomSmartEditor>(this.customSmartEditors);
+        state.customButtons = new ArrayList<CustomButton>(this.customButtons);
+        state.backgroundTextureLayers = new ArrayList<TextureLayerDef>(this.backgroundTextureLayers);
+        state.foregroundTextureLayers = new ArrayList<TextureLayerDef>(this.foregroundTextureLayers);
+        state.layerRuntimeStates = new HashMap<String, LayerRuntimeState>(this.layerRuntimeStates);
+        state.textureLayerIds = new HashSet<String>(this.textureLayerIds);
+        state.activePageId = this.activePageId;
+        state.guiLeft = this.guiLeft;
+        state.guiTop = this.guiTop;
+        state.xSize = this.xSize;
+        state.ySize = this.ySize;
+    }
+
+    private RuntimeGuiState captureRuntimeState(@Nullable String subGuiId, boolean modal) {
+        RuntimeGuiState state = new RuntimeGuiState();
+        state.subGuiId = subGuiId;
+        state.modal = modal;
+        storeRuntimeState(state);
+        return state;
+    }
+
+    private void applyRuntimeState(RuntimeGuiState state) {
+        this.styleOverride = state.styleOverride;
+        this.customBackgroundTexture = state.customBackgroundTexture;
+        this.renderWidth = state.renderWidth;
+        this.renderHeight = state.renderHeight;
+        this.guiScaleMode = state.guiScaleMode;
+        this.logicalWidth = state.logicalWidth;
+        this.logicalHeight = state.logicalHeight;
+        this.renderScale = state.renderScale;
+        this.renderOriginX = state.renderOriginX;
+        this.renderOriginY = state.renderOriginY;
+        this.draggingPanelId = state.draggingPanelId;
+        this.infoScrollbarDragOffset = state.infoScrollbarDragOffset;
+        this.smartInterfaceEditorInput = state.smartInterfaceEditorInput;
+        this.smartInterfacePrevButton = state.smartInterfacePrevButton;
+        this.smartInterfaceNextButton = state.smartInterfaceNextButton;
+        this.smartInterfaceApplyButton = state.smartInterfaceApplyButton;
+        this.smartInterfaceIndex = state.smartInterfaceIndex;
+        this.smartInterfaceEditorX = state.smartInterfaceEditorX;
+        this.smartInterfaceEditorY = state.smartInterfaceEditorY;
+        this.smartInterfaceEditorPriority = state.smartInterfaceEditorPriority;
+        this.smartInterfaceActiveVirtualKey = state.smartInterfaceActiveVirtualKey;
+        this.smartInterfaceHideInfoText = state.smartInterfaceHideInfoText;
+        this.smartInterfaceHideTitleText = state.smartInterfaceHideTitleText;
+        this.smartInterfaceCustomTitleText = state.smartInterfaceCustomTitleText;
+        this.hideDefaultSmartInterfaceEditor = state.hideDefaultSmartInterfaceEditor;
+        this.activePageId = state.activePageId;
+        this.guiLeft = state.guiLeft;
+        this.guiTop = state.guiTop;
+        this.xSize = state.xSize;
+        this.ySize = state.ySize;
+
+        this.panelScroll.clear();
+        this.panelScroll.putAll(state.panelScroll);
+        this.panelMaxScroll.clear();
+        this.panelMaxScroll.putAll(state.panelMaxScroll);
+        this.smartInterfaceVirtualInputCache.clear();
+        this.smartInterfaceVirtualInputCache.putAll(state.smartInterfaceVirtualInputCache);
+        this.customSmartEditors.clear();
+        this.customSmartEditors.addAll(state.customSmartEditors);
+        this.customButtons.clear();
+        this.customButtons.addAll(state.customButtons);
+        this.backgroundTextureLayers.clear();
+        this.backgroundTextureLayers.addAll(state.backgroundTextureLayers);
+        this.foregroundTextureLayers.clear();
+        this.foregroundTextureLayers.addAll(state.foregroundTextureLayers);
+        this.layerRuntimeStates.clear();
+        this.layerRuntimeStates.putAll(state.layerRuntimeStates);
+        this.textureLayerIds.clear();
+        this.textureLayerIds.addAll(state.textureLayerIds);
+    }
+
+    private boolean hasActiveModalSubGui() {
+        return !this.modalSubGuiStack.isEmpty();
+    }
+
+    private boolean hasReplaceSubGui() {
+        if (this.currentRuntimeState == null || this.replaceSubGuiStack.isEmpty()) {
+            return false;
+        }
+        RuntimeGuiState current = this.currentRuntimeState;
+        RuntimeGuiState top = this.replaceSubGuiStack.get(this.replaceSubGuiStack.size() - 1);
+        return current != top;
+    }
+
+    private RuntimeGuiState getTopModalSubGui() {
+        return this.modalSubGuiStack.get(this.modalSubGuiStack.size() - 1);
+    }
+
+    private String normalizeSubGuiId(@Nullable String raw) {
+        return raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeSubGuiOpenMode(@Nullable String raw) {
+        String normalized = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+        return "modal".equals(normalized) ? "modal" : "replace";
+    }
+
     @Nullable
     public Rectangle getJeiRightExtensionArea() {
+        if (this.guiScaleMode) {
+            int extra = this.renderWidth - BASE_WIDTH;
+            if (extra <= 0) {
+                return null;
+            }
+            return new Rectangle(
+                Math.round(this.renderOriginX + BASE_WIDTH * this.renderScale),
+                this.renderOriginY,
+                Math.round(extra * this.renderScale),
+                Math.round(this.renderHeight * this.renderScale)
+            );
+        }
         if (getDisableRightExtension()) {
             return null;
         }
@@ -1691,7 +2343,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             int leftControls = editor.showControls ? (SMART_EDITOR_BUTTON_W * 2 + 3) : 0;
             editor.input = new GuiTextField(0, this.fontRenderer, absX + leftControls, absY, inputWidth, SMART_EDITOR_INPUT_H);
             editor.input.setEnableBackgroundDrawing(editor.inputBackground);
-            editor.input.setMaxStringLength(24);
+            editor.input.setMaxStringLength(1024);
 
             if (editor.showControls) {
                 editor.prev = new GuiButton(buttonId++, absX, absY, SMART_EDITOR_BUTTON_W, SMART_EDITOR_BUTTON_H, "<");
@@ -1751,7 +2403,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         int absX = this.guiLeft + this.smartInterfaceEditorX;
         int absY = this.guiTop + this.smartInterfaceEditorY;
         this.smartInterfaceEditorInput = new GuiTextField(0, this.fontRenderer, absX + SMART_EDITOR_BUTTON_W * 2 + 3, absY, inputWidth, SMART_EDITOR_INPUT_H);
-        this.smartInterfaceEditorInput.setMaxStringLength(24);
+        this.smartInterfaceEditorInput.setMaxStringLength(1024);
 
         this.smartInterfacePrevButton = new GuiButton(101, absX, absY, SMART_EDITOR_BUTTON_W, SMART_EDITOR_BUTTON_H, "<");
         this.smartInterfaceNextButton = new GuiButton(102, absX + SMART_EDITOR_BUTTON_W + 1, absY, SMART_EDITOR_BUTTON_W, SMART_EDITOR_BUTTON_H, ">");
@@ -1863,7 +2515,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 infoText = buildSmartInterfaceValueInfo(current);
                 infoColor = 0xBFD3FF;
             } else if (!virtualKey.isEmpty()) {
-                infoText = "Key: " + virtualKey;
+                infoText = buildVirtualSmartInterfaceValueInfo(virtualKey);
                 infoColor = 0xBFD3FF;
             } else {
                 infoText = "No DataPort bound";
@@ -1897,6 +2549,18 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             valueInfo = I18n.format("gui.smartinterface.value", data.getValue());
         }
         return data.getType() + " | " + valueInfo;
+    }
+
+    private String buildVirtualSmartInterfaceValueInfo(String key) {
+        Float numeric = ControllerCustomDataAccess.readNumber(this.controller, key);
+        if (numeric != null) {
+            return key + " | " + I18n.format("gui.smartinterface.value", numeric.floatValue());
+        }
+        String text = ControllerCustomDataAccess.readString(this.controller, key);
+        if (text != null) {
+            return key + " | " + text;
+        }
+        return "Key: " + key;
     }
 
     private boolean handleSmartInterfaceMouseClicked(int mouseX, int mouseY, int mouseButton) {
@@ -1948,11 +2612,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             return true;
         }
 
-        if (Character.isDigit(typedChar) || typedChar == '.' || typedChar == '-' || typedChar == 'E' || typedChar == 'e'
-            || MiscUtils.isTextBoxKey(keyCode)) {
-            this.smartInterfaceEditorInput.textboxKeyTyped(typedChar, keyCode);
-            return true;
-        }
+        this.smartInterfaceEditorInput.textboxKeyTyped(typedChar, keyCode);
         return true;
     }
 
@@ -1975,30 +2635,34 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             return;
         }
 
-        try {
-            float parsed = Float.parseFloat(text.trim());
-            if (!Float.isFinite(parsed)) {
+        ParsedDataPortValue parsed = parseDataPortValue(text);
+        String interfaceType;
+        if (hasData) {
+            if (!parsed.numeric) {
                 return;
             }
-
-            String interfaceType;
-            if (hasData) {
-                SmartInterfaceData current = dataList[this.smartInterfaceIndex];
-                current.setValue(parsed);
-                interfaceType = current.getType();
-            } else {
-                interfaceType = getSelectedSmartInterfaceVirtualKey(virtualKeys);
-                if (interfaceType.isEmpty()) {
-                    return;
-                }
+            SmartInterfaceData current = dataList[this.smartInterfaceIndex];
+            current.setValue(parsed.number);
+            interfaceType = current.getType();
+        } else {
+            interfaceType = getSelectedSmartInterfaceVirtualKey(virtualKeys);
+            if (interfaceType.isEmpty()) {
+                return;
             }
+        }
 
-            MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerSmartInterfaceUpdate(this.controller.getPos(), interfaceType, parsed));
-            this.smartInterfaceEditorInput.setText(Float.toString(parsed));
+        if (parsed.numeric) {
+            MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerSmartInterfaceUpdate(this.controller.getPos(), interfaceType, parsed.number));
             if (useVirtualKeys) {
-                this.smartInterfaceVirtualInputCache.put(interfaceType, Float.toString(parsed));
+                this.smartInterfaceEditorInput.setText(Float.toString(parsed.number));
+                this.smartInterfaceVirtualInputCache.put(interfaceType, Float.toString(parsed.number));
             }
-        } catch (NumberFormatException ignored) {
+        } else {
+            MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerSmartInterfaceUpdate(this.controller.getPos(), interfaceType, parsed.text));
+            if (useVirtualKeys) {
+                this.smartInterfaceEditorInput.setText(parsed.text);
+            }
+            this.smartInterfaceVirtualInputCache.put(interfaceType, parsed.text);
         }
     }
 
@@ -2015,10 +2679,21 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             String cached = this.smartInterfaceVirtualInputCache.get(selectedKey);
             boolean switched = this.smartInterfaceActiveVirtualKey == null || !this.smartInterfaceActiveVirtualKey.equals(selectedKey);
             this.smartInterfaceActiveVirtualKey = selectedKey;
-            if (cached != null) {
-                this.smartInterfaceEditorInput.setText(cached);
-            } else if (switched || this.smartInterfaceEditorInput.getText() == null) {
-                this.smartInterfaceEditorInput.setText("");
+            Float numeric = ControllerCustomDataAccess.readNumber(this.controller, selectedKey);
+            if (numeric != null) {
+                String normalized = Float.toString(numeric.floatValue());
+                this.smartInterfaceEditorInput.setText(normalized);
+                this.smartInterfaceVirtualInputCache.put(selectedKey, normalized);
+            } else {
+                String text = ControllerCustomDataAccess.readString(this.controller, selectedKey);
+                if (text != null) {
+                    this.smartInterfaceEditorInput.setText(text);
+                    this.smartInterfaceVirtualInputCache.put(selectedKey, text);
+                } else if (cached != null) {
+                    this.smartInterfaceEditorInput.setText(cached);
+                } else if (switched || this.smartInterfaceEditorInput.getText() == null) {
+                    this.smartInterfaceEditorInput.setText("");
+                }
             }
             return;
         }
@@ -2031,7 +2706,8 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         }
         this.smartInterfaceActiveVirtualKey = null;
         clampSmartInterfaceIndex(dataList.length);
-        this.smartInterfaceEditorInput.setText(Float.toString(dataList[this.smartInterfaceIndex].getValue()));
+        SmartInterfaceData current = dataList[this.smartInterfaceIndex];
+        this.smartInterfaceEditorInput.setText(Float.toString(current.getValue()));
     }
 
     private void drawCustomSmartInterfaceEditorsBackground(int mouseX, int mouseY, @Nullable Integer priorityFilter) {
@@ -2135,11 +2811,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 applyCustomSmartEditorValue(editor);
                 return true;
             }
-            if (Character.isDigit(typedChar) || typedChar == '.' || typedChar == '-' || typedChar == 'E' || typedChar == 'e'
-                || MiscUtils.isTextBoxKey(keyCode)) {
-                editor.input.textboxKeyTyped(typedChar, keyCode);
-                return true;
-            }
+            editor.input.textboxKeyTyped(typedChar, keyCode);
             return true;
         }
         return false;
@@ -2157,16 +2829,15 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         if (text == null || text.trim().isEmpty()) {
             return;
         }
-        try {
-            float parsed = Float.parseFloat(text.trim());
-            if (!Float.isFinite(parsed)) {
-                return;
-            }
-            MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerSmartInterfaceUpdate(this.controller.getPos(), key, parsed));
-            String normalized = Float.toString(parsed);
+        ParsedDataPortValue parsed = parseDataPortValue(text);
+        if (parsed.numeric) {
+            MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerSmartInterfaceUpdate(this.controller.getPos(), key, parsed.number));
+            String normalized = Float.toString(parsed.number);
             editor.input.setText(normalized);
             this.smartInterfaceVirtualInputCache.put(key, normalized);
-        } catch (NumberFormatException ignored) {
+        } else {
+            MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerSmartInterfaceUpdate(this.controller.getPos(), key, parsed.text));
+            this.smartInterfaceVirtualInputCache.put(key, parsed.text);
         }
     }
 
@@ -2181,6 +2852,19 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         String cached = this.smartInterfaceVirtualInputCache.get(key);
         boolean switched = editor.activeKey == null || !editor.activeKey.equals(key);
         editor.activeKey = key;
+        Float numeric = ControllerCustomDataAccess.readNumber(this.controller, key);
+        if (numeric != null) {
+            String normalized = Float.toString(numeric.floatValue());
+            editor.input.setText(normalized);
+            this.smartInterfaceVirtualInputCache.put(key, normalized);
+            return;
+        }
+        String text = ControllerCustomDataAccess.readString(this.controller, key);
+        if (text != null) {
+            editor.input.setText(text);
+            this.smartInterfaceVirtualInputCache.put(key, text);
+            return;
+        }
         if (cached != null) {
             editor.input.setText(cached);
         } else if (switched || editor.input.getText() == null) {
@@ -2217,9 +2901,12 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 button.buttonId = style.buttonId == null || style.buttonId.trim().isEmpty() ? button.id : style.buttonId.trim();
                 button.key = style.key;
                 button.value = style.value == null ? ("smart_add".equals(style.action) ? 1.0F : 0.0F) : style.value.floatValue();
+                button.stringValue = style.stringValue;
                 button.min = style.min;
                 button.max = style.max;
                 button.targetPage = normalizePageId(style.targetPage);
+                button.targetSubGui = normalizeSubGuiId(style.targetSubGui);
+                button.openMode = normalizeSubGuiOpenMode(style.openMode);
                 button.priority = style.priority == null ? DEFAULT_SMART_EDITOR_PRIORITY : style.priority.intValue();
                 button.page = normalizePageIdOrNull(style.page);
                 button.visible = style.visible == null || style.visible.booleanValue();
@@ -2227,7 +2914,6 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 this.customButtons.add(button);
             }
         }
-        this.activePageId = resolveInitialPageId(cfg, this.activePageId);
     }
 
     private void drawCustomButtons(int mouseX, int mouseY, @Nullable Integer priorityFilter) {
@@ -2250,7 +2936,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         if (mouseButton != 0) {
             return false;
         }
-        for (CustomButton button : this.customButtons) {
+        List<CustomButton> ordered = new ArrayList<CustomButton>(this.customButtons);
+        ordered.sort((a, b) -> Integer.compare(b.priority, a.priority));
+        for (CustomButton button : ordered) {
             if (!button.visible || !isPageVisible(button.page) || button.button == null) {
                 continue;
             }
@@ -2273,6 +2961,14 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             this.activePageId = button.targetPage;
             return;
         }
+        if ("subgui".equals(button.action)) {
+            openSubGui(button.targetSubGui, button.openMode);
+            return;
+        }
+        if ("close_subgui".equals(button.action)) {
+            closeActiveSubGui();
+            return;
+        }
         if ("event".equals(button.action)) {
             MMCEGuiExt.NET_CHANNEL.sendToServer(PktControllerButtonAction.event(this.controller.getPos(), button.buttonId));
             return;
@@ -2280,7 +2976,18 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         if (!"smart_set".equals(button.action) && !"smart_add".equals(button.action)) {
             return;
         }
-        if (button.key == null || button.key.trim().isEmpty() || !Float.isFinite(button.value)) {
+        if (button.key == null || button.key.trim().isEmpty()) {
+            return;
+        }
+        if ("smart_set".equals(button.action) && button.stringValue != null) {
+            MMCEGuiExt.NET_CHANNEL.sendToServer(PktControllerButtonAction.smart(
+                this.controller.getPos(),
+                button.key,
+                button.stringValue
+            ));
+            return;
+        }
+        if (!Float.isFinite(button.value)) {
             return;
         }
         MMCEGuiExt.NET_CHANNEL.sendToServer(PktControllerButtonAction.smart(
@@ -2324,6 +3031,18 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             return;
         }
         this.smartInterfaceIndex = MathHelper.clamp(this.smartInterfaceIndex, 0, size - 1);
+    }
+
+    private ParsedDataPortValue parseDataPortValue(String text) {
+        String normalized = text == null ? "" : text.trim();
+        try {
+            float number = Float.parseFloat(normalized);
+            if (Float.isFinite(number)) {
+                return new ParsedDataPortValue(number);
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return new ParsedDataPortValue(normalized);
     }
 
     private boolean getSmartInterfaceEditorEnabled(MMCEGuiExtConfig.MachineController cfg) {
@@ -2810,16 +3529,91 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         private String key;
         private float value;
         @Nullable
+        private String stringValue;
+        @Nullable
         private Float min;
         @Nullable
         private Float max;
         private String targetPage = "main";
+        private String targetSubGui = "";
+        private String openMode = "replace";
         private int priority = DEFAULT_SMART_EDITOR_PRIORITY;
         @Nullable
         private String page;
         private boolean visible = true;
         @Nullable
         private GuiButton button;
+    }
+
+    private static class ParsedDataPortValue {
+        private final boolean numeric;
+        private final float number;
+        private final String text;
+
+        private ParsedDataPortValue(float number) {
+            this.numeric = true;
+            this.number = number;
+            this.text = "";
+        }
+
+        private ParsedDataPortValue(String text) {
+            this.numeric = false;
+            this.number = 0.0F;
+            this.text = text == null ? "" : text;
+        }
+    }
+
+    private static class RuntimeGuiState {
+        @Nullable
+        private String subGuiId;
+        private boolean modal;
+        private MachineGuiStyleManager.ControllerStyle styleOverride = MachineGuiStyleManager.ControllerStyle.EMPTY;
+        @Nullable
+        private ResourceLocation customBackgroundTexture;
+        private int renderWidth;
+        private int renderHeight;
+        private boolean guiScaleMode;
+        private int logicalWidth;
+        private int logicalHeight;
+        private float renderScale;
+        private int renderOriginX;
+        private int renderOriginY;
+        private Map<String, Integer> panelScroll = new HashMap<String, Integer>();
+        private Map<String, Integer> panelMaxScroll = new HashMap<String, Integer>();
+        @Nullable
+        private String draggingPanelId;
+        private int infoScrollbarDragOffset;
+        @Nullable
+        private GuiTextField smartInterfaceEditorInput;
+        @Nullable
+        private GuiButton smartInterfacePrevButton;
+        @Nullable
+        private GuiButton smartInterfaceNextButton;
+        @Nullable
+        private GuiButton smartInterfaceApplyButton;
+        private int smartInterfaceIndex;
+        private int smartInterfaceEditorX;
+        private int smartInterfaceEditorY;
+        private int smartInterfaceEditorPriority;
+        private Map<String, String> smartInterfaceVirtualInputCache = new HashMap<String, String>();
+        @Nullable
+        private String smartInterfaceActiveVirtualKey;
+        private boolean smartInterfaceHideInfoText;
+        private boolean smartInterfaceHideTitleText;
+        @Nullable
+        private String smartInterfaceCustomTitleText;
+        private boolean hideDefaultSmartInterfaceEditor;
+        private List<CustomSmartEditor> customSmartEditors = Collections.emptyList();
+        private List<CustomButton> customButtons = Collections.emptyList();
+        private List<TextureLayerDef> backgroundTextureLayers = Collections.emptyList();
+        private List<TextureLayerDef> foregroundTextureLayers = Collections.emptyList();
+        private Map<String, LayerRuntimeState> layerRuntimeStates = new HashMap<String, LayerRuntimeState>();
+        private Set<String> textureLayerIds = new HashSet<String>();
+        private String activePageId = "main";
+        private int guiLeft;
+        private int guiTop;
+        private int xSize;
+        private int ySize;
     }
 
     private static class PanelDef {
@@ -2835,4 +3629,3 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         }
     }
 }
-

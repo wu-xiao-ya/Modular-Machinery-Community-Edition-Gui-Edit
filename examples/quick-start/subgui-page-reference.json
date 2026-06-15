@@ -1,0 +1,63 @@
+{
+  "registryname": "demo:subgui_page_reference",
+  "localizedname": "Sub GUI Controller Demo",
+  "requires-blueprint": false,
+  "parts": [],
+  "mmce_gui_ext": {
+    "machineController": {
+      "backgroundTexture": "demo:textures/gui/subgui_controller_main.png",
+      "guiWidth": 300,
+      "guiHeight": 213,
+      "defaultPageId": "main",
+      "customPanels": [
+        "main,180,8,112,116,main"
+      ],
+      "texts": [
+        { "x": 186, "y": 14, "value": "Main Screen", "page": "main" },
+        { "x": 186, "y": 28, "value": "Open modal or replace sub GUIs.", "scale": 0.7, "page": "main" }
+      ],
+      "buttons": [
+        { "x": 186, "y": 96, "width": 48, "height": 20, "label": "Modal", "action": "subgui", "targetSubGui": "modal_help", "openMode": "modal", "page": "main" },
+        { "x": 238, "y": 96, "width": 48, "height": 20, "label": "Replace", "action": "subgui", "targetSubGui": "replace_settings", "openMode": "replace", "page": "main" }
+      ],
+      "subGuis": [
+        {
+          "id": "modal_help",
+          "mode": "modal",
+          "x": 176,
+          "y": 18,
+          "guiWidth": 124,
+          "guiHeight": 100,
+          "backgroundTexture": "demo:textures/gui/subgui_modal.png",
+          "hideDefaultBackground": true,
+          "texts": [
+            { "x": 8, "y": 8, "value": "Modal Sub GUI" },
+            { "x": 8, "y": 22, "value": "Use close_subgui to dismiss it.", "scale": 0.7 }
+          ],
+          "buttons": [
+            { "x": 8, "y": 68, "width": 44, "height": 20, "label": "Close", "action": "close_subgui" },
+            { "x": 56, "y": 68, "width": 56, "height": 20, "label": "Page", "action": "page", "targetPage": "settings" }
+          ]
+        },
+        {
+          "id": "replace_settings",
+          "mode": "replace",
+          "x": 180,
+          "y": 0,
+          "guiWidth": 112,
+          "guiHeight": 213,
+          "backgroundTexture": "demo:textures/gui/subgui_replace.png",
+          "hideDefaultBackground": false,
+          "texts": [
+            { "x": 8, "y": 8, "value": "Replace Sub GUI" },
+            { "x": 8, "y": 22, "value": "This one covers the main panel area.", "scale": 0.7 }
+          ],
+          "buttons": [
+            { "x": 8, "y": 96, "width": 44, "height": 20, "label": "Back", "action": "page", "targetPage": "main" },
+            { "x": 56, "y": 96, "width": 48, "height": 20, "label": "Close", "action": "close_subgui" }
+          ]
+        }
+      ]
+    }
+  }
+}

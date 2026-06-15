@@ -1,6 +1,8 @@
 package com.fushu.mmceguiext.common.network;
 
+import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.config.ControllerButtonPolicyManager;
+import com.fushu.mmceguiext.common.util.ControllerCustomDataAccess;
 import hellfirepvp.modularmachinery.common.container.ContainerController;
 import hellfirepvp.modularmachinery.common.container.ContainerFactoryController;
 import hellfirepvp.modularmachinery.common.tiles.TileSmartInterface;
@@ -8,7 +10,6 @@ import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineContr
 import hellfirepvp.modularmachinery.common.util.SmartInterfaceData;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
@@ -20,9 +21,14 @@ import java.util.Map;
 
 public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHandler<PktControllerSmartInterfaceUpdate, IMessage> {
     private static final int MAX_INTERFACE_TYPE_LENGTH = 128;
+    private static final int MAX_VALUE_LENGTH = 1024;
+    private static final byte VALUE_NUMBER = 0;
+    private static final byte VALUE_STRING = 1;
     private BlockPos controllerPos = BlockPos.ORIGIN;
     private String interfaceType = "";
     private float value = 0.0F;
+    private boolean stringValue = false;
+    private String textValue = "";
 
     public PktControllerSmartInterfaceUpdate() {
     }
@@ -31,6 +37,14 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
         this.controllerPos = controllerPos;
         this.interfaceType = interfaceType == null ? "" : interfaceType;
         this.value = value;
+        this.stringValue = false;
+    }
+
+    public PktControllerSmartInterfaceUpdate(BlockPos controllerPos, String interfaceType, String value) {
+        this.controllerPos = controllerPos;
+        this.interfaceType = interfaceType == null ? "" : interfaceType;
+        this.stringValue = true;
+        this.textValue = value == null ? "" : value;
     }
 
     @Override
@@ -38,15 +52,27 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
         NetworkBufferUtils.requireReadable(buf, 8);
         this.controllerPos = BlockPos.fromLong(buf.readLong());
         this.interfaceType = NetworkBufferUtils.readBoundedUtf8(buf, MAX_INTERFACE_TYPE_LENGTH);
-        NetworkBufferUtils.requireReadable(buf, 4);
-        this.value = buf.readFloat();
+        NetworkBufferUtils.requireReadable(buf, 1);
+        byte kind = buf.readByte();
+        this.stringValue = kind == VALUE_STRING;
+        if (this.stringValue) {
+            this.textValue = NetworkBufferUtils.readBoundedUtf8(buf, MAX_VALUE_LENGTH);
+        } else {
+            NetworkBufferUtils.requireReadable(buf, 4);
+            this.value = buf.readFloat();
+        }
     }
 
     @Override
     public void toBytes(ByteBuf buf) {
         buf.writeLong(this.controllerPos.toLong());
         NetworkBufferUtils.writeBoundedUtf8(buf, this.interfaceType, MAX_INTERFACE_TYPE_LENGTH);
-        buf.writeFloat(this.value);
+        buf.writeByte(this.stringValue ? VALUE_STRING : VALUE_NUMBER);
+        if (this.stringValue) {
+            NetworkBufferUtils.writeBoundedUtf8(buf, this.textValue, MAX_VALUE_LENGTH);
+        } else {
+            buf.writeFloat(this.value);
+        }
     }
 
     @Override
@@ -67,7 +93,10 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
         if (interfaceType == null) {
             return;
         }
-        if (!Float.isFinite(message.value)) {
+        if (!message.stringValue && !Float.isFinite(message.value)) {
+            return;
+        }
+        if (message.stringValue && message.textValue != null && message.textValue.length() > MAX_VALUE_LENGTH) {
             return;
         }
 
@@ -83,7 +112,15 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
             return;
         }
         TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
-        applySmartInterfaceUpdate(controller, message.controllerPos, interfaceType, message.value);
+        boolean updated;
+        if (message.stringValue) {
+            updated = applySmartInterfaceUpdate(controller, message.controllerPos, interfaceType, message.textValue == null ? "" : message.textValue);
+        } else {
+            updated = applySmartInterfaceUpdate(controller, message.controllerPos, interfaceType, message.value);
+        }
+        if (updated) {
+            syncCustomDataToPlayer(controller, player);
+        }
     }
 
     static boolean applySmartInterfaceUpdate(TileMultiblockMachineController controller, BlockPos controllerPos, String interfaceType, float value) {
@@ -115,12 +152,32 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
             }
 
             provider.addMachineData(controllerPos, current.getParent(), current.getType(), value, true);
+            ControllerCustomDataAccess.writeNumber(controller, interfaceType, value);
             updated = true;
             break;
         }
         if (!updated && configuredKey) {
-            updated = tryWriteControllerCustomData(controller, interfaceType, value);
+            updated = ControllerCustomDataAccess.writeNumber(controller, interfaceType, value);
         }
+        if (updated) {
+            controller.markForUpdateSync();
+        }
+        return updated;
+    }
+
+    static boolean applySmartInterfaceUpdate(TileMultiblockMachineController controller, BlockPos controllerPos, String interfaceType, String value) {
+        interfaceType = normalizeBounded(interfaceType, MAX_INTERFACE_TYPE_LENGTH);
+        if (controller == null || controllerPos == null || interfaceType == null || value == null || value.length() > MAX_VALUE_LENGTH) {
+            return false;
+        }
+
+        boolean configuredKey = ControllerButtonPolicyManager.isConfiguredSmartKey(controller, interfaceType)
+            || hasControllerCustomData(controller, interfaceType);
+        if (!configuredKey) {
+            return false;
+        }
+
+        boolean updated = ControllerCustomDataAccess.writeString(controller, interfaceType, value);
         if (updated) {
             controller.markForUpdateSync();
         }
@@ -154,33 +211,22 @@ public class PktControllerSmartInterfaceUpdate implements IMessage, IMessageHand
         }
     }
 
-    private static boolean tryWriteControllerCustomData(TileMultiblockMachineController controller, String key, float value) {
-        try {
-            Method getTagMethod = controller.getClass().getMethod("getCustomDataTag");
-            Method setTagMethod = controller.getClass().getMethod("setCustomDataTag", NBTTagCompound.class);
-
-            NBTTagCompound tag = new NBTTagCompound();
-            Object existing = getTagMethod.invoke(controller);
-            if (existing instanceof NBTTagCompound) {
-                tag = ((NBTTagCompound) existing).copy();
-            }
-
-            tag.setFloat(key, value);
-            setTagMethod.invoke(controller, tag);
-            return true;
-        } catch (Exception ignored) {
-            return false;
-        }
+    static boolean hasControllerCustomData(TileMultiblockMachineController controller, String key) {
+        return ControllerCustomDataAccess.hasKey(controller, key);
     }
 
-    static boolean hasControllerCustomData(TileMultiblockMachineController controller, String key) {
-        try {
-            Method getTagMethod = controller.getClass().getMethod("getCustomDataTag");
-            Object existing = getTagMethod.invoke(controller);
-            return existing instanceof NBTTagCompound && ((NBTTagCompound) existing).hasKey(key);
-        } catch (Exception ignored) {
-            return false;
+    static Float readNumericControllerCustomData(TileMultiblockMachineController controller, String key) {
+        return ControllerCustomDataAccess.readNumber(controller, key);
+    }
+
+    static void syncCustomDataToPlayer(TileMultiblockMachineController controller, EntityPlayerMP player) {
+        if (controller == null || player == null) {
+            return;
         }
+        MMCEGuiExt.NET_CHANNEL.sendTo(
+            new PktControllerCustomDataSync(controller.getPos(), ControllerCustomDataAccess.readTag(controller)),
+            player
+        );
     }
 
     private static boolean isPlayerEditingThisController(EntityPlayerMP player, BlockPos controllerPos) {

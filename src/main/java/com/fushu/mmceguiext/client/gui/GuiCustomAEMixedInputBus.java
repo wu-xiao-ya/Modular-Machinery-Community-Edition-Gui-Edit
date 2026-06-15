@@ -115,6 +115,12 @@ public class GuiCustomAEMixedInputBus extends AEBaseGui {
             if (slot instanceof SlotDisabled) {
                 int idx = slot.getSlotIndex();
                 if (idx >= 0) {
+                    CustomAEMixedInputBusRegistry.ComponentDef capacityCard = findIndexedComponent("slot", "capacity_card", idx);
+                    if (capacityCard != null && slot.inventory == this.owner.getCapacityCardInventory().asGUIAccess()) {
+                        slot.xPos = capacityCard.x;
+                        slot.yPos = capacityCard.y;
+                        continue;
+                    }
                     CustomAEMixedInputBusRegistry.ComponentDef component = findIndexedComponent("slot", "item_storage", idx);
                     if (component == null) {
                         component = findIndexedComponent("slot", "item_output", idx);

@@ -14,6 +14,9 @@ This file is a quick reference for pack authors.
 - `enableRightExtension`
   - CN: 是否启用右侧扩展区域。
   - EN: Whether the right-side extension area is enabled.
+- `centerFullGui`
+  - CN: 机器 JSON/styleFile 字段。是否按完整视觉左右边界水平居中 GUI。适合背景贴图使用 `backgroundTextureOffsetX` 向左扩展时避免整体偏右。
+  - EN: Machine JSON/styleFile field. Whether to horizontally center the GUI by its full visual left/right bounds. Useful when `backgroundTextureOffsetX` extends the background left.
 
 ## 2. Background / 背景
 
@@ -123,7 +126,131 @@ This file is a quick reference for pack authors.
   - CN: 渲染优先级，越大越后画。
   - EN: Render priority. Higher values draw later.
 
-## 5. Layer overlays / 图层叠加
+## 5. Controller pages and buttons / 控制器分页与按钮
+
+- Sub GUI overlay file / 子 GUI 独立文件
+  - CN: 主机器 JSON 仍放在 `config/modularmachinery/machinery`。子 GUI overlay JSON 放在 `config/mmceguiext/subgui`，不要放到 `modularmachinery/machinery` 子目录，避免被 MM 机器加载器当成机器定义扫描。
+  - EN: Main machine JSON still lives in `config/modularmachinery/machinery`. Sub GUI overlay JSON lives in `config/mmceguiext/subgui`; do not put it under `modularmachinery/machinery`, or the MM machine loader may scan it as a machine definition.
+  - CN: 子 GUI 文件使用同一个 `registryname`，内容仍写在 `mmce_gui_ext.machineController` 或 `mmce_gui_ext.factoryController` 中，会追加合并到主 GUI。
+  - EN: A sub GUI file uses the same `registryname`; its contents still go under `mmce_gui_ext.machineController` or `mmce_gui_ext.factoryController` and are appended onto the main GUI style.
+- `subGuis`
+  - CN: 控制器下的子 GUI 数组。每一项都是一个可打开的子界面，子项可直接写与主 controller 同级的字段，也可以包在 `style` / `gui` / `controller` 里。
+  - EN: Array of sub GUI definitions under the controller. Each entry is an openable sub screen. You may write controller-level fields directly on the entry, or wrap them in `style` / `gui` / `controller`.
+- `defaultPageId`
+  - CN: GUI 打开时默认显示的页。未填写时通常使用 `main`。
+  - EN: Page shown when the GUI opens. Usually `main` when omitted.
+- `page`
+  - CN: 可写在 `customPanels` 第 6 段、`texts`、`smartInterfaceEditors`、图层和按钮上，用来限制它们只在某一页显示。`state` / `guiState` 可作为别名。
+  - EN: Can be used on the 6th segment of `customPanels`, `texts`, `smartInterfaceEditors`, layers, and buttons to show them only on one page. `state` / `guiState` are accepted aliases.
+- `buttons`
+  - CN: 自定义控制器按钮数组，每个对象一个按钮。
+  - EN: Custom controller button array. One object per button.
+
+### `subGuis` fields / 子 GUI 条目字段
+
+- `id`
+  - CN: 子 GUI ID，按钮用 `targetSubGui` 指向它。
+  - EN: Sub GUI ID. Buttons point to it with `targetSubGui`.
+- `mode` / `openMode`
+  - CN: 打开模式，支持 `modal` 和 `replace`。`displayMode` 等别名也会被兼容。
+  - EN: Open mode. Supports `modal` and `replace`. Aliases such as `displayMode` are also accepted.
+- `x`, `y`
+  - CN: 子 GUI 左上角坐标。
+  - EN: Sub GUI top-left position.
+- `guiWidth`, `guiHeight`
+  - CN: 子 GUI 尺寸。也兼容 `width` / `height`。
+  - EN: Sub GUI size. `width` / `height` are also accepted.
+- `backgroundTexture`
+  - CN: 子 GUI 背景贴图。
+  - EN: Sub GUI background texture.
+- `hideDefaultBackground`
+  - CN: 是否隐藏默认底图。
+  - EN: Whether to hide the default background.
+- `buttons`
+  - CN: 子 GUI 内按钮，字段与主 controller 相同。
+  - EN: Buttons inside the sub GUI. Same fields as the main controller.
+- `texts`
+  - CN: 子 GUI 文本，字段与主 controller 相同。
+  - EN: Texts inside the sub GUI. Same fields as the main controller.
+- `customPanels`
+  - CN: 子 GUI 自定义信息区，格式仍为 `id,x,y,width,height`。
+  - EN: Sub GUI custom panels. Format is still `id,x,y,width,height`.
+- `infoSections`
+  - CN: 子 GUI 信息区条目，规则与主 controller 相同。
+  - EN: Sub GUI info sections. Same rules as the main controller.
+- `smartInterfaceEditors`
+  - CN: 子 GUI Smart Interface 编辑器条目，规则与主 controller 相同。
+  - EN: Sub GUI Smart Interface editor entries. Same rules as the main controller.
+- `textureLayers`
+  - CN: 子 GUI 纹理图层，规则与主 controller 相同。
+  - EN: Sub GUI texture layers. Same rules as the main controller.
+
+### `buttons` fields / 按钮字段
+
+- `x`, `y`
+  - CN: 按钮左上角坐标，必填。
+  - EN: Button top-left position. Required.
+- `width`, `height`
+  - CN: 按钮尺寸。可省略，使用默认尺寸。
+  - EN: Button size. Optional; defaults are used when omitted.
+- `label`
+  - CN: 按钮显示文字，必填。
+  - EN: Text shown on the button. Required.
+- `action`
+  - CN: 按钮行为。支持 `page`、`subgui`、`close_subgui`、`smart_add`、`smart_set`、`event`。`switch_state` / `set_state` 会兼容为 `page`；`data_port_add` / `data_port_set` 会兼容为数值按钮；`open_subgui` / `close_sub_gui` 等别名也会被兼容。
+  - EN: Button action. Supports `page`, `subgui`, `close_subgui`, `smart_add`, `smart_set`, and `event`. `switch_state` / `set_state` alias to `page`; `data_port_add` / `data_port_set` alias to numeric data-port buttons; aliases such as `open_subgui` / `close_sub_gui` are also accepted.
+- `targetPage`
+  - CN: `page` 按钮跳转到的页。只写 `targetPage` 且不写 `action` 时，会自动按 `page` 按钮处理。`targetState` / `targetGuiState` 可作为别名。
+  - EN: Destination page for `page` buttons. If `targetPage` is set and `action` is omitted, the button is treated as a `page` button. `targetState` / `targetGuiState` are accepted aliases.
+- `targetSubGui`
+  - CN: `subgui` 按钮要打开的子 GUI ID。只写 `targetSubGui` 且不写 `action` 时，会自动按 `subgui` 按钮处理。
+  - EN: Sub GUI ID to open for `subgui` buttons. If `targetSubGui` is set and `action` is omitted, the button is treated as a `subgui` button.
+- `openMode`
+  - CN: `subgui` 按钮打开方式，支持 `modal` 和 `replace`。未填时优先用目标子 GUI 自己的 `mode`。
+  - EN: Open mode for `subgui` buttons. Supports `modal` and `replace`. When omitted, the target sub GUI's own `mode` is used first.
+- `key`
+  - CN: `smart_add` / `smart_set` 操作的 Smart Interface / DataPort 虚拟 key。`dataPortKey` / `portKey` 可作为别名。
+  - EN: Smart Interface / DataPort virtual key used by `smart_add` / `smart_set`. `dataPortKey` / `portKey` are accepted aliases.
+- `value`
+  - CN: `smart_add` 时为增量，省略时默认为 `1.0`；`smart_set` 时可填数值或字符串。数值会写入 Smart Interface 数值通道，字符串会写入控制器 `customData[key]` 作为兜底读取值。
+  - EN: Delta for `smart_add`, defaulting to `1.0` when omitted; `smart_set` accepts either numbers or strings. Numbers go through the Smart Interface numeric path, while strings are written to controller `customData[key]` for fallback reads.
+- `min`, `max`
+  - CN: `smart_add` / `smart_set` 后限制结果范围。
+  - EN: Clamp the result after `smart_add` / `smart_set`.
+- `buttonId`
+  - CN: `event` 按钮发送到脚本事件的 ID，必填。也可用 `id`、`eventId` 等别名。
+  - EN: ID sent to the script event for `event` buttons. Required. Aliases such as `id` and `eventId` are accepted.
+- `id`
+  - CN: 按钮配置 ID；`event` 按钮未写 `buttonId` 时也会作为事件 ID。
+  - EN: Button config ID; also used as the event ID when an `event` button omits `buttonId`.
+- `visible`
+  - CN: 是否显示按钮。
+  - EN: Whether the button is visible.
+- `priority`
+  - CN: 按钮排序优先级，越大越后处理。
+  - EN: Button ordering priority. Higher values are handled later.
+
+```json
+{
+  "mmce_gui_ext": {
+    "machineController": {
+      "defaultPageId": "main",
+      "texts": [
+        { "x": 186, "y": 14, "value": "Main Page", "page": "main" },
+        { "x": 186, "y": 14, "value": "Settings", "page": "settings" }
+      ],
+      "buttons": [
+        { "x": 186, "y": 96, "label": "Settings", "action": "page", "targetPage": "settings", "page": "main" },
+        { "x": 238, "y": 96, "label": "+1", "action": "smart_add", "key": "pulse_counter", "value": 1.0, "page": "main" },
+        { "x": 186, "y": 96, "label": "Reset", "action": "smart_set", "key": "pulse_counter", "value": 0.0, "page": "settings" },
+        { "x": 238, "y": 96, "label": "Click", "action": "event", "buttonId": "custom_click", "page": "settings" }
+      ]
+    }
+  }
+}
+```
+
+## 6. Layer overlays / 图层叠加
 
 - `textureLayers`
   - CN: 通用图层数组，可做背景或前景。
@@ -174,16 +301,81 @@ This file is a quick reference for pack authors.
   - CN: 图层优先级，越大越晚画。
   - EN: Layer priority. Higher values draw later.
 
-## 6. Factory-only / 工厂专用
+## 7. Factory-only / 工厂专用
 
 - `specialThreadBackgroundColor`
   - CN: 工厂核心线程背景色，格式可用 `RRGGBB` 或 `AARRGGBB`。
   - EN: Factory core/thread background color. Use `RRGGBB` or `AARRGGBB`.
+- `threadQueueX` / `threadQueueY`
+  - CN: 工厂线程队列左上角坐标。可用 `queueX` / `queueY` 作为别名。
+  - EN: Top-left position of the factory thread queue. `queueX` / `queueY` aliases are accepted.
+- `threadScrollbarX` / `threadScrollbarY`
+  - CN: 工厂线程队列滚动条左上角坐标。可用 `queueScrollbarX` / `queueScrollbarY` 作为别名。
+  - EN: Top-left position of the factory thread queue scrollbar. `queueScrollbarX` / `queueScrollbarY` aliases are accepted.
+- `threadVisibleRows`
+  - CN: 工厂线程队列可见行数，优先级高于全局 `queueVisibleRows`。
+  - EN: Visible rows in the factory thread queue. Overrides global `queueVisibleRows`.
+- `threadRowWidth` / `threadRowHeight`
+  - CN: 工厂线程队列每行宽度与高度，用于绘制、点击与滚动范围计算。
+  - EN: Per-row width and height for the factory thread queue, used for rendering, hit testing, and scroll math.
 - `queueVisibleRows`
   - CN: 左侧队列可见行数。
   - EN: Number of visible rows in the left queue.
 
-## 7. Common patterns / 常见写法
+### Factory thread queue copy-paste example / 工厂线程队列可直接照抄示例
+
+```json
+{
+  "mmce_gui_ext": {
+    "factoryController": {
+      "threadQueueX": 12,
+      "threadQueueY": 14,
+      "threadScrollbarX": 98,
+      "threadScrollbarY": 22,
+      "threadVisibleRows": 7,
+      "threadRowWidth": 90,
+      "threadRowHeight": 34
+    }
+  }
+}
+```
+
+## 8. AE mixed bus capacity cards / AE 混合总线容量卡
+
+- `capacityCardSlots`
+  - CN: 旧式容量卡槽坐标数组，元素为 `{ "x": 116, "y": 18 }`。
+  - EN: Legacy capacity-card slot coordinate array, each entry like `{ "x": 116, "y": 18 }`.
+- `gui.components[].role = "capacity_card"`
+  - CN: 新式 GUI 容量卡槽。`type` 必须为 `slot`，`index` 可省略自动递增。
+  - EN: New-style GUI capacity-card slot. `type` must be `slot`; `index` can be omitted for auto-increment.
+- `config/mmceguiext/capacity_cards/*.json`
+  - CN: 自定义容量卡注册目录。支持 `item`、`meta`/`damage`、`nbt`、`matchNbt`、`multiplier`、`flatFluid`、`flatGas`。
+  - EN: Custom capacity-card registry directory. Supports `item`, `meta`/`damage`, `nbt`, `matchNbt`, `multiplier`, `flatFluid`, and `flatGas`.
+
+```json
+{
+  "gui": {
+    "components": [
+      { "type": "slot", "role": "capacity_card", "index": 0, "x": 116, "y": 18 }
+    ]
+  }
+}
+```
+
+```json
+{
+  "item": "appliedenergistics2:material",
+  "meta": 35,
+  "multiplier": 1.5,
+  "flatFluid": 1000,
+  "flatGas": 1000
+}
+```
+
+- CN: 这组字段可以直接拷到机器 JSON 里。`queueX` / `queueY` / `queueScrollbarX` / `queueScrollbarY` / `queueVisibleRows` / `queueRowWidth` / `queueRowHeight` 这些别名也能用。
+- EN: You can copy this block directly into a machine JSON. Aliases such as `queueX` / `queueY` / `queueScrollbarX` / `queueScrollbarY` / `queueVisibleRows` / `queueRowWidth` / `queueRowHeight` are also accepted.
+
+## 8. Common patterns / 常见写法
 
 - CN: 只改背景时，通常只写 `backgroundTexture` + `hideDefaultBackground`。
 - EN: For background-only edits, usually only set `backgroundTexture` and `hideDefaultBackground`.
@@ -192,7 +384,7 @@ This file is a quick reference for pack authors.
 - CN: 只改叠层时，优先用 `backgroundLayers` / `foregroundLayers`。
 - EN: For overlay-only edits, use `backgroundLayers` / `foregroundLayers`.
 
-## 8. Fake progress bar example / 假进度条示例
+## 9. Fake progress bar example / 假进度条示例
 
 CN: 下面这个例子用一个蓝色方块贴图拉成长条，看起来像进度条。
 EN: The example below stretches a blue square texture into a long bar, which can look like a progress bar.

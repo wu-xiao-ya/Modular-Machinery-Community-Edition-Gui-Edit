@@ -101,6 +101,19 @@ final class MachineGuiStyleParser {
             scope,
             "backgroundTextureOffsetY"
         );
+        style.centerFullGui = getBoolean(
+            node,
+            result,
+            scope,
+            "centerFullGui",
+            "center_full_gui",
+            "centerEntireGui",
+            "center_entire_gui",
+            "centerVisualBounds",
+            "center_visual_bounds",
+            "centerGui",
+            "center_gui"
+        );
         style.hideDefaultBackground = getBoolean(node, result, scope, "hideDefaultBackground", "hideDefault", "disableDefaultTexture");
         style.guiWidth = validateRangeInt(
             getInt(node, result, scope, "guiWidth", "gui_width", "width"),
@@ -117,6 +130,24 @@ final class MachineGuiStyleParser {
             result,
             scope,
             "guiHeight"
+        );
+        style.coordinateWidth = validateRangeInt(
+            getInt(node, result, scope, "coordinateWidth", "coordinate_width", "logicalWidth", "logical_width",
+                "canvasWidth", "canvas_width"),
+            1,
+            MAX_GUI_SIZE,
+            result,
+            scope,
+            "coordinateWidth"
+        );
+        style.coordinateHeight = validateRangeInt(
+            getInt(node, result, scope, "coordinateHeight", "coordinate_height", "logicalHeight", "logical_height",
+                "canvasHeight", "canvas_height"),
+            1,
+            MAX_GUI_SIZE,
+            result,
+            scope,
+            "coordinateHeight"
         );
         style.backgroundTextureWidth = validateRangeInt(
             getInt(node, result, scope, "backgroundTextureWidth", "background_texture_width", "textureWidth", "texture_width"),
@@ -191,6 +222,60 @@ final class MachineGuiStyleParser {
             "thread_scrollbar_y",
             "queueScrollbarY",
             "queue_scrollbar_y"
+        );
+        style.threadVisibleRows = validateRangeInt(
+            getInt(
+                node,
+                result,
+                scope,
+                "threadVisibleRows",
+                "thread_visible_rows",
+                "queueVisibleRows",
+                "queue_visible_rows",
+                "visibleRows",
+                "visible_rows"
+            ),
+            1,
+            MAX_ARRAY_ENTRIES,
+            result,
+            scope,
+            "threadVisibleRows"
+        );
+        style.threadRowWidth = validateRangeInt(
+            getInt(
+                node,
+                result,
+                scope,
+                "threadRowWidth",
+                "thread_row_width",
+                "queueRowWidth",
+                "queue_row_width",
+                "threadElementWidth",
+                "thread_element_width"
+            ),
+            24,
+            MAX_COMPONENT_SIZE,
+            result,
+            scope,
+            "threadRowWidth"
+        );
+        style.threadRowHeight = validateRangeInt(
+            getInt(
+                node,
+                result,
+                scope,
+                "threadRowHeight",
+                "thread_row_height",
+                "queueRowHeight",
+                "queue_row_height",
+                "threadElementHeight",
+                "thread_element_height"
+            ),
+            16,
+            MAX_COMPONENT_SIZE,
+            result,
+            scope,
+            "threadRowHeight"
         );
         style.disableRightExtension = getBoolean(
             node,
@@ -349,7 +434,19 @@ final class MachineGuiStyleParser {
             "showPerformance",
             "show_performance"
         );
-        style.defaultPageId = getTrimmedString(node, result, scope, "defaultPageId", "default_page_id", "pageId", "page_id");
+        style.defaultPageId = getTrimmedString(
+            node,
+            result,
+            scope,
+            "defaultPageId",
+            "default_page_id",
+            "pageId",
+            "page_id",
+            "defaultStateId",
+            "default_state_id",
+            "stateId",
+            "state_id"
+        );
         style.defaultPanelId = getTrimmedString(node, result, scope, "defaultPanelId", "default_panel_id", "panelId", "panel_id");
         style.customPanels = parseStringArray(node, result, scope, "customPanels", "custom_panels", "panels");
         style.infoSections = parseInfoSections(node, result, scope);
@@ -357,6 +454,7 @@ final class MachineGuiStyleParser {
         style.smartInterfaceEditors = parseSmartInterfaceEditors(node, result, scope);
         style.buttons = parseButtons(node, result, scope);
         style.textureLayers = parseTextureLayers(node, result, scope);
+        style.subGuis = parseSubGuis(node, result, scope);
 
         Boolean useDefaultBackground = getBoolean(node, result, scope, "useDefaultBackground");
         if (useDefaultBackground != null) {
@@ -455,7 +553,7 @@ final class MachineGuiStyleParser {
             text.priority = getInt(obj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
             text.shadow = getBoolean(obj, result, itemScope, "shadow", "withShadow", "with_shadow");
             text.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
-            text.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab");
+            text.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
             text.align = normalizeTextAlign(getTrimmedString(obj, result, itemScope, "align", "alignment", "textAlign", "text_align"));
             texts.add(text);
         }
@@ -510,7 +608,7 @@ final class MachineGuiStyleParser {
             editor.showControls = getBoolean(editorObj, result, itemScope, "showControls", "show_controls");
             editor.inputBackground = getBoolean(editorObj, result, itemScope, "inputBackground", "input_background");
             editor.priority = getInt(editorObj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
-            editor.page = getTrimmedString(editorObj, result, itemScope, "page", "pageId", "page_id", "tab");
+            editor.page = getTrimmedString(editorObj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
             editors.add(editor);
         }
 
@@ -549,9 +647,67 @@ final class MachineGuiStyleParser {
             String label = getTrimmedString(obj, result, itemScope, "label", "text", "title");
             String action = getTrimmedString(obj, result, itemScope, "action", "mode", "type");
             String buttonId = getTrimmedString(obj, result, itemScope, "buttonId", "button_id", "eventId", "event_id", "id", "name");
-            String targetPage = getTrimmedString(obj, result, itemScope, "targetPage", "target_page", "pageTarget", "page_target");
-            String key = getTrimmedString(obj, result, itemScope, "key", "virtualKey", "virtual_key", "interfaceType", "interface_type");
-            Float value = getFloat(obj, result, itemScope, "value", "delta", "amount");
+            String targetPage = getTrimmedString(
+                obj,
+                result,
+                itemScope,
+                "targetPage",
+                "target_page",
+                "pageTarget",
+                "page_target",
+                "targetState",
+                "target_state",
+                "stateTarget",
+                "state_target",
+                "targetGuiState",
+                "target_gui_state"
+            );
+            String targetSubGui = getTrimmedString(
+                obj,
+                result,
+                itemScope,
+                "targetSubGui",
+                "target_sub_gui",
+                "targetSubgui",
+                "target_subgui",
+                "subGui",
+                "sub_gui",
+                "subgui",
+                "subGuiId",
+                "sub_gui_id",
+                "subguiId",
+                "subgui_id"
+            );
+            String openMode = normalizeSubGuiMode(getTrimmedString(
+                obj,
+                result,
+                itemScope,
+                "openMode",
+                "open_mode",
+                "targetMode",
+                "target_mode",
+                "mode"
+            ));
+            String key = getTrimmedString(
+                obj,
+                result,
+                itemScope,
+                "key",
+                "virtualKey",
+                "virtual_key",
+                "interfaceType",
+                "interface_type",
+                "dataPortKey",
+                "data_port_key",
+                "portKey",
+                "port_key",
+                "dataPort",
+                "data_port"
+            );
+            Float value = getOptionalFloat(obj, "value", "delta", "amount");
+            String stringValue = value == null
+                ? getValueAsString(obj, result, itemScope, "value", "textValue", "text_value", "stringValue", "string_value")
+                : null;
             if (x == null || y == null || label == null || label.isEmpty()) {
                 result.warnForMachine(scope, itemScope + " is missing required fields x, y or label.");
                 continue;
@@ -577,13 +733,21 @@ final class MachineGuiStyleParser {
                 result.warnForMachine(scope, itemScope + " event action requires buttonId.");
                 continue;
             }
+            if ("subgui".equals(normalizedAction) && (targetSubGui == null || targetSubGui.isEmpty())) {
+                result.warnForMachine(scope, itemScope + " subgui action requires targetSubGui.");
+                continue;
+            }
             if (("smart_set".equals(normalizedAction) || "smart_add".equals(normalizedAction))
                 && (key == null || key.isEmpty())) {
                 result.warnForMachine(scope, itemScope + " smart action requires key.");
                 continue;
             }
-            if ("smart_set".equals(normalizedAction) && value == null) {
+            if ("smart_set".equals(normalizedAction) && value == null && stringValue == null) {
                 result.warnForMachine(scope, itemScope + " smart_set action requires value.");
+                continue;
+            }
+            if ("smart_add".equals(normalizedAction) && value == null) {
+                result.warnForMachine(scope, itemScope + " smart_add action requires numeric value.");
                 continue;
             }
 
@@ -598,12 +762,15 @@ final class MachineGuiStyleParser {
             button.buttonId = buttonId;
             button.key = key;
             button.value = value;
+            button.stringValue = stringValue;
             button.min = getFloat(obj, result, itemScope, "min", "minimum");
             button.max = getFloat(obj, result, itemScope, "max", "maximum");
             button.targetPage = targetPage;
+            button.targetSubGui = targetSubGui;
+            button.openMode = openMode;
             button.priority = getInt(obj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
             button.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
-            button.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab");
+            button.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
             buttons.add(button);
         }
 
@@ -621,6 +788,83 @@ final class MachineGuiStyleParser {
         appendTextureLayers(out, findElement(node, "backgroundLayers", "background_layers"), false, result, scope);
         appendTextureLayers(out, findElement(node, "foregroundLayers", "foreground_layers"), true, result, scope);
         return out.isEmpty() ? null : out;
+    }
+
+    @Nullable
+    private static List<MachineGuiStyleManager.SubGuiStyle> parseSubGuis(
+        JsonObject node,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        MatchedElement match = findElement(node, "subGuis", "sub_guis", "subGuiList", "sub_gui_list");
+        if (match == null) {
+            return null;
+        }
+        if (!match.element.isJsonArray()) {
+            result.warnForMachine(scope, field(scope, match.key) + " must be an array.");
+            return null;
+        }
+
+        List<MachineGuiStyleManager.SubGuiStyle> subGuis = new ArrayList<MachineGuiStyleManager.SubGuiStyle>();
+        JsonArray array = match.element.getAsJsonArray();
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
+            MachineGuiStyleManager.SubGuiStyle subGui = parseSubGuiStyle(
+                array.get(i),
+                result,
+                field(scope, match.key + "[" + i + "]")
+            );
+            if (subGui != null) {
+                subGuis.add(subGui);
+            }
+        }
+        return subGuis.isEmpty() ? null : subGuis;
+    }
+
+    @Nullable
+    private static MachineGuiStyleManager.SubGuiStyle parseSubGuiStyle(
+        @Nullable JsonElement node,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        if (node == null || !node.isJsonObject()) {
+            result.warnForMachine(scope, scope + " must be an object.");
+            return null;
+        }
+
+        JsonObject obj = node.getAsJsonObject();
+        String id = getTrimmedString(obj, result, scope, "id", "name", "subGuiId", "sub_gui_id", "subguiId", "subgui_id");
+        if (id == null || id.isEmpty()) {
+            result.warnForMachine(scope, scope + " is missing required field id.");
+            return null;
+        }
+
+        MachineGuiStyleManager.SubGuiStyle subGui = new MachineGuiStyleManager.SubGuiStyle();
+        subGui.id = id;
+        subGui.mode = normalizeSubGuiMode(getTrimmedString(obj, result, scope, "mode", "openMode", "open_mode", "displayMode", "display_mode"));
+        subGui.x = getInt(obj, result, scope, "x");
+        subGui.y = getInt(obj, result, scope, "y");
+        subGui.width = validateRangeInt(getInt(obj, result, scope, "width", "w", "guiWidth", "gui_width"), 1, MAX_COMPONENT_SIZE, result, scope, "width");
+        subGui.height = validateRangeInt(getInt(obj, result, scope, "height", "h", "guiHeight", "gui_height"), 1, MAX_COMPONENT_SIZE, result, scope, "height");
+
+        JsonObject styleNode = getObject(obj, result, scope, "style", "gui", "controllerStyle", "controller_style");
+        if (styleNode != null) {
+            subGui.style = parseStyle(styleNode, result, scope + ".style");
+        } else {
+            MachineGuiStyleManager.ControllerStyle inlineStyle = parseStyle(obj, result, scope);
+            subGui.style = inlineStyle == MachineGuiStyleManager.ControllerStyle.EMPTY ? null : inlineStyle;
+        }
+
+        if (subGui.style != null) {
+            if (subGui.width != null) {
+                subGui.style.guiWidth = subGui.width;
+            }
+            if (subGui.height != null) {
+                subGui.style.guiHeight = subGui.height;
+            }
+        }
+
+        return subGui.isEmpty() ? null : subGui;
     }
 
     @Nullable
@@ -750,7 +994,7 @@ final class MachineGuiStyleParser {
         layer.foreground = forceForeground
             ? Boolean.TRUE
             : getBoolean(obj, result, scope, "foreground", "front", "drawForeground");
-        layer.page = getTrimmedString(obj, result, scope, "page", "pageId", "page_id", "tab");
+        layer.page = getTrimmedString(obj, result, scope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
         return layer;
     }
 
@@ -761,18 +1005,43 @@ final class MachineGuiStyleParser {
             return null;
         }
         if ("page".equals(text) || "switchpage".equals(text) || "switch_page".equals(text)
-            || "page_switch".equals(text) || "setpage".equals(text) || "set_page".equals(text)) {
+            || "page_switch".equals(text) || "setpage".equals(text) || "set_page".equals(text)
+            || "state".equals(text) || "switch_state".equals(text) || "set_state".equals(text)
+            || "gui_state".equals(text) || "switch_gui_state".equals(text) || "set_gui_state".equals(text)) {
             return "page";
         }
         if ("event".equals(text) || "click_event".equals(text) || "button_event".equals(text)) {
             return "event";
         }
-        if ("smart_set".equals(text) || "smartset".equals(text) || "set".equals(text)) {
+        if ("subgui".equals(text) || "sub_gui".equals(text) || "open_subgui".equals(text) || "open_sub_gui".equals(text)) {
+            return "subgui";
+        }
+        if ("close_subgui".equals(text) || "close_sub_gui".equals(text) || "subgui_close".equals(text) || "sub_gui_close".equals(text)) {
+            return "close_subgui";
+        }
+        if ("smart_set".equals(text) || "smartset".equals(text) || "set".equals(text)
+            || "data_set".equals(text) || "data_port_set".equals(text) || "port_set".equals(text)) {
             return "smart_set";
         }
         if ("smart_add".equals(text) || "smartadd".equals(text) || "add".equals(text)
-            || "increment".equals(text) || "inc".equals(text)) {
+            || "increment".equals(text) || "inc".equals(text)
+            || "data_add".equals(text) || "data_port_add".equals(text) || "port_add".equals(text)) {
             return "smart_add";
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeSubGuiMode(@Nullable String raw) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("modal".equals(text) || "overlay".equals(text) || "dialog".equals(text) || "popup".equals(text)) {
+            return "modal";
+        }
+        if ("replace".equals(text) || "swap".equals(text) || "fullscreen".equals(text) || "full".equals(text)) {
+            return "replace";
         }
         return null;
     }
@@ -831,6 +1100,24 @@ final class MachineGuiStyleParser {
     }
 
     @Nullable
+    private static String getValueAsString(JsonObject obj, MachineFileParseResult result, String scope, String... keys) {
+        MatchedElement match = findElement(obj, keys);
+        if (match == null) {
+            return null;
+        }
+        if (!match.element.isJsonPrimitive()) {
+            result.warn(field(scope, match.key) + " must be a primitive value.");
+            return null;
+        }
+        try {
+            return match.element.getAsString();
+        } catch (Exception ex) {
+            result.warn(field(scope, match.key) + " must be a valid primitive value.");
+            return null;
+        }
+    }
+
+    @Nullable
     private static Boolean getBoolean(JsonObject obj, MachineFileParseResult result, String scope, String... keys) {
         MatchedElement match = findElement(obj, keys);
         if (match == null) {
@@ -876,6 +1163,20 @@ final class MachineGuiStyleParser {
             return Float.valueOf(value);
         } catch (Exception ex) {
             result.warn(field(scope, match.key) + " must be a valid number.");
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Float getOptionalFloat(JsonObject obj, String... keys) {
+        MatchedElement match = findElement(obj, keys);
+        if (match == null || !match.element.isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            float value = match.element.getAsFloat();
+            return Float.isFinite(value) ? Float.valueOf(value) : null;
+        } catch (Exception ignored) {
             return null;
         }
     }

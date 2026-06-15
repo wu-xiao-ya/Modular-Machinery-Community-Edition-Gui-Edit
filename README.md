@@ -1,27 +1,46 @@
-﻿# Modular Machinery: Community Edition Gui Edit (MMCEGE, 1.12.2)
+# Modular Machinery: Community Edition Gui Edit (MMCEGE, 1.12.2)
 
-MMCEGE addon for MMCE controller GUIs.  
-MMCEGE 是一个用于 MMCE 控制器 GUI 的附属模组。
+MMCEGE is an addon for **Modular Machinery: Community Edition** (the KasumiNova fork).
+MMCEGE 是 **Modular Machinery: Community Edition**（KasumiNova 分支）的附属模组。
 
-## Docs | 文档
+It started as a controller-GUI editor, but now bundles four subsystems:
+它最初只是控制器 GUI 编辑器，目前已包含四个子系统：
 
-- Full tutorial (Chinese): `docs/TUTORIAL.zh-CN.md`
-- Game-ready example pack: `examples/game-ready-1.0.1/`
-- Quick start in example folder: `examples/game-ready-1.0.1/README.zh-CN.md`
+1. **Controller GUI replacement / customization** — resizable, texture-driven, multi-panel controller GUIs.
+   **控制器 GUI 替换 / 自定义** — 可调整大小、贴图驱动、多信息区的控制器 GUI。
+2. **JSON-defined custom hatches** — define new fluid/gas/item/energy hatch blocks from config, no code.
+   **JSON 定义的自定义仓口（hatch）** — 用配置文件定义新的流体/气体/物品/能量仓口方块，无需写代码。
+3. **JSON-defined custom AE2 buses** — ME item input, and mixed (item+fluid+gas) input/output buses.
+   **JSON 定义的自定义 AE2 总线** — ME 物品输入总线，以及混合（物品+流体+气体）输入/输出总线。
+4. **Long-capacity recipe requirements** — fluid/gas recipe amounts beyond the vanilla `int` limit.
+   **Long 容量配方需求** — 流体/气体配方量可突破原版 `int`（约 21 亿 mB）上限。
 
-## Features | 功能
+Current version / 当前版本: **`1.1.0-beta`** · MC `1.12.2` · author / 作者: WuXiaoYa
 
-- Replace Machine Controller and Factory Controller GUIs. / 替换普通控制器与集成控制器 GUI。
-- Resizable extra canvas area (without breaking slot alignment). / 支持可调整大小的扩展区域（不会破坏槽位对齐）。
-- Scrollable and draggable info panel. / 支持信息区域滚动与拖拽。
-- Optional custom background texture. / 支持自定义背景贴图。
-- Optional hide of MMCE default background. / 支持隐藏 MMCE 默认背景。
-- Per-machine override from each MMCE machine JSON. / 支持在每台机器的 JSON 中单独覆盖配置。
+---
+
+## Dependencies | 依赖
+
+Required (hard) / 必需依赖：
+
+- `modularmachinery` (Community Edition)
+- `appliedenergistics2` (AE2 Extended Life)
+- `mekanism`
+- `mekeng` (Mekanism Energistics — provides the AE gas storage channel / 提供 AE 气体存储通道)
+
+Optional (soft, compile-only) / 可选依赖：
+
+- The One Probe (hatch probe info / 仓口探针信息)
+- AE2 Fluid Crafting Rework, GregTech CE, HEI/JEI, GeckoLib
+
+---
 
 ## Build | 构建
 
-From `C:\mc_modding\MMCE-FUSHU`:  
-在 `C:\mc_modding\MMCE-FUSHU` 目录执行：
+The project is built with the MMCE source Gradle wrapper.
+本项目使用 MMCE 源码的 Gradle wrapper 构建。
+
+From the repo root / 在仓库根目录执行：
 
 ```powershell
 .\mmce-src\gradlew.bat -p .\mmce-gui-ext build
@@ -29,13 +48,44 @@ From `C:\mc_modding\MMCE-FUSHU`:
 
 Output / 产物：
 
-- `mmce-gui-ext/build/libs/MMCEGE-1.0.1.jar`
+- `mmce-gui-ext/build/libs/MMCEGE-1.1.0-beta.jar`
+
+MMCEGE is a coremod (`FMLCorePlugin = com.fushu.mmceguiext.core.MMCEGuiExtEarlyMixinLoader`); its Mixins load before MMCE.
+MMCEGE 是一个 coremod（`FMLCorePlugin`），其 Mixin 会在 MMCE 之前加载。
+
+---
+
+## Docs & Examples | 文档与示例
+
+- Full tutorial (Chinese) / 完整教程（中文）: `docs/TUTORIAL.zh-CN.md`
+- Field quick reference / 字段速查表: `examples/MMCE_GUI_EXT_FIELD_REFERENCE.md`
+- Quick-start snippets / 快速上手片段: `examples/quick-start/`
+- Game-ready demo pack / 可直接使用的示例包: `examples/game-ready-1.0.1/`
+- Default-machine overrides demo / 原版机器覆盖示例: `examples/default-machines-with-mmce-gui-ext/`, `examples/DEFAULT_MMCE_MACHINES_DEMO.md`
+- Custom hatch example / 自定义仓口示例: `examples/custom_hatches/`
+- Smart Interface editor demo / Smart Interface 编辑器示例: `examples/smart-interface-editor-demo.json` + `.zs`
+
+Config directories MMCEGE reads at startup / MMCEGE 启动时读取的配置目录：
+
+| Path / 路径 | Purpose / 用途 |
+|---|---|
+| `config/mmceguiext/client.cfg` | Global client config / 全局客户端配置 |
+| `config/modularmachinery/machinery/*.json` | Per-machine controller GUI override (`mmce_gui_ext` node) / 机器级控制器 GUI 覆盖 |
+| `config/mmceguiext/custom_hatches/*.json` | Custom hatch definitions / 自定义仓口定义 |
+| `config/mmceguiext/custom_ae_item_input_buses/*.json` | Custom ME item input bus definitions / 自定义 ME 物品输入总线 |
+| `config/mmceguiext/custom_ae_mixed_input_buses/*.json` | Custom mixed input bus definitions / 自定义混合输入总线 |
+| `config/mmceguiext/custom_ae_mixed_output_buses/*.json` | Custom mixed output bus definitions / 自定义混合输出总线 |
+
+---
+
+# Part 1 — Controller GUI | 第一部分 · 控制器 GUI
+
+MMCEGE replaces the vanilla Machine / Factory controller GUI **only when** a custom texture, hidden default background, or per-machine style override is present. It hooks Forge's `GuiOpenEvent` and does **not** patch any MMCE GUI class.
+MMCEGE 仅在存在自定义贴图、隐藏默认背景或机器级样式覆盖时才替换原版普通/集成控制器 GUI。它挂接 Forge 的 `GuiOpenEvent`，**不修改** 任何 MMCE 的 GUI 类。
 
 ## Global Config | 全局配置
 
-File / 配置文件：
-
-- `.minecraft/config/mmceguiext/client.cfg`
+File / 配置文件：`config/mmceguiext/client.cfg`
 
 Important keys / 重要键：
 
@@ -53,21 +103,8 @@ Important keys / 重要键：
 - `machineController.smartInterfaceEditorY` (`-1` = auto right-bottom)
 - `machineController.smartInterfaceEditorInputWidth`
 - `machineController.smartInterfaceEditorVirtualKey` (used when no bound DataPort, writes to controller `customData[key]`; supports multiple keys split by `,` or `;`)
-- `factoryController.backgroundTexture`
-- `factoryController.backgroundTextureWidth`
-- `factoryController.backgroundTextureHeight`
-- `factoryController.useNineSlice`
-- `factoryController.backgroundCorner`
-- `factoryController.hideDefaultBackground`
-- `factoryController.disableRightExtension` (force width to MMCE base width, no right-side expanded area / 强制宽度为 MMCE 基础宽度，不启用右侧扩展区)
+- `factoryController.*` — same keys as `machineController.*` / 与 `machineController.*` 同名键
 - `factoryController.specialThreadBackgroundColor` (hex `RRGGBB` or `AARRGGBB`, for core/special thread row tint / 十六进制颜色，用于核心/特殊线程行着色)
-- `factoryController.defaultPanelId`
-- `factoryController.customPanels` (format / 格式: `id,x,y,width,height`)
-- `factoryController.enableSmartInterfaceEditor`
-- `factoryController.smartInterfaceEditorX` (`-1` = auto right-bottom)
-- `factoryController.smartInterfaceEditorY` (`-1` = auto right-bottom)
-- `factoryController.smartInterfaceEditorInputWidth`
-- `factoryController.smartInterfaceEditorVirtualKey` (used when no bound DataPort, writes to controller `customData[key]`; supports multiple keys split by `,` or `;`)
 
 Rules / 规则：
 
@@ -76,50 +113,23 @@ Rules / 规则：
 - If custom texture is empty and `hideDefaultBackground = true`, default texture is not drawn. / 若未配置自定义贴图且 `hideDefaultBackground = true`，则不绘制默认贴图。
 - If MMCE default texture is used, info text stays in MMCE original info area. / 使用 MMCE 默认贴图时，信息文本仍在 MMCE 原信息区域渲染。
 - Multi-panel mode is enabled only in custom-texture mode. / 多信息区功能仅在自定义贴图模式下启用。
-- Special/core factory thread row color can be overridden. / 工厂控制器核心/特殊线程行颜色支持覆盖。
 
 ## GUI Texture Size Guide | GUI 贴图尺寸指南
 
-Use these sizes when drawing controller GUI textures:  
-绘制控制器 GUI 贴图时建议使用以下尺寸：
-
 - Machine Controller, right extension disabled: `176 x 213` / 普通控制器关闭右扩展：`176 x 213`
-- Machine Controller, right extension enabled: use actual runtime size `guiWidth x guiHeight` (minimum `176 x 213`) / 普通控制器启用右扩展：使用运行时尺寸 `guiWidth x guiHeight`（最小 `176 x 213`）
+- Machine Controller, right extension enabled: use runtime `guiWidth x guiHeight` (min `176 x 213`) / 普通控制器启用右扩展：使用运行时尺寸（最小 `176 x 213`）
 - Factory Controller, right extension disabled: `280 x 213` / 集成控制器关闭右扩展：`280 x 213`
-- Factory Controller, right extension enabled: use actual runtime size `guiWidth x guiHeight` (minimum `280 x 213`) / 集成控制器启用右扩展：使用运行时尺寸 `guiWidth x guiHeight`（最小 `280 x 213`）
+- Factory Controller, right extension enabled: use runtime `guiWidth x guiHeight` (min `280 x 213`) / 集成控制器启用右扩展：使用运行时尺寸（最小 `280 x 213`）
 
-`guiWidth/guiHeight` can be set globally in `client.cfg`, or per machine in `mmce_gui_ext`.  
-`guiWidth/guiHeight` 可在 `client.cfg` 全局设置，也可在每台机器的 `mmce_gui_ext` 中单独设置。  
-Per-machine value has higher priority.  
-机器级配置优先级更高。
+`guiWidth/guiHeight` can be set globally in `client.cfg`, or per machine in `mmce_gui_ext`; per-machine value has higher priority.
+`guiWidth/guiHeight` 可在 `client.cfg` 全局设置，也可在每台机器的 `mmce_gui_ext` 中单独设置；机器级配置优先。
 
-If `disableRightExtension = true`, width is forced to MMCE base width (`176` machine / `280` factory), so your texture should be made at base width.  
-若 `disableRightExtension = true`，宽度会强制为 MMCE 基础宽度（普通 `176` / 集成 `280`），贴图应按基础宽度制作。
-
-For 9-slice mode (`useNineSlice = true`), source texture can stay at base size and scales cleanly.  
-9-slice 模式（`useNineSlice = true`）下，源贴图可保持基础尺寸并进行无损拉伸。  
-For direct mode (`useNineSlice = false`), use exact target size to avoid stretching.  
-直接绘制模式（`useNineSlice = false`）下，请使用目标精确尺寸以避免拉伸变形。
-
-## ZS Panel Selection | ZS 信息区选择
-
-In Controller GUI extra info, route a line to a target panel with:  
-在控制器 GUI 扩展信息中，可使用以下前缀把文本发送到指定信息区：
-
-- `[panel:panel_id]your text`
-
-If no prefix is provided, text goes to `defaultPanelId`.  
-如果不写前缀，文本会进入 `defaultPanelId` 指定的信息区。
-
-Example / 示例：
-
-- `[panel:main]Main status line`
-- `[panel:debug]Debug line`
-- `no prefix -> default panel` / `无前缀 -> 默认信息区`
+- 9-slice mode (`useNineSlice = true`): source texture can stay at base size and scales cleanly. / 9-slice 模式下源贴图可保持基础尺寸并无损拉伸。
+- Direct mode (`useNineSlice = false`): use exact target size to avoid stretching. / 直接绘制模式请使用目标精确尺寸以避免拉伸。
 
 ## Per-machine JSON Override | 机器级 JSON 覆盖
 
-Put override fields inside each MMCE machine JSON (under `config/modularmachinery/machinery/*.json`):  
+Put override fields inside each MMCE machine JSON (`config/modularmachinery/machinery/*.json`):
 将覆盖字段写入每台 MMCE 机器的 JSON（位于 `config/modularmachinery/machinery/*.json`）：
 
 ```json
@@ -141,7 +151,14 @@ Put override fields inside each MMCE machine JSON (under `config/modularmachiner
       "guiWidth": 520,
       "guiHeight": 240,
       "disableRightExtension": true,
-      "specialThreadBackgroundColor": "B2E5FF"
+      "specialThreadBackgroundColor": "B2E5FF",
+      "threadQueueX": 12,
+      "threadQueueY": 14,
+      "threadScrollbarX": 98,
+      "threadScrollbarY": 22,
+      "threadVisibleRows": 7,
+      "threadRowWidth": 90,
+      "threadRowHeight": 34
     }
   }
 }
@@ -149,53 +166,153 @@ Put override fields inside each MMCE machine JSON (under `config/modularmachiner
 
 Supported aliases / 支持的别名：
 
-- `mmceGuiExt`, `mmce_gui_ext`, `mmce-gui-ext`
-- `machineController`, `machine_controller`, `machine`
-- `factoryController`, `factory_controller`, `factory`
-- size keys / 尺寸键名: `guiWidth` / `gui_width` / `width`, `guiHeight` / `gui_height` / `height`
+- Root node / 根节点: `mmceGuiExt`, `mmce_gui_ext`, `mmce-gui-ext`
+- Controller node / 控制器节点: `machineController` / `machine_controller` / `machine`, `factoryController` / `factory_controller` / `factory`
+- Size keys / 尺寸键名: `guiWidth` / `gui_width` / `width`, `guiHeight` / `gui_height` / `height`
 
-Per-machine JSON values override global config values for that machine.  
-机器 JSON 中的值会覆盖该机器对应的全局配置值。
+Per-machine values override global config for that machine. Since `1.0.1+`, if a machine defines any `mmce_gui_ext` node, unspecified GUI size falls back to MMCE base size (`176x213` / `280x213`) first, reducing coupling to global `client.cfg`.
+机器级值会覆盖该机器对应的全局配置。自 `1.0.1+` 起，只要机器定义了 `mmce_gui_ext` 节点，未显式填写的 GUI 尺寸会优先回退到 MMCE 基础尺寸，从而降低对全局 `client.cfg` 的耦合。
 
-Since `1.0.1+`, if a machine defines any `mmce_gui_ext` style node, unspecified GUI size falls back to MMCE base size first (`176x213` / `280x213`) to reduce global `client.cfg` coupling.  
-从 `1.0.1+` 开始，只要机器定义了 `mmce_gui_ext` 样式节点，未显式填写的 GUI 尺寸会优先回退到 MMCE 基础尺寸（`176x213` / `280x213`），从而降低对全局 `client.cfg` 的耦合。
+For the full per-machine field list (panels, buttons, sub GUIs, texts, texture layers, Smart Interface editors), see `examples/MMCE_GUI_EXT_FIELD_REFERENCE.md`.
+完整的机器级字段列表（信息区、按钮、子 GUI、文字、纹理图层、Smart Interface 编辑器）见 `examples/MMCE_GUI_EXT_FIELD_REFERENCE.md`。
 
-If a machine uses custom texture but does not set `backgroundTextureWidth/Height`, renderer auto-uses runtime target size to avoid accidental scaling from global texture size.  
-若机器使用了自定义贴图但未设置 `backgroundTextureWidth/Height`，渲染器会自动使用运行时目标尺寸，避免被全局贴图尺寸误触发缩放。
+### Texture Offset For Left/Top Decorations | 左上装饰偏移
 
+Use these to align textures whose main frame is not at `(0,0)`:
+用于让“主框不在贴图 0,0”的贴图正确对齐：
 
+- `backgroundTextureOffsetX` (and aliases `offsetX`, `textureOriginX`, …)
+- `backgroundTextureOffsetY` (and aliases `offsetY`, `textureOriginY`, …)
+- `backgroundTextureWidth` / `backgroundTextureHeight`
+- `useNineSlice` / `backgroundCorner`
+- `centerFullGui` — horizontally center by full visual bounds (useful with a left-extended background) / 按完整视觉边界水平居中（背景向左扩展时有用）
 
-## 1.0.1 Offset For Left/Top Decorations | 1.0.1 左上装饰偏移
+## Runtime ZS Directives | 运行时 ZS 指令
 
-Use these keys to align custom textures that place the main frame at (offsetX, offsetY):
-使用以下键让“主框不在贴图 0,0”的贴图正确对齐：
+These directives are read from text lines pushed into MMCE's `ControllerGUIRenderEvent.extraInfo[]` (e.g. via CraftTweaker/ZenScript). They are **client-side only**.
+以下指令读取自推入 MMCE `ControllerGUIRenderEvent.extraInfo[]` 的文本行（例如通过 CraftTweaker/ZenScript），**仅作用于客户端**。
 
-- `machineController.backgroundTextureOffsetX`
-- `machineController.backgroundTextureOffsetY`
-- `factoryController.backgroundTextureOffsetX`
-- `factoryController.backgroundTextureOffsetY`
+**Panel routing / 信息区路由**
 
-Per-machine JSON override keys:
-机器 JSON 覆盖键：
+- `[panel:panel_id]your text` — send a line to a specific panel; no prefix → `defaultPanelId`. / 把该行发送到指定信息区；无前缀则进入 `defaultPanelId`。
 
-- `backgroundTextureOffsetX` / `background_texture_offset_x` / `textureOffsetX` / `texture_offset_x` / `offsetX` / `offset_x` / `textureOriginX` / `texture_origin_x`
-- `backgroundTextureOffsetY` / `background_texture_offset_y` / `textureOffsetY` / `texture_offset_y` / `offsetY` / `offset_y` / `textureOriginY` / `texture_origin_y`
-- `backgroundTextureWidth` / `background_texture_width` / `textureWidth` / `texture_width`
-- `backgroundTextureHeight` / `background_texture_height` / `textureHeight` / `texture_height`
-- `useNineSlice` / `use_nine_slice` / `nineSlice` / `nine_slice`
-- `backgroundCorner` / `background_corner` / `corner` / `cornerSize` / `corner_size`
-- `enableSmartInterfaceEditor` / `enable_smart_interface_editor` / `enableDataPortEditor` / `enable_data_port_editor` / `enableDataPort`
-- `smartInterfaceEditorX` / `smart_interface_editor_x` / `dataPortEditorX` / `data_port_editor_x` / `dataPortX` / `data_port_x`
-- `smartInterfaceEditorY` / `smart_interface_editor_y` / `dataPortEditorY` / `data_port_editor_y` / `dataPortY` / `data_port_y`
-- `smartInterfaceEditorInputWidth` / `smart_interface_editor_input_width` / `dataPortEditorInputWidth` / `data_port_editor_input_width` / `dataPortWidth` / `data_port_width`
-- `smartInterfaceEditorVirtualKey` / `smart_interface_editor_virtual_key` / `dataPortEditorVirtualKey` / `data_port_editor_virtual_key` / `virtualDataPortKey` / `virtual_data_port_key`
+**Smart Interface editor / Smart Interface 编辑器**
 
-Smart Interface editor ZS directives (put in `ControllerGUIRenderEvent.extraInfo[]`):
-Smart Interface 编辑器 ZS 指令（写在 `ControllerGUIRenderEvent.extraInfo[]`）：
+- `[mmcege:si.hide_key]` / `[mmcege:si.hide_info]` — hide bottom info line / 隐藏底部信息行
+- `[mmcege:si.show_key]` / `[mmcege:si.show_info]` — show it (default) / 显示（默认）
+- `[mmcege:si.hide_title]` / `[mmcege:si.show_title]` — hide / show top title / 隐藏 / 显示顶部标题
+- `[mmcege:si.title=Your Title]` — set custom title; placeholders `{index}` `{count}` `{key}` / 设置自定义标题，支持占位符
+- `[mmcege:si.clear_title]` — restore default title / 恢复默认标题
 
-- `[mmcege:si.hide_key]` / `[mmcege:si.hide_info]` hide the bottom info line (`Key: ...` or value info)
-- `[mmcege:si.show_key]` / `[mmcege:si.show_info]` show the bottom info line (default)
-- `[mmcege:si.hide_title]` hide top title line
-- `[mmcege:si.show_title]` show top title line (default)
-- `[mmcege:si.title=Your Title]` set custom top title; supports placeholders `{index}` `{count}` `{key}`
-- `[mmcege:si.clear_title]` clear custom title and restore default
+**Texture layer control / 纹理图层控制**
+
+- `[mmcege:layer.<layerId>.<action>=<value>]` where action ∈ `x`, `y`, `scale`, `scaleX`, `scaleY`, `rotation`, `priority`, `visible`, `reset`, `clear`
+  / action 可为 `x`、`y`、`scale`、`scaleX`、`scaleY`、`rotation`、`priority`、`visible`、`reset`、`clear`
+- `[mmcege:layer.reset_all]` / `[mmcege:layer.clear_all]` — reset all layer states / 重置所有图层状态
+
+## Controller Buttons | 控制器按钮
+
+Buttons are defined per-machine (`buttons[]`) and validated server-side by a policy manager to prevent forged actions. Button actions:
+按钮在机器级 JSON（`buttons[]`）中定义，由服务端策略管理器校验以防止伪造。按钮动作类型：
+
+- `page` — client-side page switch / 纯客户端页面切换
+- `subgui` — open a configured sub GUI / 打开已配置的子 GUI
+- `close_subgui` — close the current sub GUI / 关闭当前子 GUI
+- `event` — fire MMCE `ControllerButtonClickEvent` server-side / 在服务端触发 MMCE 按钮点击事件
+- `smart_set` / `smart_add` — set / add a Smart Interface value (with optional min/max clamp) / 设置 / 累加 Smart Interface 值（可选 min/max 限幅）
+
+See `examples/quick-start/buttons-and-pages.json`, `event-button-test.json`, `controller-button-test.json`, `subgui-page-reference.json`.
+示例见 `examples/quick-start/` 下相应文件。
+
+---
+
+# Part 2 — Custom Hatches | 第二部分 · 自定义仓口
+
+Drop a `.json` into `config/mmceguiext/custom_hatches/` and MMCEGE registers a new block + item + tile at startup. Each hatch acts as an MMCE multiblock component (input/output for fluid / gas / item / energy, or a combined component) and uses **long** capacities (beyond the `int` limit).
+在 `config/mmceguiext/custom_hatches/` 放入一个 `.json`，MMCEGE 会在启动时注册新的方块 + 物品 + tile。每个仓口作为 MMCE 多方块组件（流体/气体/物品/能量的输入或输出，或组合组件），容量使用 **long**（突破 `int` 上限）。
+
+Key top-level fields / 关键顶层字段：
+
+- `id` — unique id; block registers as `mmceguiext:<id>` / 唯一 id，方块注册为 `mmceguiext:<id>`
+- `displayName` — block/item display name / 方块与物品的显示名
+- `componentType` — `item` / `fluid` / `gas` / `energy`, or combined: `mixed` / `hybrid` / `item_fluid` / `item_fluid_gas`
+- `ioType` — `input` / `output`
+- `capacity` — default capacity; `fluidCapacity` / `gasCapacity` / `energyCapacity` / `energyTransfer` override per type / 默认容量；可按类型单独覆盖
+- `components[]` — MMCE machine components this hatch provides, each `{ "type": "...", "io": "..." }` / 该仓口提供的 MMCE 组件
+- `block` — block appearance: `model`, `texture`, plus optional `textureLevels[]` that swap the block texture by fill ratio (`content`, `minFillRatio`, `texture`/`model`) / 方块外观，`textureLevels` 可按填充比例切换贴图
+- `guiStyleFile` / `gui` — GUI layout (see below) / GUI 布局（见下）
+- `tips` / `tooltip` — item tooltip lines / 物品提示行
+
+The `gui` object holds `width`/`height`/`coordinateWidth`/`coordinateHeight` and a `components[]` list of GUI elements (`type`: `slot`, `tank`, `text`, `player_inventory`, …). Tank/text values support placeholders like `fluid.name`, `tank.amount_capacity`, `{amount_capacity_formatted}`.
+`gui` 对象包含 `width`/`height`/`coordinateWidth`/`coordinateHeight` 与 `components[]`（`type` 可为 `slot`/`tank`/`text`/`player_inventory` 等）。tank/text 的值支持占位符，如 `fluid.name`、`tank.amount_capacity`、`{amount_capacity_formatted}`。
+
+Minimal example / 最小示例（fluid input hatch）:
+
+```json
+{
+  "id": "fluid_meter_hatch_test",
+  "displayName": "Fluid Meter Hatch Test",
+  "componentType": "fluid",
+  "ioType": "input",
+  "capacity": 4000,
+  "fluidCapacity": 4000,
+  "block": { "model": "mmceguiext:hatch/mix_in_lv1", "texture": "minecraft:textures/blocks/glass.png" },
+  "components": [ { "type": "fluid", "io": "input" } ],
+  "gui": {
+    "width": 176, "height": 166, "coordinateWidth": 176, "coordinateHeight": 166,
+    "components": [
+      { "type": "tank", "x": 80, "y": 15, "width": 18, "height": 61, "content": "fluid", "overlay": true,
+        "tips": [ "Fluid: {amount_capacity_formatted} mB" ] },
+      { "type": "player_inventory", "x": 8, "y": 84, "hotbarY": 142 }
+    ]
+  }
+}
+```
+
+Working examples / 可用示例：`config/mmceguiext/custom_hatches/custom_gas_input_hatch.json`, `examples/custom_hatches/fluid_meter_hatch_test.json`.
+
+Hatch GUIs / 仓口 GUI：
+
+- Fluid-processor GUI — full custom GUI with tanks/slots and (when applicable) AE inventory access. / 完整自定义 GUI，含储罐/槽位与（适用时）AE 库存访问。
+- Fluid-hatch GUI — extends MMCE's native fluid hatch GUI. / 扩展 MMCE 原版流体仓 GUI。
+- Upgrade-bus GUI — custom layout over MMCE's upgrade bus. / MMCE 升级总线的自定义布局。
+
+Probe info / 探针信息: when The One Probe is installed, hatch fill levels and capacities are shown on the probe. / 安装 The One Probe 后，探针会显示仓口的填充与容量。
+
+---
+
+# Part 3 — Custom AE2 Buses (experimental) | 第三部分 · 自定义 AE2 总线（实验性）
+
+> These are advanced/experimental. JSON shape mirrors the hatch system; capabilities depend on AE2 + Mekanism Energistics being present. Treat the `Def` parsing in the registry classes as the source of truth.
+> 这些功能较新/实验性。JSON 结构与仓口系统同构；能力依赖 AE2 + Mekanism Energistics。字段以注册表类中的 `Def` 解析为准。
+
+Each bus type is JSON-defined (one `.json` per definition) and registered as a block + tile at startup, connecting to the AE2 ME network via an `AENetworkProxy` (requires a channel, consumes network power).
+每种总线均由 JSON 定义（每个定义一个 `.json`），启动时注册为方块 + tile，通过 `AENetworkProxy` 接入 AE2 ME 网络（需要频道，消耗网络能量）。
+
+| Directory / 目录 | Bus / 总线 | What it does / 作用 |
+|---|---|---|
+| `custom_ae_item_input_buses/` | ME Item Input Bus | Item-only input; dynamic slot count (≤4096) and oversized stacks; config/storage pre-fetch from the ME network. / 纯物品输入；动态槽位数、超大堆叠、从 ME 网络预拉取。 |
+| `custom_ae_mixed_input_buses/` | Mixed Input Bus | One block inputs **item + fluid + gas** at once via three AE storage channels; exposed to MMCE as three grouped components. / 一个方块同时输入物品+流体+气体，对 MMCE 暴露为三个分组组件。 |
+| `custom_ae_mixed_output_buses/` | Mixed Output Bus | Buffers recipe outputs (item+fluid+gas) and pushes them to the ME network; exposed as MMCE-CE's combined `item_fluid_gas` component. / 缓冲配方产物并推送至 ME 网络，对外为 MMCE-CE 的组合组件。 |
+
+Common JSON fields / 通用 JSON 字段：`id`, `displayName`, the GUI layout (`gui.components[]` with `slot` / `tank` entries, or legacy flat `configSlots` / `storageSlots`), block model/texture. The mixed buses additionally describe item/fluid/gas config + storage regions.
+通用字段：`id`、`displayName`、GUI 布局（`gui.components[]` 含 `slot`/`tank`，或旧式扁平 `configSlots`/`storageSlots`）、方块模型/贴图。混合总线另外描述物品/流体/气体的 config + storage 区域。
+
+---
+
+# Part 4 — Long-Capacity Recipe Requirements | 第四部分 · Long 容量配方需求
+
+MMCE's `RequirementFluid` / `RequirementGas` store the recipe `amount` as `int`, which overflows above ~2.1 billion mB. MMCEGE patches the requirement system (via Mixins) so fluid/gas amounts are parsed and processed as `long`.
+MMCE 的 `RequirementFluid` / `RequirementGas` 以 `int` 存储配方 `amount`，超过约 21 亿 mB 会溢出。MMCEGE 通过 Mixin 改造需求系统，使流体/气体量以 `long` 解析与处理。
+
+**No configuration needed** — just write large `amount` values in your MMCE recipe JSON and they will be respected at parse, craft-start, finish, and parallelism checks (vanilla recipes are unaffected; int paths still work).
+**无需任何配置** — 直接在 MMCE 配方 JSON 中写大数值即可，解析、开始合成、完成、并行度计算均会正确处理（原版配方不受影响，int 路径照常工作）。
+
+This is what makes the long-capacity custom hatches / AE buses above actually usable in recipes.
+正是这一改造，让前面 long 容量的自定义仓口 / AE 总线能在配方中真正可用。
+
+---
+
+## License | 许可
+
+See the MMCE source license. / 见 MMCE 源码许可。

@@ -8,9 +8,9 @@ import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -29,18 +29,26 @@ public final class MachineGuiStyleManager {
     private static boolean pinnedCache = false;
     private static final Map<String, ControllerStyle> MACHINE_CONTROLLER_STYLES = new HashMap<String, ControllerStyle>();
     private static final Map<String, ControllerStyle> FACTORY_CONTROLLER_STYLES = new HashMap<String, ControllerStyle>();
+    private static final Map<String, ControllerStyle> MACHINE_SUBGUI_STYLES = new HashMap<String, ControllerStyle>();
+    private static final Map<String, ControllerStyle> FACTORY_SUBGUI_STYLES = new HashMap<String, ControllerStyle>();
 
     private MachineGuiStyleManager() {
     }
 
     public static ControllerStyle resolveMachineController(@Nullable DynamicMachine machine) {
         ensureLoaded();
-        return resolve(machine, MACHINE_CONTROLLER_STYLES);
+        return merge(
+            resolve(machine, MACHINE_CONTROLLER_STYLES),
+            resolve(machine, MACHINE_SUBGUI_STYLES)
+        );
     }
 
     public static ControllerStyle resolveFactoryController(@Nullable DynamicMachine machine) {
         ensureLoaded();
-        return resolve(machine, FACTORY_CONTROLLER_STYLES);
+        return merge(
+            resolve(machine, FACTORY_CONTROLLER_STYLES),
+            resolve(machine, FACTORY_SUBGUI_STYLES)
+        );
     }
 
     private static ControllerStyle resolve(@Nullable DynamicMachine machine, Map<String, ControllerStyle> source) {
@@ -94,19 +102,31 @@ public final class MachineGuiStyleManager {
     private static void reload() {
         MACHINE_CONTROLLER_STYLES.clear();
         FACTORY_CONTROLLER_STYLES.clear();
+        MACHINE_SUBGUI_STYLES.clear();
+        FACTORY_SUBGUI_STYLES.clear();
 
         Path machineryDir = Loader.instance().getConfigDir().toPath().resolve(MACHINERY_DIR);
-        if (!Files.exists(machineryDir)) {
-            return;
+        if (Files.exists(machineryDir)) {
+            try (Stream<Path> stream = Files.walk(machineryDir)) {
+                stream
+                    .filter(Files::isRegularFile)
+                    .filter(MachineGuiStyleManager::isMachineJson)
+                    .forEach(MachineGuiStyleManager::loadMachineJson);
+            } catch (IOException ex) {
+                LOGGER.warn("Failed to scan MMCE GUI ext machine configs under {}: {}", machineryDir, ex.getMessage());
+            }
         }
 
-        try (Stream<Path> stream = Files.walk(machineryDir)) {
-            stream
-                .filter(Files::isRegularFile)
-                .filter(MachineGuiStyleManager::isMachineJson)
-                .forEach(MachineGuiStyleManager::loadMachineJson);
-        } catch (IOException ex) {
-            LOGGER.warn("Failed to scan MMCE GUI ext machine configs under {}: {}", machineryDir, ex.getMessage());
+        Path subGuiDir = SubGuiConfigLoader.getSubGuiRootDir();
+        if (Files.exists(subGuiDir)) {
+            try (Stream<Path> stream = Files.walk(subGuiDir)) {
+                stream
+                    .filter(Files::isRegularFile)
+                    .filter(MachineGuiStyleManager::isMachineJson)
+                    .forEach(MachineGuiStyleManager::loadSubGuiJson);
+            } catch (IOException ex) {
+                LOGGER.warn("Failed to scan MMCE GUI ext subGUI configs under {}: {}", subGuiDir, ex.getMessage());
+            }
         }
     }
 
@@ -121,7 +141,7 @@ public final class MachineGuiStyleManager {
                 LOGGER.warn("Skipping MMCE GUI ext machine config {} because it is larger than {} bytes.", path, MAX_MACHINE_STYLE_FILE_BYTES);
                 return;
             }
-            String content = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+            String content = new String(Files.readAllBytes(path), java.nio.charset.StandardCharsets.UTF_8);
             MachineGuiStyleParser.MachineFileParseResult parsed =
                 MachineGuiStyleParser.parseMachineJson(path.toString(), content);
 
@@ -151,6 +171,53 @@ public final class MachineGuiStyleManager {
         }
     }
 
+    private static void loadSubGuiJson(Path path) {
+        try {
+            if (Files.size(path) > MAX_MACHINE_STYLE_FILE_BYTES) {
+                LOGGER.warn("Skipping MMCE GUI ext subGUI config {} because it is larger than {} bytes.", path, MAX_MACHINE_STYLE_FILE_BYTES);
+                return;
+            }
+            MachineGuiStyleParser.MachineFileParseResult parsed = SubGuiConfigLoader.loadSubGuiJson(path);
+
+            for (String warning : parsed.warnings) {
+                LOGGER.warn(warning);
+            }
+
+            if (parsed.namespacedKey == null || parsed.pathKey == null) {
+                return;
+            }
+
+            if (parsed.machineNodePresent) {
+                ControllerStyle machineStyle = parsed.machineStyle == ControllerStyle.EMPTY
+                    ? new ControllerStyle()
+                    : parsed.machineStyle;
+                mergeStyle(MACHINE_SUBGUI_STYLES, parsed.namespacedKey, parsed.pathKey, parsed.allowPathFallback, machineStyle);
+            }
+
+            if (parsed.factoryNodePresent) {
+                ControllerStyle factoryStyle = parsed.factoryStyle == ControllerStyle.EMPTY
+                    ? new ControllerStyle()
+                    : parsed.factoryStyle;
+                mergeStyle(FACTORY_SUBGUI_STYLES, parsed.namespacedKey, parsed.pathKey, parsed.allowPathFallback, factoryStyle);
+            }
+        } catch (Exception ex) {
+            LOGGER.warn("Failed to read MMCE GUI ext subGUI config {}: {}", path, ex.getMessage());
+        }
+    }
+
+    private static ControllerStyle merge(@Nullable ControllerStyle base, @Nullable ControllerStyle overlay) {
+        if (base == null || base == ControllerStyle.EMPTY || base.isEmpty()) {
+            if (overlay == null || overlay == ControllerStyle.EMPTY || overlay.isEmpty()) {
+                return ControllerStyle.EMPTY;
+            }
+            return ControllerStyle.copyOf(overlay);
+        }
+        if (overlay == null || overlay == ControllerStyle.EMPTY || overlay.isEmpty()) {
+            return base;
+        }
+        return ControllerStyle.copyOf(base).mergeFrom(overlay);
+    }
+
     private static void putStyle(
         Map<String, ControllerStyle> target,
         String namespacedKey,
@@ -172,6 +239,28 @@ public final class MachineGuiStyleManager {
         }
     }
 
+    private static void mergeStyle(
+        Map<String, ControllerStyle> target,
+        String namespacedKey,
+        String pathKey,
+        boolean allowPathFallback,
+        ControllerStyle style
+    ) {
+        mergeStyleForKey(target, namespacedKey, style);
+        if (allowPathFallback) {
+            mergeStyleForKey(target, pathKey, style);
+        }
+    }
+
+    private static void mergeStyleForKey(Map<String, ControllerStyle> target, String key, ControllerStyle style) {
+        ControllerStyle previous = target.get(key);
+        if (previous == null || previous == ControllerStyle.EMPTY || previous.isEmpty()) {
+            target.put(key, ControllerStyle.copyOf(style));
+            return;
+        }
+        target.put(key, ControllerStyle.copyOf(previous).mergeFrom(style));
+    }
+
     public static class ControllerStyle {
         public static final ControllerStyle EMPTY = new ControllerStyle();
 
@@ -182,11 +271,17 @@ public final class MachineGuiStyleManager {
         @Nullable
         public Integer backgroundTextureOffsetY;
         @Nullable
+        public Boolean centerFullGui;
+        @Nullable
         public Boolean hideDefaultBackground;
         @Nullable
         public Integer guiWidth;
         @Nullable
         public Integer guiHeight;
+        @Nullable
+        public Integer coordinateWidth;
+        @Nullable
+        public Integer coordinateHeight;
         @Nullable
         public Integer backgroundTextureWidth;
         @Nullable
@@ -205,6 +300,12 @@ public final class MachineGuiStyleManager {
         public Integer threadScrollbarX;
         @Nullable
         public Integer threadScrollbarY;
+        @Nullable
+        public Integer threadVisibleRows;
+        @Nullable
+        public Integer threadRowWidth;
+        @Nullable
+        public Integer threadRowHeight;
         @Nullable
         public Boolean disableRightExtension;
         @Nullable
@@ -251,14 +352,19 @@ public final class MachineGuiStyleManager {
         public List<ButtonStyle> buttons;
         @Nullable
         public List<TextureLayerStyle> textureLayers;
+        @Nullable
+        public List<SubGuiStyle> subGuis;
 
         public boolean isEmpty() {
             return (backgroundTexture == null || backgroundTexture.trim().isEmpty())
                    && backgroundTextureOffsetX == null
                    && backgroundTextureOffsetY == null
+                   && centerFullGui == null
                    && hideDefaultBackground == null
                    && guiWidth == null
                    && guiHeight == null
+                   && coordinateWidth == null
+                   && coordinateHeight == null
                    && backgroundTextureWidth == null
                    && backgroundTextureHeight == null
                    && backgroundCorner == null
@@ -268,6 +374,9 @@ public final class MachineGuiStyleManager {
                    && threadQueueY == null
                    && threadScrollbarX == null
                    && threadScrollbarY == null
+                   && threadVisibleRows == null
+                   && threadRowWidth == null
+                   && threadRowHeight == null
                    && disableRightExtension == null
                    && enableSmartInterfaceEditor == null
                    && smartInterfaceEditorX == null
@@ -290,7 +399,147 @@ public final class MachineGuiStyleManager {
                    && (texts == null || texts.isEmpty())
                    && (smartInterfaceEditors == null || smartInterfaceEditors.isEmpty())
                    && (buttons == null || buttons.isEmpty())
-                   && (textureLayers == null || textureLayers.isEmpty());
+                   && (textureLayers == null || textureLayers.isEmpty())
+                   && (subGuis == null || subGuis.isEmpty());
+        }
+
+        public static ControllerStyle copyOf(ControllerStyle source) {
+            ControllerStyle copy = new ControllerStyle();
+            if (source == null) {
+                return copy;
+            }
+            copy.backgroundTexture = source.backgroundTexture;
+            copy.backgroundTextureOffsetX = source.backgroundTextureOffsetX;
+            copy.backgroundTextureOffsetY = source.backgroundTextureOffsetY;
+            copy.centerFullGui = source.centerFullGui;
+            copy.hideDefaultBackground = source.hideDefaultBackground;
+            copy.guiWidth = source.guiWidth;
+            copy.guiHeight = source.guiHeight;
+            copy.coordinateWidth = source.coordinateWidth;
+            copy.coordinateHeight = source.coordinateHeight;
+            copy.backgroundTextureWidth = source.backgroundTextureWidth;
+            copy.backgroundTextureHeight = source.backgroundTextureHeight;
+            copy.backgroundCorner = source.backgroundCorner;
+            copy.useNineSlice = source.useNineSlice;
+            copy.specialThreadBackgroundColor = source.specialThreadBackgroundColor;
+            copy.threadQueueX = source.threadQueueX;
+            copy.threadQueueY = source.threadQueueY;
+            copy.threadScrollbarX = source.threadScrollbarX;
+            copy.threadScrollbarY = source.threadScrollbarY;
+            copy.threadVisibleRows = source.threadVisibleRows;
+            copy.threadRowWidth = source.threadRowWidth;
+            copy.threadRowHeight = source.threadRowHeight;
+            copy.disableRightExtension = source.disableRightExtension;
+            copy.enableSmartInterfaceEditor = source.enableSmartInterfaceEditor;
+            copy.smartInterfaceEditorX = source.smartInterfaceEditorX;
+            copy.smartInterfaceEditorY = source.smartInterfaceEditorY;
+            copy.smartInterfaceEditorInputWidth = source.smartInterfaceEditorInputWidth;
+            copy.smartInterfaceEditorVirtualKey = source.smartInterfaceEditorVirtualKey;
+            copy.smartInterfaceEditorPriority = source.smartInterfaceEditorPriority;
+            copy.foregroundContentPriority = source.foregroundContentPriority;
+            copy.hideDefaultSmartInterfaceEditor = source.hideDefaultSmartInterfaceEditor;
+            copy.hidePlayerInventory = source.hidePlayerInventory;
+            copy.showBlueprintInfo = source.showBlueprintInfo;
+            copy.showStructureInfo = source.showStructureInfo;
+            copy.showStatusInfo = source.showStatusInfo;
+            copy.showParallelismInfo = source.showParallelismInfo;
+            copy.showPerformanceInfo = source.showPerformanceInfo;
+            copy.defaultPageId = source.defaultPageId;
+            copy.defaultPanelId = source.defaultPanelId;
+            copy.customPanels = source.customPanels == null ? null : new ArrayList<String>(source.customPanels);
+            copy.infoSections = source.infoSections == null ? null : new ArrayList<InfoSectionStyle>(source.infoSections);
+            copy.texts = source.texts == null ? null : new ArrayList<TextStyle>(source.texts);
+            copy.smartInterfaceEditors = source.smartInterfaceEditors == null ? null : new ArrayList<SmartInterfaceEditorStyle>(source.smartInterfaceEditors);
+            copy.buttons = source.buttons == null ? null : new ArrayList<ButtonStyle>(source.buttons);
+            copy.textureLayers = source.textureLayers == null ? null : new ArrayList<TextureLayerStyle>(source.textureLayers);
+            copy.subGuis = source.subGuis == null ? null : copySubGuiList(source.subGuis);
+            return copy;
+        }
+
+        public ControllerStyle mergeFrom(@Nullable ControllerStyle overlay) {
+            if (overlay == null) {
+                return this;
+            }
+            if (overlay.backgroundTexture != null) this.backgroundTexture = overlay.backgroundTexture;
+            if (overlay.backgroundTextureOffsetX != null) this.backgroundTextureOffsetX = overlay.backgroundTextureOffsetX;
+            if (overlay.backgroundTextureOffsetY != null) this.backgroundTextureOffsetY = overlay.backgroundTextureOffsetY;
+            if (overlay.centerFullGui != null) this.centerFullGui = overlay.centerFullGui;
+            if (overlay.hideDefaultBackground != null) this.hideDefaultBackground = overlay.hideDefaultBackground;
+            if (overlay.guiWidth != null) this.guiWidth = overlay.guiWidth;
+            if (overlay.guiHeight != null) this.guiHeight = overlay.guiHeight;
+            if (overlay.coordinateWidth != null) this.coordinateWidth = overlay.coordinateWidth;
+            if (overlay.coordinateHeight != null) this.coordinateHeight = overlay.coordinateHeight;
+            if (overlay.backgroundTextureWidth != null) this.backgroundTextureWidth = overlay.backgroundTextureWidth;
+            if (overlay.backgroundTextureHeight != null) this.backgroundTextureHeight = overlay.backgroundTextureHeight;
+            if (overlay.backgroundCorner != null) this.backgroundCorner = overlay.backgroundCorner;
+            if (overlay.useNineSlice != null) this.useNineSlice = overlay.useNineSlice;
+            if (overlay.specialThreadBackgroundColor != null) this.specialThreadBackgroundColor = overlay.specialThreadBackgroundColor;
+            if (overlay.threadQueueX != null) this.threadQueueX = overlay.threadQueueX;
+            if (overlay.threadQueueY != null) this.threadQueueY = overlay.threadQueueY;
+            if (overlay.threadScrollbarX != null) this.threadScrollbarX = overlay.threadScrollbarX;
+            if (overlay.threadScrollbarY != null) this.threadScrollbarY = overlay.threadScrollbarY;
+            if (overlay.threadVisibleRows != null) this.threadVisibleRows = overlay.threadVisibleRows;
+            if (overlay.threadRowWidth != null) this.threadRowWidth = overlay.threadRowWidth;
+            if (overlay.threadRowHeight != null) this.threadRowHeight = overlay.threadRowHeight;
+            if (overlay.disableRightExtension != null) this.disableRightExtension = overlay.disableRightExtension;
+            if (overlay.enableSmartInterfaceEditor != null) this.enableSmartInterfaceEditor = overlay.enableSmartInterfaceEditor;
+            if (overlay.smartInterfaceEditorX != null) this.smartInterfaceEditorX = overlay.smartInterfaceEditorX;
+            if (overlay.smartInterfaceEditorY != null) this.smartInterfaceEditorY = overlay.smartInterfaceEditorY;
+            if (overlay.smartInterfaceEditorInputWidth != null) this.smartInterfaceEditorInputWidth = overlay.smartInterfaceEditorInputWidth;
+            if (overlay.smartInterfaceEditorVirtualKey != null) this.smartInterfaceEditorVirtualKey = overlay.smartInterfaceEditorVirtualKey;
+            if (overlay.smartInterfaceEditorPriority != null) this.smartInterfaceEditorPriority = overlay.smartInterfaceEditorPriority;
+            if (overlay.foregroundContentPriority != null) this.foregroundContentPriority = overlay.foregroundContentPriority;
+            if (overlay.hideDefaultSmartInterfaceEditor != null) this.hideDefaultSmartInterfaceEditor = overlay.hideDefaultSmartInterfaceEditor;
+            if (overlay.hidePlayerInventory != null) this.hidePlayerInventory = overlay.hidePlayerInventory;
+            if (overlay.showBlueprintInfo != null) this.showBlueprintInfo = overlay.showBlueprintInfo;
+            if (overlay.showStructureInfo != null) this.showStructureInfo = overlay.showStructureInfo;
+            if (overlay.showStatusInfo != null) this.showStatusInfo = overlay.showStatusInfo;
+            if (overlay.showParallelismInfo != null) this.showParallelismInfo = overlay.showParallelismInfo;
+            if (overlay.showPerformanceInfo != null) this.showPerformanceInfo = overlay.showPerformanceInfo;
+            if (overlay.defaultPageId != null) this.defaultPageId = overlay.defaultPageId;
+            if (overlay.defaultPanelId != null) this.defaultPanelId = overlay.defaultPanelId;
+            this.customPanels = appendList(this.customPanels, overlay.customPanels);
+            this.infoSections = appendList(this.infoSections, overlay.infoSections);
+            this.texts = appendList(this.texts, overlay.texts);
+            this.smartInterfaceEditors = appendList(this.smartInterfaceEditors, overlay.smartInterfaceEditors);
+            this.buttons = appendList(this.buttons, overlay.buttons);
+            this.textureLayers = appendList(this.textureLayers, overlay.textureLayers);
+            this.subGuis = appendSubGuiList(this.subGuis, overlay.subGuis);
+            return this;
+        }
+
+        @Nullable
+        private static <T> List<T> appendList(@Nullable List<T> base, @Nullable List<T> overlay) {
+            if (overlay == null || overlay.isEmpty()) {
+                return base;
+            }
+            List<T> out = base == null ? new ArrayList<T>() : new ArrayList<T>(base);
+            out.addAll(overlay);
+            return out;
+        }
+
+        @Nullable
+        private static List<SubGuiStyle> copySubGuiList(@Nullable List<SubGuiStyle> source) {
+            if (source == null || source.isEmpty()) {
+                return source;
+            }
+            List<SubGuiStyle> copy = new ArrayList<SubGuiStyle>(source.size());
+            for (SubGuiStyle subGui : source) {
+                copy.add(SubGuiStyle.copyOf(subGui));
+            }
+            return copy;
+        }
+
+        @Nullable
+        private static List<SubGuiStyle> appendSubGuiList(@Nullable List<SubGuiStyle> base, @Nullable List<SubGuiStyle> overlay) {
+            if (overlay == null || overlay.isEmpty()) {
+                return base;
+            }
+            List<SubGuiStyle> out = base == null ? new ArrayList<SubGuiStyle>() : copySubGuiList(base);
+            for (SubGuiStyle subGui : overlay) {
+                out.add(SubGuiStyle.copyOf(subGui));
+            }
+            return out;
         }
     }
 
@@ -369,17 +618,65 @@ public final class MachineGuiStyleManager {
         @Nullable
         public Float value;
         @Nullable
+        public String stringValue;
+        @Nullable
         public Float min;
         @Nullable
         public Float max;
         @Nullable
         public String targetPage;
         @Nullable
+        public String targetSubGui;
+        @Nullable
+        public String openMode;
+        @Nullable
         public Integer priority;
         @Nullable
         public Boolean visible;
         @Nullable
         public String page;
+    }
+
+    public static class SubGuiStyle {
+        @Nullable
+        public String id;
+        @Nullable
+        public String mode;
+        @Nullable
+        public Integer x;
+        @Nullable
+        public Integer y;
+        @Nullable
+        public Integer width;
+        @Nullable
+        public Integer height;
+        @Nullable
+        public ControllerStyle style;
+
+        public boolean isEmpty() {
+            return (id == null || id.trim().isEmpty())
+                   && (mode == null || mode.trim().isEmpty())
+                   && x == null
+                   && y == null
+                   && width == null
+                   && height == null
+                   && (style == null || style == ControllerStyle.EMPTY || style.isEmpty());
+        }
+
+        public static SubGuiStyle copyOf(@Nullable SubGuiStyle source) {
+            SubGuiStyle copy = new SubGuiStyle();
+            if (source == null) {
+                return copy;
+            }
+            copy.id = source.id;
+            copy.mode = source.mode;
+            copy.x = source.x;
+            copy.y = source.y;
+            copy.width = source.width;
+            copy.height = source.height;
+            copy.style = source.style == null ? null : ControllerStyle.copyOf(source.style);
+            return copy;
+        }
     }
 
     public static class TextureLayerStyle {

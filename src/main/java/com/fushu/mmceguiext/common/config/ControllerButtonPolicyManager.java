@@ -29,6 +29,7 @@ public final class ControllerButtonPolicyManager {
     private static final long RELOAD_INTERVAL_MS = 5000L;
     private static final long MAX_MACHINE_CONFIG_BYTES = 1024L * 1024L;
     private static final String MACHINERY_DIR = "modularmachinery/machinery";
+    private static final String SUBGUI_DIR = "mmceguiext/subgui";
     private static final int MAX_BUTTONS_PER_CONTROLLER = 256;
     private static final int MAX_SMART_EDITOR_KEYS_PER_CONTROLLER = 256;
     private static final int MAX_STRING_LENGTH = 128;
@@ -69,7 +70,25 @@ public final class ControllerButtonPolicyManager {
             if (!normalizedAction.equals(policy.action) || !normalizedKey.equals(policy.key)) {
                 continue;
             }
-            if (floatsMatch(policy.value, value)) {
+            if (policy.value != null && floatsMatch(policy.value.floatValue(), value)) {
+                return policy;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    public static ButtonPolicy matchSmart(TileMultiblockMachineController controller, byte kind, String key, String value) {
+        String normalizedAction = kind == 1 ? "smart_add" : kind == 0 ? "smart_set" : null;
+        String normalizedKey = normalize(key);
+        if (!"smart_set".equals(normalizedAction) || normalizedKey == null || value == null) {
+            return null;
+        }
+        for (ButtonPolicy policy : resolve(controller)) {
+            if (!normalizedAction.equals(policy.action) || !normalizedKey.equals(policy.key)) {
+                continue;
+            }
+            if (policy.stringValue != null && policy.stringValue.equals(value)) {
                 return policy;
             }
         }
@@ -155,18 +174,23 @@ public final class ControllerButtonPolicyManager {
         MACHINE_EDITOR_KEYS.clear();
         FACTORY_EDITOR_KEYS.clear();
 
-        Path machineryDir = Loader.instance().getConfigDir().toPath().resolve(MACHINERY_DIR);
-        if (!Files.exists(machineryDir)) {
+        Path configDir = Loader.instance().getConfigDir().toPath();
+        scanPolicyDir(configDir.resolve(MACHINERY_DIR));
+        scanPolicyDir(configDir.resolve(SUBGUI_DIR));
+    }
+
+    private static void scanPolicyDir(Path dir) {
+        if (!Files.exists(dir)) {
             return;
         }
 
-        try (Stream<Path> stream = Files.walk(machineryDir)) {
+        try (Stream<Path> stream = Files.walk(dir)) {
             stream
                 .filter(Files::isRegularFile)
                 .filter(ControllerButtonPolicyManager::isMachineJson)
                 .forEach(ControllerButtonPolicyManager::loadMachineJson);
         } catch (IOException ex) {
-            LOGGER.warn("Failed to scan MMCE GUI ext button policies under {}: {}", machineryDir, ex.getMessage());
+            LOGGER.warn("Failed to scan MMCE GUI ext button policies under {}: {}", dir, ex.getMessage());
         }
     }
 
@@ -203,16 +227,16 @@ public final class ControllerButtonPolicyManager {
             }
             JsonObject machineNode = getObject(extNode, "machineController", "machine_controller", "machine");
             JsonObject factoryNode = getObject(extNode, "factoryController", "factory_controller", "factory");
-            putButtons(MACHINE_BUTTONS, namespacedKey, pathKey, allowPathFallback, parseButtons(machineNode));
-            putButtons(FACTORY_BUTTONS, namespacedKey, pathKey, allowPathFallback, parseButtons(factoryNode));
-            putEditorKeys(MACHINE_EDITOR_KEYS, namespacedKey, pathKey, allowPathFallback, parseEditorKeys(machineNode));
-            putEditorKeys(FACTORY_EDITOR_KEYS, namespacedKey, pathKey, allowPathFallback, parseEditorKeys(factoryNode));
+            mergeButtons(MACHINE_BUTTONS, namespacedKey, pathKey, allowPathFallback, parseButtons(machineNode));
+            mergeButtons(FACTORY_BUTTONS, namespacedKey, pathKey, allowPathFallback, parseButtons(factoryNode));
+            mergeEditorKeys(MACHINE_EDITOR_KEYS, namespacedKey, pathKey, allowPathFallback, parseEditorKeys(machineNode));
+            mergeEditorKeys(FACTORY_EDITOR_KEYS, namespacedKey, pathKey, allowPathFallback, parseEditorKeys(factoryNode));
         } catch (Exception ex) {
             LOGGER.warn("Failed to read MMCE GUI ext button policy {}: {}", path, ex.getMessage());
         }
     }
 
-    private static void putButtons(
+    private static void mergeButtons(
         Map<String, List<ButtonPolicy>> target,
         String namespacedKey,
         String pathKey,
@@ -222,13 +246,13 @@ public final class ControllerButtonPolicyManager {
         if (buttons.isEmpty()) {
             return;
         }
-        target.put(namespacedKey, buttons);
+        mergeButtonList(target, namespacedKey, buttons);
         if (allowPathFallback) {
-            target.put(pathKey, buttons);
+            mergeButtonList(target, pathKey, buttons);
         }
     }
 
-    private static void putEditorKeys(
+    private static void mergeEditorKeys(
         Map<String, List<String>> target,
         String namespacedKey,
         String pathKey,
@@ -238,9 +262,46 @@ public final class ControllerButtonPolicyManager {
         if (keys.isEmpty()) {
             return;
         }
-        target.put(namespacedKey, keys);
+        mergeStringList(target, namespacedKey, keys);
         if (allowPathFallback) {
-            target.put(pathKey, keys);
+            mergeStringList(target, pathKey, keys);
+        }
+    }
+
+    private static void mergeButtonList(Map<String, List<ButtonPolicy>> target, String key, List<ButtonPolicy> buttons) {
+        List<ButtonPolicy> existing = target.get(key);
+        if (existing == null) {
+            List<ButtonPolicy> copy = new ArrayList<ButtonPolicy>();
+            for (ButtonPolicy button : buttons) {
+                if (copy.size() >= MAX_BUTTONS_PER_CONTROLLER) {
+                    break;
+                }
+                copy.add(button);
+            }
+            target.put(key, copy);
+            return;
+        }
+        for (ButtonPolicy button : buttons) {
+            if (existing.size() >= MAX_BUTTONS_PER_CONTROLLER) {
+                break;
+            }
+            existing.add(button);
+        }
+    }
+
+    private static void mergeStringList(Map<String, List<String>> target, String key, List<String> values) {
+        List<String> existing = target.get(key);
+        if (existing == null) {
+            target.put(key, new ArrayList<String>(values));
+            return;
+        }
+        for (String value : values) {
+            if (existing.size() >= MAX_SMART_EDITOR_KEYS_PER_CONTROLLER) {
+                break;
+            }
+            if (!existing.contains(value)) {
+                existing.add(value);
+            }
         }
     }
 
@@ -248,24 +309,8 @@ public final class ControllerButtonPolicyManager {
         if (controllerNode == null) {
             return java.util.Collections.emptyList();
         }
-        JsonElement buttonsElement = getElement(controllerNode, "buttons", "buttonList", "button_list", "guiButtons", "gui_buttons");
-        if (buttonsElement == null || !buttonsElement.isJsonArray()) {
-            return java.util.Collections.emptyList();
-        }
-
         List<ButtonPolicy> out = new ArrayList<ButtonPolicy>();
-        JsonArray buttons = buttonsElement.getAsJsonArray();
-        int limit = Math.min(buttons.size(), MAX_BUTTONS_PER_CONTROLLER);
-        for (int i = 0; i < limit; i++) {
-            JsonElement child = buttons.get(i);
-            if (child == null || !child.isJsonObject()) {
-                continue;
-            }
-            ButtonPolicy policy = parseButton(child.getAsJsonObject());
-            if (policy != null) {
-                out.add(policy);
-            }
-        }
+        collectButtons(controllerNode, out);
         return out;
     }
 
@@ -274,6 +319,55 @@ public final class ControllerButtonPolicyManager {
             return java.util.Collections.emptyList();
         }
         List<String> out = new ArrayList<String>();
+        collectEditorKeys(controllerNode, out);
+        return out.isEmpty() ? java.util.Collections.emptyList() : out;
+    }
+
+    private static void collectButtons(JsonObject controllerNode, List<ButtonPolicy> out) {
+        if (controllerNode == null || out.size() >= MAX_BUTTONS_PER_CONTROLLER) {
+            return;
+        }
+        JsonElement buttonsElement = getElement(controllerNode, "buttons", "buttonList", "button_list", "guiButtons", "gui_buttons");
+        if (buttonsElement != null && buttonsElement.isJsonArray()) {
+            JsonArray buttons = buttonsElement.getAsJsonArray();
+            int limit = Math.min(buttons.size(), MAX_BUTTONS_PER_CONTROLLER - out.size());
+            for (int i = 0; i < limit; i++) {
+                JsonElement child = buttons.get(i);
+                if (child == null || !child.isJsonObject()) {
+                    continue;
+                }
+                ButtonPolicy policy = parseButton(child.getAsJsonObject());
+                if (policy != null) {
+                    out.add(policy);
+                }
+            }
+        }
+        if (out.size() >= MAX_BUTTONS_PER_CONTROLLER) {
+            return;
+        }
+        JsonElement subGuisElement = getElement(controllerNode, "subGuis", "sub_guis", "subGui", "sub_gui");
+        if (subGuisElement == null || !subGuisElement.isJsonArray()) {
+            return;
+        }
+        JsonArray subGuis = subGuisElement.getAsJsonArray();
+        int limit = Math.min(subGuis.size(), MAX_BUTTONS_PER_CONTROLLER - out.size());
+        for (int i = 0; i < limit; i++) {
+            JsonElement child = subGuis.get(i);
+            if (child == null || !child.isJsonObject()) {
+                continue;
+            }
+            JsonObject subGuiNode = child.getAsJsonObject();
+            collectButtons(subGuiNode, out);
+            if (out.size() >= MAX_BUTTONS_PER_CONTROLLER) {
+                break;
+            }
+        }
+    }
+
+    private static void collectEditorKeys(JsonObject controllerNode, List<String> out) {
+        if (controllerNode == null || out.size() >= MAX_SMART_EDITOR_KEYS_PER_CONTROLLER) {
+            return;
+        }
         addVirtualKeys(out, getString(controllerNode,
             "smartInterfaceEditorVirtualKey",
             "smart_interface_editor_virtual_key",
@@ -291,7 +385,7 @@ public final class ControllerButtonPolicyManager {
         );
         if (editorsElement != null && editorsElement.isJsonArray()) {
             JsonArray editors = editorsElement.getAsJsonArray();
-            int limit = Math.min(editors.size(), MAX_SMART_EDITOR_KEYS_PER_CONTROLLER);
+            int limit = Math.min(editors.size(), MAX_SMART_EDITOR_KEYS_PER_CONTROLLER - out.size());
             for (int i = 0; i < limit; i++) {
                 JsonElement child = editors.get(i);
                 if (child == null || !child.isJsonObject()) {
@@ -300,7 +394,25 @@ public final class ControllerButtonPolicyManager {
                 addVirtualKeys(out, getString(child.getAsJsonObject(), "virtualKey", "virtual_key", "key", "type"));
             }
         }
-        return out.isEmpty() ? java.util.Collections.emptyList() : out;
+        if (out.size() >= MAX_SMART_EDITOR_KEYS_PER_CONTROLLER) {
+            return;
+        }
+        JsonElement subGuisElement = getElement(controllerNode, "subGuis", "sub_guis", "subGui", "sub_gui");
+        if (subGuisElement == null || !subGuisElement.isJsonArray()) {
+            return;
+        }
+        JsonArray subGuis = subGuisElement.getAsJsonArray();
+        int limit = Math.min(subGuis.size(), MAX_SMART_EDITOR_KEYS_PER_CONTROLLER - out.size());
+        for (int i = 0; i < limit; i++) {
+            JsonElement child = subGuis.get(i);
+            if (child == null || !child.isJsonObject()) {
+                continue;
+            }
+            collectEditorKeys(child.getAsJsonObject(), out);
+            if (out.size() >= MAX_SMART_EDITOR_KEYS_PER_CONTROLLER) {
+                break;
+            }
+        }
     }
 
     private static void addVirtualKeys(List<String> out, @Nullable String raw) {
@@ -343,16 +455,45 @@ public final class ControllerButtonPolicyManager {
 
         ButtonPolicy policy = new ButtonPolicy(action);
         policy.buttonId = getString(obj, "buttonId", "button_id", "eventId", "event_id", "id", "name");
-        policy.key = getString(obj, "key", "virtualKey", "virtual_key", "interfaceType", "interface_type");
+        policy.key = getString(
+            obj,
+            "key",
+            "virtualKey",
+            "virtual_key",
+            "interfaceType",
+            "interface_type",
+            "dataPortKey",
+            "data_port_key",
+            "portKey",
+            "port_key",
+            "dataPort",
+            "data_port"
+        );
         Float value = getFloat(obj, "value", "delta", "amount");
-        policy.value = value == null ? ("smart_add".equals(action) ? 1.0F : 0.0F) : value.floatValue();
+        String stringValue = getStringAllowNonString(obj, "value", "textValue", "text_value", "stringValue", "string_value");
+        if (value != null) {
+            policy.value = value;
+        } else if ("smart_add".equals(action)) {
+            policy.value = Float.valueOf(1.0F);
+        } else if ("smart_set".equals(action) && stringValue == null) {
+            policy.value = Float.valueOf(0.0F);
+        } else {
+            policy.value = null;
+        }
+        policy.stringValue = value == null && "smart_set".equals(action) ? stringValue : null;
         policy.min = getFloat(obj, "min", "minimum");
         policy.max = getFloat(obj, "max", "maximum");
 
         if ("event".equals(action)) {
             return policy.buttonId == null ? null : policy;
         }
-        if (policy.key == null || !Float.isFinite(policy.value)) {
+        if (policy.key == null) {
+            return null;
+        }
+        if ("smart_add".equals(action) && (policy.value == null || !Float.isFinite(policy.value.floatValue()))) {
+            return null;
+        }
+        if ("smart_set".equals(action) && policy.value == null && policy.stringValue == null) {
             return null;
         }
         return policy;
@@ -367,11 +508,20 @@ public final class ControllerButtonPolicyManager {
         if ("event".equals(text) || "click_event".equals(text) || "button_event".equals(text)) {
             return "event";
         }
-        if ("smart_set".equals(text) || "smartset".equals(text) || "set".equals(text)) {
+        if ("page".equals(text) || "switch_state".equals(text) || "set_state".equals(text)
+            || "subgui".equals(text) || "sub_gui".equals(text)
+            || "close_subgui".equals(text) || "close_sub_gui".equals(text)) {
+            return "page";
+        }
+        if ("smart_set".equals(text) || "smartset".equals(text) || "set".equals(text)
+            || "data_set".equals(text) || "data-port-set".equals(text) || "data_port_set".equals(text)
+            || "port_set".equals(text) || "port-set".equals(text)) {
             return "smart_set";
         }
         if ("smart_add".equals(text) || "smartadd".equals(text) || "add".equals(text)
-            || "increment".equals(text) || "inc".equals(text)) {
+            || "increment".equals(text) || "inc".equals(text)
+            || "data_add".equals(text) || "data-port-add".equals(text) || "data_port_add".equals(text)
+            || "port_add".equals(text) || "port-add".equals(text)) {
             return "smart_add";
         }
         return null;
@@ -401,6 +551,20 @@ public final class ControllerButtonPolicyManager {
         }
         String value = normalize(element.getAsString());
         return value == null ? null : value;
+    }
+
+    @Nullable
+    private static String getStringAllowNonString(JsonObject obj, String... keys) {
+        JsonElement element = getElement(obj, keys);
+        if (element == null || !element.isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            String value = element.getAsString();
+            return value == null || value.length() > MAX_STRING_LENGTH ? null : value;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     @Nullable
@@ -458,7 +622,10 @@ public final class ControllerButtonPolicyManager {
         public String buttonId;
         @Nullable
         public String key;
-        public float value;
+        @Nullable
+        public Float value;
+        @Nullable
+        public String stringValue;
         @Nullable
         public Float min;
         @Nullable

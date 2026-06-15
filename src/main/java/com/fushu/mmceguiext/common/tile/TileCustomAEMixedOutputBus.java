@@ -23,6 +23,7 @@ import appeng.util.Platform;
 import com.fushu.mmceguiext.common.block.BlockCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.item.ItemBlockCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.registry.CustomAEMixedOutputBusRegistry;
+import com.fushu.mmceguiext.common.registry.CustomCapacityCardRegistry;
 import com.fushu.mmceguiext.common.util.CustomIdValidator;
 import com.mekeng.github.common.me.data.IAEGasStack;
 import com.mekeng.github.common.me.data.impl.AEGasStack;
@@ -80,6 +81,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     private static final int MAX_DYNAMIC_SLOT_COUNT = 4096;
     private static final int FLUID_TANK_CAPACITY = 8000;
     private static final int GAS_TANK_CAPACITY = 8000;
+    private static final String CAPACITY_CARD_TAG = "capacityCards";
 
     protected final AENetworkProxy proxy;
     protected final IActionSource source;
@@ -89,6 +91,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     protected final IGasStorageChannel gasChannel = AEApi.instance().storage().getStorageChannel(IGasStorageChannel.class);
 
     private IOInventory inventory = buildInventory();
+    private IOInventory capacityCardInventory = buildCapacityCardInventory(1);
     private AEFluidInventoryUpgradeable fluidTanks = createFluidTanks(DEFAULT_TANK_SLOT_COUNT);
     private GasInventory gasTanks = createGasTanks(DEFAULT_TANK_SLOT_COUNT);
     private GasInventoryHandler gasHandler = new GasInventoryHandler(gasTanks);
@@ -106,6 +109,8 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     private long lastFullFluidCheckTick = 0;
     private long lastFullGasCheckTick = 0;
     private boolean inTick = false;
+    private int currentFluidCapacity = FLUID_TANK_CAPACITY;
+    private int currentGasCapacity = GAS_TANK_CAPACITY;
 
     private String definitionId = "";
     private final CombinedBusHandler combinedHandler = new CombinedBusHandler();
@@ -150,6 +155,21 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         return new GasInventory(Math.max(1, slotCount), GAS_TANK_CAPACITY, this);
     }
 
+    private IOInventory buildCapacityCardInventory(int size) {
+        int[] slotIDs = new int[Math.max(1, size)];
+        for (int slotID = 0; slotID < slotIDs.length; slotID++) {
+            slotIDs[slotID] = slotID;
+        }
+        IOInventory inv = new IOInventory(this, new int[]{}, new int[]{});
+        inv.setStackLimit(1, slotIDs);
+        inv.setMiscSlots(slotIDs);
+        inv.setListener(slot -> {
+            recalculateCapacityFromCards();
+            markForUpdateSync();
+        });
+        return inv;
+    }
+
     private void bindInventoryListener() {
         this.inventory.setListener(slot -> {
             synchronized (this) {
@@ -170,7 +190,9 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         int physicalItemSlots = Math.max(1, itemSlots);
         int physicalFluidSlots = Math.max(1, fluidSlots);
         int physicalGasSlots = Math.max(1, gasSlots);
+        resizeCapacityCardInventory(Math.max(1, resolveCapacityCardSlotCount()));
         if (this.inventory.getSlots() >= physicalItemSlots && this.fluidTanks.getSlots() >= physicalFluidSlots && this.gasTanks.size() >= physicalGasSlots) {
+            recalculateCapacityFromCards();
             return;
         }
 
@@ -191,6 +213,16 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         this.changedItemSlots = new boolean[this.inventory.getSlots()];
         this.changedFluidSlots = new boolean[this.fluidTanks.getSlots()];
         this.changedGasSlots = new boolean[this.gasTanks.size()];
+        recalculateCapacityFromCards();
+    }
+
+    private void resizeCapacityCardInventory(int size) {
+        if (this.capacityCardInventory != null && this.capacityCardInventory.getSlots() >= size) {
+            return;
+        }
+        IOInventory next = buildCapacityCardInventory(size);
+        copyInventory(this.capacityCardInventory, next);
+        this.capacityCardInventory = next;
     }
 
     private int resolveItemComponentCount() {
@@ -313,11 +345,17 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         } else {
             this.inventory = buildInventory();
         }
+        if (compound.hasKey(CAPACITY_CARD_TAG)) {
+            this.capacityCardInventory = IOInventory.deserialize(this, compound.getCompoundTag(CAPACITY_CARD_TAG));
+        } else {
+            this.capacityCardInventory = buildCapacityCardInventory(resolveCapacityCardSlotCount());
+        }
         String id = CustomIdValidator.readSanitizedString(compound, "definitionId");
         this.definitionId = id == null ? "" : id;
         configureStorageLayout();
         this.fluidTanks.readFromNBT(compound, "tanks");
         this.gasTanks.load(compound.getCompoundTag("gasTanks"));
+        recalculateCapacityFromCards();
         this.changedItemSlots = new boolean[this.inventory.getSlots()];
         this.changedFluidSlots = new boolean[this.fluidTanks.getSlots()];
         this.changedGasSlots = new boolean[this.gasTanks.size()];
@@ -328,6 +366,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
         super.writeCustomNBT(compound);
         this.proxy.writeToNBT(compound);
         compound.setTag("inventory", this.inventory.writeNBT());
+        compound.setTag(CAPACITY_CARD_TAG, this.capacityCardInventory.writeNBT());
         this.fluidTanks.writeToNBT(compound, "tanks");
         compound.setTag("gasTanks", this.gasTanks.save());
         compound.setString("definitionId", this.definitionId == null ? "" : this.definitionId);
@@ -335,6 +374,7 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
 
     public void writeDroppedData(final NBTTagCompound compound) {
         compound.setTag("inventory", this.inventory.writeNBT());
+        compound.setTag(CAPACITY_CARD_TAG, this.capacityCardInventory.writeNBT());
         this.fluidTanks.writeToNBT(compound, "tanks");
         compound.setTag("gasTanks", this.gasTanks.save());
         compound.setString("definitionId", this.definitionId == null ? "" : this.definitionId);
@@ -351,9 +391,13 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
             this.inventory = IOInventory.deserialize(this, compound.getCompoundTag("inventory"));
             bindInventoryListener();
         }
+        if (compound.hasKey(CAPACITY_CARD_TAG)) {
+            this.capacityCardInventory = IOInventory.deserialize(this, compound.getCompoundTag(CAPACITY_CARD_TAG));
+        }
         configureStorageLayout();
         this.fluidTanks.readFromNBT(compound, "tanks");
         this.gasTanks.load(compound.getCompoundTag("gasTanks"));
+        recalculateCapacityFromCards();
         this.changedItemSlots = new boolean[this.inventory.getSlots()];
         this.changedFluidSlots = new boolean[this.fluidTanks.getSlots()];
         this.changedGasSlots = new boolean[this.gasTanks.size()];
@@ -363,6 +407,9 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
     public void clearDroppedData() {
         for (int i = 0; i < this.inventory.getSlots(); i++) {
             this.inventory.setStackInSlot(i, ItemStack.EMPTY);
+        }
+        for (int i = 0; i < this.capacityCardInventory.getSlots(); i++) {
+            this.capacityCardInventory.setStackInSlot(i, ItemStack.EMPTY);
         }
         for (int i = 0; i < this.fluidTanks.getSlots(); i++) {
             this.fluidTanks.setFluidInSlot(i, null);
@@ -374,6 +421,14 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
 
     public IOInventory getInventory() {
         return this.inventory;
+    }
+
+    public IOInventory getCapacityCardInventory() {
+        return this.capacityCardInventory;
+    }
+
+    public int getActiveCapacityCardSlots() {
+        return Math.min(resolveCapacityCardSlotCount(), this.capacityCardInventory.getSlots());
     }
 
     public AEFluidInventoryUpgradeable getFluidTanks() {
@@ -394,6 +449,26 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
 
     public int getActiveGasSlots() {
         return getActiveGasSlotBound();
+    }
+
+    private int resolveCapacityCardSlotCount() {
+        CustomAEMixedOutputBusRegistry.Def def = getDefinition();
+        if (def == null) {
+            return 0;
+        }
+        int count = def.capacityCardSlots == null ? 0 : def.capacityCardSlots.size();
+        if (def.gui != null && def.gui.components != null) {
+            for (CustomAEMixedOutputBusRegistry.ComponentDef component : def.gui.components) {
+                if (component == null || component.index < 0) {
+                    continue;
+                }
+                if ("slot".equalsIgnoreCase(component.type == null ? "" : component.type)
+                    && "capacity_card".equalsIgnoreCase(component.role == null ? "" : component.role)) {
+                    count = Math.max(count, component.index + 1);
+                }
+            }
+        }
+        return Math.max(0, count);
     }
 
     private boolean isItemSlotDefined(int slot) {
@@ -892,6 +967,95 @@ public class TileCustomAEMixedOutputBus extends TileColorableMachineComponent im
             }
         }
         return false;
+    }
+
+    private void recalculateCapacityFromCards() {
+        double multiplier = 1.0D;
+        long flatFluid = 0L;
+        long flatGas = 0L;
+        for (int slot = 0; slot < this.capacityCardInventory.getSlots(); slot++) {
+            ItemStack stack = this.capacityCardInventory.getStackInSlot(slot);
+            CustomCapacityCardRegistry.CapacityModifier modifier = CustomCapacityCardRegistry.resolveModifier(stack);
+            if (modifier.isEmpty()) {
+                continue;
+            }
+            multiplier *= modifier.multiplier;
+            flatFluid += modifier.flatFluid;
+            flatGas += modifier.flatGas;
+        }
+        int newFluidCapacity = clampCapacity(FLUID_TANK_CAPACITY, multiplier, flatFluid);
+        int newGasCapacity = clampCapacity(GAS_TANK_CAPACITY, multiplier, flatGas);
+        if (newFluidCapacity == this.currentFluidCapacity && newGasCapacity == this.currentGasCapacity) {
+            return;
+        }
+        this.currentFluidCapacity = newFluidCapacity;
+        this.currentGasCapacity = newGasCapacity;
+        this.fluidTanks.setCapacity(newFluidCapacity);
+        resizeGasTankCapacity(newGasCapacity);
+        markAllSlotsChanged();
+        tryRebalanceOverCapacity();
+        markDirty();
+    }
+
+    private void resizeGasTankCapacity(int capacity) {
+        NBTTagCompound tankData = this.gasTanks.save();
+        this.gasTanks = new GasInventory(Math.max(1, this.gasTanks.size()), capacity, this);
+        this.gasTanks.load(tankData);
+        this.gasHandler = new GasInventoryHandler(this.gasTanks);
+    }
+
+    private int clampCapacity(int baseCapacity, double multiplier, long flatBonus) {
+        double scaled = Math.max(1.0D, baseCapacity * multiplier);
+        long capacity = Math.round(scaled) + Math.max(0L, flatBonus);
+        return (int) Math.max(1L, Math.min(Integer.MAX_VALUE, capacity));
+    }
+
+    private void markAllSlotsChanged() {
+        Arrays.fill(this.changedItemSlots, true);
+        Arrays.fill(this.changedFluidSlots, true);
+        Arrays.fill(this.changedGasSlots, true);
+    }
+
+    private void tryRebalanceOverCapacity() {
+        if (this.world == null || this.world.isRemote || !this.proxy.isActive()) {
+            return;
+        }
+        try {
+            IMEMonitor<IAEFluidStack> fluidInv = this.proxy.getStorage().getInventory(this.fluidChannel);
+            IMEMonitor<IAEGasStack> gasInv = this.proxy.getStorage().getInventory(this.gasChannel);
+            pushFluidOverflowToAE(fluidInv);
+            pushGasOverflowToAE(gasInv);
+        } catch (GridAccessException ignored) {
+        }
+    }
+
+    private void pushFluidOverflowToAE(IMEMonitor<IAEFluidStack> inv) throws GridAccessException {
+        for (int slot = 0; slot < getActiveFluidSlotBound(); slot++) {
+            IAEFluidStack stack = this.fluidTanks.getFluidInSlot(slot);
+            if (stack == null || stack.getStackSize() <= this.currentFluidCapacity) {
+                continue;
+            }
+            long overflow = stack.getStackSize() - this.currentFluidCapacity;
+            IAEFluidStack left = Platform.poweredInsert(this.proxy.getEnergy(), inv, stack.copy().setStackSize(overflow), this.source);
+            long remainingOverflow = left == null ? 0L : left.getStackSize();
+            this.fluidTanks.setFluidInSlot(slot, stack.copy().setStackSize(this.currentFluidCapacity + remainingOverflow));
+        }
+    }
+
+    private void pushGasOverflowToAE(IMEMonitor<IAEGasStack> inv) throws GridAccessException {
+        for (int slot = 0; slot < getActiveGasSlotBound(); slot++) {
+            GasStack stack = this.gasTanks.getGasStack(slot);
+            if (stack == null || stack.amount <= this.currentGasCapacity) {
+                continue;
+            }
+            GasStack overflow = stack.copy();
+            overflow.amount = stack.amount - this.currentGasCapacity;
+            IAEGasStack left = Platform.poweredInsert(this.proxy.getEnergy(), inv, AEGasStack.of(overflow), this.source);
+            int remainingOverflow = left == null ? 0 : (int) left.getStackSize();
+            GasStack resized = stack.copy();
+            resized.amount = this.currentGasCapacity + remainingOverflow;
+            this.gasTanks.setGas(slot, resized);
+        }
     }
 
     @Override

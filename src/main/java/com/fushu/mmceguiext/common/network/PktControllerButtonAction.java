@@ -1,14 +1,13 @@
 package com.fushu.mmceguiext.common.network;
 
 import com.fushu.mmceguiext.common.config.ControllerButtonPolicyManager;
+import com.fushu.mmceguiext.common.integration.crafttweaker.MMCEGEEvents;
 import hellfirepvp.modularmachinery.common.container.ContainerController;
 import hellfirepvp.modularmachinery.common.container.ContainerFactoryController;
-import hellfirepvp.modularmachinery.ModularMachinery;
 import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
 import hellfirepvp.modularmachinery.common.util.SmartInterfaceData;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
@@ -18,6 +17,7 @@ import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 public class PktControllerButtonAction implements IMessage, IMessageHandler<PktControllerButtonAction, IMessage> {
     private static final int MAX_KEY_LENGTH = 128;
     private static final int MAX_BUTTON_ID_LENGTH = 128;
+    private static final int MAX_VALUE_LENGTH = 1024;
     private static final byte KIND_SMART_SET = 0;
     private static final byte KIND_SMART_ADD = 1;
     private static final byte KIND_EVENT = 2;
@@ -27,6 +27,8 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
     private String buttonId = "";
     private byte kind = KIND_SMART_ADD;
     private float value = 0.0F;
+    private boolean stringValue = false;
+    private String textValue = "";
     private boolean hasMin = false;
     private float min = 0.0F;
     private boolean hasMax = false;
@@ -41,10 +43,21 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         pkt.key = key == null ? "" : key;
         pkt.kind = additive ? KIND_SMART_ADD : KIND_SMART_SET;
         pkt.value = value;
+        pkt.stringValue = false;
         pkt.hasMin = min != null && Float.isFinite(min.floatValue());
         pkt.min = pkt.hasMin ? min.floatValue() : 0.0F;
         pkt.hasMax = max != null && Float.isFinite(max.floatValue());
         pkt.max = pkt.hasMax ? max.floatValue() : 0.0F;
+        return pkt;
+    }
+
+    public static PktControllerButtonAction smart(BlockPos controllerPos, String key, String value) {
+        PktControllerButtonAction pkt = new PktControllerButtonAction();
+        pkt.controllerPos = controllerPos == null ? BlockPos.ORIGIN : controllerPos;
+        pkt.key = key == null ? "" : key;
+        pkt.kind = KIND_SMART_SET;
+        pkt.stringValue = true;
+        pkt.textValue = value == null ? "" : value;
         return pkt;
     }
 
@@ -63,8 +76,14 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         this.kind = buf.readByte();
         this.key = NetworkBufferUtils.readBoundedUtf8(buf, MAX_KEY_LENGTH);
         this.buttonId = NetworkBufferUtils.readBoundedUtf8(buf, MAX_BUTTON_ID_LENGTH);
-        NetworkBufferUtils.requireReadable(buf, 5);
-        this.value = buf.readFloat();
+        NetworkBufferUtils.requireReadable(buf, 2);
+        this.stringValue = buf.readBoolean();
+        if (this.stringValue) {
+            this.textValue = NetworkBufferUtils.readBoundedUtf8(buf, MAX_VALUE_LENGTH);
+        } else {
+            NetworkBufferUtils.requireReadable(buf, 4);
+            this.value = buf.readFloat();
+        }
         this.hasMin = buf.readBoolean();
         if (this.hasMin) {
             NetworkBufferUtils.requireReadable(buf, 4);
@@ -84,7 +103,12 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         buf.writeByte(this.kind);
         NetworkBufferUtils.writeBoundedUtf8(buf, this.key, MAX_KEY_LENGTH);
         NetworkBufferUtils.writeBoundedUtf8(buf, this.buttonId, MAX_BUTTON_ID_LENGTH);
-        buf.writeFloat(this.value);
+        buf.writeBoolean(this.stringValue);
+        if (this.stringValue) {
+            NetworkBufferUtils.writeBoundedUtf8(buf, this.textValue, MAX_VALUE_LENGTH);
+        } else {
+            buf.writeFloat(this.value);
+        }
         buf.writeBoolean(this.hasMin);
         if (this.hasMin) {
             buf.writeFloat(this.min);
@@ -127,12 +151,30 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
             if (buttonId == null || ControllerButtonPolicyManager.matchEvent(controller, buttonId) == null) {
                 return;
             }
-            postControllerButtonClickEvent(controller, buttonId);
+            MMCEGEEvents.postControllerButtonClick(controller, buttonId);
+            PktControllerSmartInterfaceUpdate.syncCustomDataToPlayer(controller, player);
             return;
         }
 
         String key = normalizeBounded(message.key, MAX_KEY_LENGTH);
-        if (key == null || !Float.isFinite(message.value)) {
+        if (key == null) {
+            return;
+        }
+        if (message.stringValue) {
+            if (message.kind != KIND_SMART_SET || message.textValue == null || message.textValue.length() > MAX_VALUE_LENGTH) {
+                return;
+            }
+            ControllerButtonPolicyManager.ButtonPolicy stringPolicy =
+                ControllerButtonPolicyManager.matchSmart(controller, message.kind, key, message.textValue);
+            if (stringPolicy == null) {
+                return;
+            }
+            if (PktControllerSmartInterfaceUpdate.applySmartInterfaceUpdate(controller, message.controllerPos, key, message.textValue)) {
+                PktControllerSmartInterfaceUpdate.syncCustomDataToPlayer(controller, player);
+            }
+            return;
+        }
+        if (!Float.isFinite(message.value)) {
             return;
         }
         ControllerButtonPolicyManager.ButtonPolicy policy =
@@ -144,7 +186,7 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         float resolved = message.value;
         if (message.kind == KIND_SMART_ADD) {
             SmartInterfaceData current = controller.getSmartInterfaceData(key);
-            Float customValue = readControllerCustomData(controller, key);
+            Float customValue = PktControllerSmartInterfaceUpdate.readNumericControllerCustomData(controller, key);
             float base = current != null
                 ? current.getValue()
                 : customValue != null && Float.isFinite(customValue.floatValue()) ? customValue.floatValue() : 0.0F;
@@ -173,7 +215,9 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         if (!Float.isFinite(resolved)) {
             return;
         }
-        PktControllerSmartInterfaceUpdate.applySmartInterfaceUpdate(controller, message.controllerPos, key, resolved);
+        if (PktControllerSmartInterfaceUpdate.applySmartInterfaceUpdate(controller, message.controllerPos, key, resolved)) {
+            PktControllerSmartInterfaceUpdate.syncCustomDataToPlayer(controller, player);
+        }
     }
 
     private static String normalizeBounded(String value, int maxLength) {
@@ -182,32 +226,6 @@ public class PktControllerButtonAction implements IMessage, IMessageHandler<PktC
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() || trimmed.length() > maxLength ? null : trimmed;
-    }
-
-    private static Float readControllerCustomData(TileMultiblockMachineController controller, String key) {
-        try {
-            java.lang.reflect.Method getTagMethod = controller.getClass().getMethod("getCustomDataTag");
-            Object existing = getTagMethod.invoke(controller);
-            if (!(existing instanceof NBTTagCompound)) {
-                return null;
-            }
-            NBTTagCompound tag = (NBTTagCompound) existing;
-            return tag.hasKey(key) ? tag.getFloat(key) : null;
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private static void postControllerButtonClickEvent(TileMultiblockMachineController controller, String buttonId) {
-        try {
-            Class<?> eventClass = Class.forName("github.kasuminova.mmce.common.event.client.ControllerButtonClickEvent");
-            Object event = eventClass
-                .getConstructor(TileMultiblockMachineController.class, String.class)
-                .newInstance(controller, buttonId);
-            eventClass.getMethod("postEvent").invoke(event);
-        } catch (ReflectiveOperationException e) {
-            ModularMachinery.log.warn("Failed to post controller button click event for button {}", buttonId, e);
-        }
     }
 
     private static boolean isPlayerEditingThisController(EntityPlayerMP player, BlockPos controllerPos) {
