@@ -259,7 +259,85 @@ This file is a quick reference for pack authors.
 }
 ```
 
-## 6. Layer overlays / 图层叠加
+## 6. Controller sliders / 控制器滑块
+
+- `sliders`
+  - CN: 控制器滑块数组，每个对象一个可拖拽数值控件。
+  - EN: Controller slider array. One object per draggable numeric control.
+- `guiSliders` / `gui_sliders` / `rangeControls` / `range_controls`
+  - CN: `sliders` 的别名。
+  - EN: Aliases for `sliders`.
+
+### `sliders` fields / 滑块字段
+
+- `id`
+  - CN: 滑块 ID。可省略，省略时自动生成。
+  - EN: Slider ID. Optional; generated when omitted.
+- `x`, `y`, `width`, `height`
+  - CN: 滑块矩形区域，必填。
+  - EN: Slider rectangle. Required.
+- `key`
+  - CN: 写入的 Smart Interface / 虚拟 DataPort key，必填。`virtualKey` / `dataPortKey` / `portKey` 可作为别名。
+  - EN: Smart Interface / virtual DataPort key to write. Required. `virtualKey` / `dataPortKey` / `portKey` aliases are accepted.
+- `min`, `max`
+  - CN: 数值范围。默认 `0` 到 `1`。
+  - EN: Value range. Defaults to `0` to `1`.
+- `step`
+  - CN: 步进。大于 `0` 时会把拖拽结果吸附到步进值。
+  - EN: Step size. When greater than `0`, dragged values snap to this interval.
+- `value`
+  - CN: 初始值。若控制器已有同名 Smart Interface / `customData` 值，会优先读取现有值。
+  - EN: Initial value. Existing Smart Interface / `customData` values for the same key are read first.
+- `direction`
+  - CN: `horizontal` 或 `vertical`。`axis` / `orientation` 可作为别名。
+  - EN: `horizontal` or `vertical`. `axis` / `orientation` aliases are accepted.
+- `trackColor`, `fillColor`, `thumbColor`, `borderColor`
+  - CN: 轨道、填充、滑块手柄、边框颜色。支持 `RRGGBB` / `AARRGGBB`。
+  - EN: Track, fill, thumb, and border colors. `RRGGBB` / `AARRGGBB` are supported.
+- `thumbWidth`, `thumbHeight`
+  - CN: 滑块手柄尺寸。`handleWidth` / `handleHeight` 可作为别名。
+  - EN: Thumb size. `handleWidth` / `handleHeight` aliases are accepted.
+- `foreground`
+  - CN: 是否作为前景控件绘制。默认 `true`。
+  - EN: Whether to render as a foreground control. Defaults to `true`.
+- `priority`
+  - CN: 渲染和点击优先级，越大越靠后绘制、越优先命中。
+  - EN: Render and hit-test priority. Higher values draw later and are hit first.
+- `visible`
+  - CN: 是否显示并可交互。
+  - EN: Whether the slider is visible and interactive.
+- `page`
+  - CN: 限制滑块只在指定页显示。
+  - EN: Restrict the slider to a specific page.
+- `showText`, `textColor`
+  - CN: 是否显示当前数值，以及数值文本颜色。
+  - EN: Whether to draw the current value and the value text color.
+
+```json
+{
+  "mmce_gui_ext": {
+    "machineController": {
+      "sliders": [
+        {
+          "id": "speed_slider",
+          "x": 186,
+          "y": 72,
+          "width": 96,
+          "height": 12,
+          "key": "speed",
+          "min": 0,
+          "max": 10,
+          "step": 0.5,
+          "value": 2,
+          "showText": true
+        }
+      ]
+    }
+  }
+}
+```
+
+## 7. Layer overlays / 图层叠加
 
 - `textureLayers`
   - CN: 通用图层数组，可做背景或前景。
@@ -313,7 +391,7 @@ This file is a quick reference for pack authors.
   - CN: 图层优先级，越大越晚画。
   - EN: Layer priority. Higher values draw later.
 
-## 7. Factory-only / 工厂专用
+## 8. Factory-only / 工厂专用
 
 - `specialThreadBackgroundColor`
   - CN: 工厂核心线程背景色，格式可用 `RRGGBB` 或 `AARRGGBB`。
@@ -352,7 +430,7 @@ This file is a quick reference for pack authors.
 }
 ```
 
-## 8. AE mixed bus capacity cards / AE 混合总线容量卡
+## 9. AE mixed bus capacity cards / AE 混合总线容量卡
 
 - `capacityCardSlots`
   - CN: 旧式容量卡槽坐标数组，元素为 `{ "x": 116, "y": 18 }`。
@@ -387,7 +465,7 @@ This file is a quick reference for pack authors.
 - CN: 这组字段可以直接拷到机器 JSON 里。`queueX` / `queueY` / `queueScrollbarX` / `queueScrollbarY` / `queueVisibleRows` / `queueRowWidth` / `queueRowHeight` 这些别名也能用。
 - EN: You can copy this block directly into a machine JSON. Aliases such as `queueX` / `queueY` / `queueScrollbarX` / `queueScrollbarY` / `queueVisibleRows` / `queueRowWidth` / `queueRowHeight` are also accepted.
 
-## 8. Common patterns / 常见写法
+## 10. Common patterns / 常见写法
 
 - CN: 只改背景时，通常只写 `backgroundTexture` + `hideDefaultBackground`。
 - EN: For background-only edits, usually only set `backgroundTexture` and `hideDefaultBackground`.
@@ -396,12 +474,12 @@ This file is a quick reference for pack authors.
 - CN: 只改叠层时，优先用 `backgroundLayers` / `foregroundLayers`。
 - EN: For overlay-only edits, use `backgroundLayers` / `foregroundLayers`.
 
-## 9. Fake progress bar example / 假进度条示例
+## 11. Fake progress bar example / 假进度条示例
 
 CN: 下面这个例子用一个蓝色方块贴图拉成长条，看起来像进度条。
 EN: The example below stretches a blue square texture into a long bar, which can look like a progress bar.
 
-## Custom hatch block texture levels / 自定义仓室方块贴图分级
+## 12. Custom hatch block texture levels / 自定义仓室方块贴图分级
 
 - `block.texture`
   - ZH: 自定义仓室方块默认贴图。未命中任何分级时使用它。

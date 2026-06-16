@@ -2,7 +2,7 @@
 
 [首页](Home) · [English](Controller-GUI-EN)
 
-替换/自定义 MMCE 普通控制器与集成（工厂）控制器的 GUI：可调整大小、自定义背景贴图、多信息区、纹理图层、Smart Interface 编辑器、自定义按钮与页面。
+替换/自定义 MMCE 普通控制器与集成（工厂）控制器的 GUI：可调整大小、自定义背景贴图、多信息区、纹理图层、Smart Interface 编辑器、自定义按钮、滑块与页面。
 
 ## 工作机制
 
@@ -68,7 +68,7 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 
 机器级值覆盖全局。自 `1.0.1+`，只要机器定义了 `mmce_gui_ext` 节点，未填的 GUI 尺寸优先回退到 MMCE 基础尺寸（`176x213` / `280x213`），降低对全局 cfg 的耦合。
 
-机器级常用字段（详见速查表）：`backgroundTexture`、`backgroundTextureOffsetX/Y`、`hideDefaultBackground`、`guiWidth`、`guiHeight`、`enableRightExtension`、`useNineSlice`、`backgroundTextureWidth/Height`、`backgroundCorner`、`centerFullGui`、`specialThreadBackgroundColor`、`enableSmartInterfaceEditor`、`smartInterfaceEditorX/Y`、`smartInterfaceEditorInputWidth`、`smartInterfaceEditorVirtualKey`、`smartInterfaceEditorPriority`、`foregroundContentPriority`、`hideDefaultSmartInterfaceEditor`、`defaultPanelId`、`customPanels`、`smartInterfaceEditors`、`textureLayers`/`backgroundLayers`/`foregroundLayers`、`buttons`。
+机器级常用字段（详见速查表）：`backgroundTexture`、`backgroundTextureOffsetX/Y`、`hideDefaultBackground`、`guiWidth`、`guiHeight`、`enableRightExtension`、`useNineSlice`、`backgroundTextureWidth/Height`、`backgroundCorner`、`centerFullGui`、`specialThreadBackgroundColor`、`enableSmartInterfaceEditor`、`smartInterfaceEditorX/Y`、`smartInterfaceEditorInputWidth`、`smartInterfaceEditorVirtualKey`、`smartInterfaceEditorPriority`、`foregroundContentPriority`、`hideDefaultSmartInterfaceEditor`、`defaultPanelId`、`customPanels`、`smartInterfaceEditors`、`sliders`、`textureLayers`/`backgroundLayers`/`foregroundLayers`、`buttons`。
 工厂线程队列可直接照抄的字段是 `threadQueueX`、`threadQueueY`、`threadScrollbarX`、`threadScrollbarY`、`threadVisibleRows`、`threadRowWidth`、`threadRowHeight`；别名 `queueX`、`queueY`、`queueScrollbarX`、`queueScrollbarY`、`queueVisibleRows`、`queueRowWidth`、`queueRowHeight` 也可用。自定义这些字段也会触发集成控制器自代理。
 
 ---
@@ -94,7 +94,9 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 ## 5. 纹理图层（textureLayers）
 
 `textureLayers` / `backgroundLayers`（自动背景层）/ `foregroundLayers`（自动前景层）。每层字段：
-`id`（建议必写，运行时指令靠它定位）、`texture`、`offsetX`、`offsetY`、`width`、`height`、`textureWidth`、`textureHeight`、`corner`、`useNineSlice`、`foreground`（在 `textureLayers` 里用它指定层级）、`priority`。
+`id`（建议必写，运行时指令靠它定位）、`texture`、`offsetX`、`offsetY`、`width`、`height`、`textureWidth`、`textureHeight`、`alpha`/`opacity`/`transparency`、`corner`、`useNineSlice`、`foreground`（在 `textureLayers` 里用它指定层级）、`priority`。
+
+`alpha` 支持 `0.0` 到 `1.0`，也支持 `0` 到 `255`；运行时可用 `[mmcege:layer.<id>.alpha=0.5]` 修改。
 
 ---
 
@@ -118,7 +120,37 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 
 ---
 
-## 8. 运行时 ZS 指令
+## 8. 控制器滑块
+
+`sliders[]` 在机器级定义，普通控制器和集成控制器都支持。别名：`guiSliders`、`gui_sliders`、`rangeControls`、`range_controls`。滑块拖动后会把数值写入 `key` 指定的 Smart Interface / 虚拟 DataPort。
+
+最小示例：
+
+```json
+"sliders": [
+  {
+    "id": "speed_slider",
+    "x": 186,
+    "y": 72,
+    "width": 96,
+    "height": 12,
+    "key": "speed",
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "value": 2,
+    "showText": true
+  }
+]
+```
+
+常用字段：`id`、`x`、`y`、`width`、`height`、`key`、`min`、`max`、`step`、`value`、`direction`、`trackColor`、`fillColor`、`thumbColor`、`borderColor`、`thumbWidth`、`thumbHeight`、`priority`、`foreground`、`visible`、`page`、`showText`、`textColor`。
+
+示例：`examples/quick-start/sliders.json`。
+
+---
+
+## 9. 运行时 ZS 指令
 
 从推入 MMCE `ControllerGUIRenderEvent.extraInfo[]` 的文本行读取（例如 CraftTweaker/ZenScript 的 `onControllerGUIRender`），**仅客户端**。
 
@@ -132,12 +164,12 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 - `[mmcege:si.clear_title]` —— 恢复默认标题
 
 **纹理图层控制**（`<id>` 为该层 id）
-- `[mmcege:layer.<id>.x=300]`、`.y=186`、`.scale=1.25`、`.scaleX=1.25`、`.scaleY=0.90`、`.rotation=45`、`.alpha=0.5`、`.priority=30`、`.visible=true`、`.reset`、`.clear`
+- `[mmcege:layer.<id>.x=300]`、`.y=186`、`.scale=1.25`、`.scaleX=1.25`、`.scaleY=0.90`、`.rotation=45`、`.alpha=0.5`、`.opacity=128`、`.transparency=0.25`、`.priority=30`、`.visible=true`、`.reset`、`.clear`
 - `[mmcege:layer.reset_all]` / `[mmcege:layer.clear_all]` —— 重置所有图层状态
 
 ---
 
-## 9. 注意事项
+## 10. 注意事项
 
 - 机器 JSON 与 ZS 中的机器 ID 必须一致。
 - 建议所有可运行时控制的图层都写 `id`。

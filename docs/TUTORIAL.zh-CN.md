@@ -44,9 +44,11 @@ MMCEGE 目前包含四大功能，本教程按部分组织：
 - 虚拟 DataPort（无实体端口也可写值）
 - 与 MMCE 原生 DataPort 类似的读取方式（`getSmartInterfaceData` + `customData` 兜底）
 - 多层贴图（背景层/前景层）
-- 贴图优先级（`priority`）
-- 贴图运行时控制（平移、缩放、旋转、显隐、动态优先级）
+- 贴图透明度与优先级（`alpha` / `priority`）
+- 贴图运行时控制（平移、缩放、旋转、透明度、显隐、动态优先级）
+- 控制器滑块（`sliders[]`，可拖拽写入 Smart Interface / 虚拟 DataPort 数值）
 - 工厂核心线程背景色 `specialThreadBackgroundColor`
+- 集成控制器线程队列位置与尺寸自定义（`threadQueueX/Y` 等，单独配置也会启用自代理 GUI）
 
 ## 4. JSON 写法总览（推荐字段名）
 
@@ -84,6 +86,7 @@ MMCEGE 目前包含四大功能，本教程按部分组织：
 - `defaultPanelId`
 - `customPanels`
 - `smartInterfaceEditors`
+- `sliders`
 - `textureLayers` / `backgroundLayers` / `foregroundLayers`
 - `subGuis`
 
@@ -159,6 +162,7 @@ MMCEGE 目前包含四大功能，本教程按部分组织：
 - `height`
 - `textureWidth`
 - `textureHeight`
+- `alpha` / `opacity` / `transparency`
 - `corner`
 - `useNineSlice`
 - `foreground`
@@ -169,6 +173,64 @@ MMCEGE 目前包含四大功能，本教程按部分组织：
 - `backgroundLayers` 自动是背景层。
 - `foregroundLayers` 自动是前景层。
 - `textureLayers` 里可用 `foreground: true/false` 指定层级。
+- `alpha` 支持 `0.0` 到 `1.0`，也支持 `0` 到 `255`。
+
+### 4.5 `sliders` 格式
+
+`sliders` 是控制器下的滑块数组，普通控制器和集成控制器都可用。别名也支持 `guiSliders`、`gui_sliders`、`rangeControls`、`range_controls`。
+
+每个滑块至少写：
+
+- `x`
+- `y`
+- `width`
+- `height`
+- `key`
+
+常用字段：
+
+- `id`
+- `min`
+- `max`
+- `step`
+- `value`
+- `direction`（`horizontal` / `vertical`）
+- `trackColor`
+- `fillColor`
+- `thumbColor`
+- `borderColor`
+- `thumbWidth`
+- `thumbHeight`
+- `priority`
+- `foreground`
+- `visible`
+- `page`
+- `showText`
+- `textColor`
+
+示例：
+
+```json
+"sliders": [
+  {
+    "id": "speed_slider",
+    "x": 186,
+    "y": 72,
+    "width": 96,
+    "height": 12,
+    "key": "speed",
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "value": 2,
+    "showText": true
+  }
+]
+```
+
+滑块会直接写入 `key` 指定的 Smart Interface / 虚拟 DataPort 数值。读取方式仍然建议使用第 6 章的兼容读取逻辑。
+
+可直接复制的完整示例：`examples/quick-start/sliders.json`。
 
 ## 5. ZS 指令写法（`onControllerGUIRender` 的 `extraInfo`）
 
@@ -210,6 +272,8 @@ MMCEGE 目前包含四大功能，本教程按部分组织：
 - `[mmcege:layer.<id>.scaleY=0.90]`
 - `[mmcege:layer.<id>.rotation=45]`
 - `[mmcege:layer.<id>.alpha=0.5]`
+- `[mmcege:layer.<id>.opacity=128]`
+- `[mmcege:layer.<id>.transparency=0.25]`
 - `[mmcege:layer.<id>.priority=30]`
 - `[mmcege:layer.<id>.visible=true]`
 - `[mmcege:layer.<id>.reset]`

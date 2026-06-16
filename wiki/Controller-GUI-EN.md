@@ -2,7 +2,7 @@
 
 [Home](Home) · [中文版](Controller-GUI-ZH)
 
-Replace / customize the MMCE Machine and Factory controller GUIs: resizable, custom background textures, multi-panel info areas, texture layers, Smart Interface editors, custom buttons and pages.
+Replace / customize the MMCE Machine and Factory controller GUIs: resizable, custom background textures, multi-panel info areas, texture layers, Smart Interface editors, custom buttons, sliders, and pages.
 
 ## How it works
 
@@ -68,7 +68,7 @@ Aliases:
 
 Per-machine values override global. Since `1.0.1+`, if a machine defines any `mmce_gui_ext` node, unspecified GUI size falls back to the MMCE base size (`176x213` / `280x213`) first, reducing coupling to global cfg.
 
-Common per-machine fields (see the quick reference for the full list): `backgroundTexture`, `backgroundTextureOffsetX/Y`, `hideDefaultBackground`, `guiWidth`, `guiHeight`, `enableRightExtension`, `useNineSlice`, `backgroundTextureWidth/Height`, `backgroundCorner`, `centerFullGui`, `specialThreadBackgroundColor`, `enableSmartInterfaceEditor`, `smartInterfaceEditorX/Y`, `smartInterfaceEditorInputWidth`, `smartInterfaceEditorVirtualKey`, `smartInterfaceEditorPriority`, `foregroundContentPriority`, `hideDefaultSmartInterfaceEditor`, `defaultPanelId`, `customPanels`, `smartInterfaceEditors`, `textureLayers`/`backgroundLayers`/`foregroundLayers`, `buttons`.
+Common per-machine fields (see the quick reference for the full list): `backgroundTexture`, `backgroundTextureOffsetX/Y`, `hideDefaultBackground`, `guiWidth`, `guiHeight`, `enableRightExtension`, `useNineSlice`, `backgroundTextureWidth/Height`, `backgroundCorner`, `centerFullGui`, `specialThreadBackgroundColor`, `enableSmartInterfaceEditor`, `smartInterfaceEditorX/Y`, `smartInterfaceEditorInputWidth`, `smartInterfaceEditorVirtualKey`, `smartInterfaceEditorPriority`, `foregroundContentPriority`, `hideDefaultSmartInterfaceEditor`, `defaultPanelId`, `customPanels`, `smartInterfaceEditors`, `sliders`, `textureLayers`/`backgroundLayers`/`foregroundLayers`, `buttons`.
 For the factory thread queue, the copy-paste fields are `threadQueueX`, `threadQueueY`, `threadScrollbarX`, `threadScrollbarY`, `threadVisibleRows`, `threadRowWidth`, and `threadRowHeight`; aliases like `queueX`, `queueY`, `queueScrollbarX`, `queueScrollbarY`, `queueVisibleRows`, `queueRowWidth`, and `queueRowHeight` are accepted. Customizing these fields also triggers the integrated-controller self proxy.
 
 ---
@@ -94,7 +94,9 @@ For the factory thread queue, the copy-paste fields are `threadQueueX`, `threadQ
 ## 5. Texture layers
 
 `textureLayers` / `backgroundLayers` (auto background) / `foregroundLayers` (auto foreground). Per-layer fields:
-`id` (strongly recommended — runtime directives locate by it), `texture`, `offsetX`, `offsetY`, `width`, `height`, `textureWidth`, `textureHeight`, `corner`, `useNineSlice`, `foreground` (use it inside `textureLayers` to set the layer tier), `priority`.
+`id` (strongly recommended — runtime directives locate by it), `texture`, `offsetX`, `offsetY`, `width`, `height`, `textureWidth`, `textureHeight`, `alpha`/`opacity`/`transparency`, `corner`, `useNineSlice`, `foreground` (use it inside `textureLayers` to set the layer tier), `priority`.
+
+`alpha` accepts `0.0` to `1.0`, or `0` to `255`; runtime directives can change it with `[mmcege:layer.<id>.alpha=0.5]`.
 
 ---
 
@@ -118,7 +120,37 @@ Examples: `examples/quick-start/buttons-and-pages.json`, `event-button-test.json
 
 ---
 
-## 8. Runtime ZS directives
+## 8. Controller sliders
+
+`sliders[]` are defined per-machine and work in both Machine and Factory controller GUIs. Aliases: `guiSliders`, `gui_sliders`, `rangeControls`, `range_controls`. Dragging a slider writes a numeric value to the Smart Interface / virtual DataPort key named by `key`.
+
+Minimal example:
+
+```json
+"sliders": [
+  {
+    "id": "speed_slider",
+    "x": 186,
+    "y": 72,
+    "width": 96,
+    "height": 12,
+    "key": "speed",
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "value": 2,
+    "showText": true
+  }
+]
+```
+
+Common fields: `id`, `x`, `y`, `width`, `height`, `key`, `min`, `max`, `step`, `value`, `direction`, `trackColor`, `fillColor`, `thumbColor`, `borderColor`, `thumbWidth`, `thumbHeight`, `priority`, `foreground`, `visible`, `page`, `showText`, `textColor`.
+
+Example: `examples/quick-start/sliders.json`.
+
+---
+
+## 9. Runtime ZS directives
 
 Read from text lines pushed into MMCE's `ControllerGUIRenderEvent.extraInfo[]` (e.g. CraftTweaker/ZenScript's `onControllerGUIRender`), **client-side only**.
 
@@ -132,12 +164,12 @@ Read from text lines pushed into MMCE's `ControllerGUIRenderEvent.extraInfo[]` (
 - `[mmcege:si.clear_title]` — restore default title
 
 **Texture layer control** (`<id>` is the layer's id)
-- `[mmcege:layer.<id>.x=300]`, `.y=186`, `.scale=1.25`, `.scaleX=1.25`, `.scaleY=0.90`, `.rotation=45`, `.alpha=0.5`, `.priority=30`, `.visible=true`, `.reset`, `.clear`
+- `[mmcege:layer.<id>.x=300]`, `.y=186`, `.scale=1.25`, `.scaleX=1.25`, `.scaleY=0.90`, `.rotation=45`, `.alpha=0.5`, `.opacity=128`, `.transparency=0.25`, `.priority=30`, `.visible=true`, `.reset`, `.clear`
 - `[mmcege:layer.reset_all]` / `[mmcege:layer.clear_all]` — reset all layer states
 
 ---
 
-## 9. Notes
+## 10. Notes
 
 - The machine ID in the machine JSON and in ZS must match.
 - Give every runtime-controllable layer an `id`.
