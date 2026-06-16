@@ -30,6 +30,10 @@ repositories {
         url = uri("https://repo.spongepowered.org/maven")
     }
     maven {
+        name = "CleanroomMC"
+        url = uri("https://maven.cleanroommc.com")
+    }
+    maven {
         name = "GTNH Maven"
         url = uri("https://nexus.gtnewhorizons.com/repository/public/")
     }
@@ -73,8 +77,7 @@ dependencies {
     implementation(rfg.deobf("curse.maven:modular-machinery-community-edition-817377:7372953"))
     implementation("com.google.code.gson:gson:2.8.9")
 
-    compileOnly("CraftTweaker2:CraftTweaker2-API:4.1.20.715")
-    compileOnly("CraftTweaker2:CraftTweaker2-MC1120-Main:1.12-4.1.20.715")
+    compileOnly(rfg.deobf("curse.maven:crafttweaker-239197:5354089"))
     val craftTweakerModsDir = System.getenv("MMCEGE_CRAFTTWEAKER_MODS_DIR")
     val localCraftTweakerJars = if (!craftTweakerModsDir.isNullOrBlank()) {
         fileTree(craftTweakerModsDir) {
