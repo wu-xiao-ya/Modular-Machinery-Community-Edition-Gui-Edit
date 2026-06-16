@@ -454,6 +454,8 @@ final class MachineGuiStyleParser {
         style.smartInterfaceEditors = parseSmartInterfaceEditors(node, result, scope);
         style.buttons = parseButtons(node, result, scope);
         style.textureLayers = parseTextureLayers(node, result, scope);
+        style.progressBars = parseProgressBars(node, result, scope);
+        style.sliders = parseSliders(node, result, scope);
         style.subGuis = parseSubGuis(node, result, scope);
 
         Boolean useDefaultBackground = getBoolean(node, result, scope, "useDefaultBackground");
@@ -793,6 +795,154 @@ final class MachineGuiStyleParser {
         appendTextureLayers(out, findElement(node, "backgroundLayers", "background_layers"), false, result, scope);
         appendTextureLayers(out, findElement(node, "foregroundLayers", "foreground_layers"), true, result, scope);
         return out.isEmpty() ? null : out;
+    }
+
+    @Nullable
+    private static List<MachineGuiStyleManager.ProgressBarStyle> parseProgressBars(
+        JsonObject node,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        MatchedElement match = findElement(node, "progressBars", "progress_bars", "guiProgressBars", "gui_progress_bars");
+        if (match == null) {
+            return null;
+        }
+        if (!match.element.isJsonArray()) {
+            result.warnForMachine(scope, field(scope, match.key) + " must be an array.");
+            return null;
+        }
+
+        List<MachineGuiStyleManager.ProgressBarStyle> progressBars = new ArrayList<MachineGuiStyleManager.ProgressBarStyle>();
+        JsonArray array = match.element.getAsJsonArray();
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
+            JsonElement child = array.get(i);
+            String itemScope = field(scope, match.key + "[" + i + "]");
+            if (child == null || !child.isJsonObject()) {
+                result.warnForMachine(scope, itemScope + " must be an object.");
+                continue;
+            }
+
+            JsonObject obj = child.getAsJsonObject();
+            Integer x = getInt(obj, result, itemScope, "x");
+            Integer y = getInt(obj, result, itemScope, "y");
+            Integer width = validateRangeInt(getInt(obj, result, itemScope, "width"), 1, MAX_COMPONENT_SIZE, result, itemScope, "width");
+            Integer height = validateRangeInt(getInt(obj, result, itemScope, "height"), 1, MAX_COMPONENT_SIZE, result, itemScope, "height");
+            if (x == null || y == null || width == null || height == null) {
+                result.warnForMachine(scope, itemScope + " is missing required fields x, y, width or height.");
+                continue;
+            }
+
+            MachineGuiStyleManager.ProgressBarStyle bar = new MachineGuiStyleManager.ProgressBarStyle();
+            bar.id = getTrimmedString(obj, result, itemScope, "id", "name");
+            bar.x = x.intValue();
+            bar.y = y.intValue();
+            bar.width = width.intValue();
+            bar.height = height.intValue();
+            bar.backgroundColor = getColor(obj, result, itemScope, "backgroundColor", "background_color", "bgColor", "bg_color");
+            bar.fillColor = getColor(obj, result, itemScope, "fillColor", "fill_color", "color", "barColor", "bar_color");
+            bar.borderColor = getColor(obj, result, itemScope, "borderColor", "border_color", "frameColor", "frame_color");
+            bar.texture = getTrimmedString(obj, result, itemScope, "texture", "barTexture", "bar_texture");
+            bar.backgroundTexture = getTrimmedString(obj, result, itemScope, "backgroundTexture", "background_texture");
+            bar.fillTexture = getTrimmedString(obj, result, itemScope, "fillTexture", "fill_texture");
+            bar.textureWidth = validateRangeInt(getInt(obj, result, itemScope, "textureWidth", "texture_width"), 1, MAX_COMPONENT_SIZE, result, itemScope, "textureWidth");
+            bar.textureHeight = validateRangeInt(getInt(obj, result, itemScope, "textureHeight", "texture_height"), 1, MAX_COMPONENT_SIZE, result, itemScope, "textureHeight");
+            bar.direction = normalizeProgressBarDirection(getTrimmedString(obj, result, itemScope, "direction", "fillDirection", "fill_direction"), result, itemScope);
+            bar.source = normalizeProgressBarSource(getTrimmedString(obj, result, itemScope, "source"), result, itemScope);
+            bar.threadIndex = getInt(obj, result, itemScope, "threadIndex", "thread_index", "thread");
+            bar.coreThreadId = getTrimmedString(obj, result, itemScope, "coreThreadId", "core_thread_id", "coreThread", "core_thread");
+            bar.min = getFloat(obj, result, itemScope, "min");
+            bar.max = getFloat(obj, result, itemScope, "max");
+            bar.priority = getInt(obj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
+            bar.foreground = getBoolean(obj, result, itemScope, "foreground", "front", "drawForeground");
+            bar.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
+            bar.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
+            bar.showText = getBoolean(obj, result, itemScope, "showText", "show_text", "displayText", "display_text");
+            bar.textColor = getColor(obj, result, itemScope, "textColor", "text_color");
+            progressBars.add(bar);
+        }
+        return progressBars.isEmpty() ? null : progressBars;
+    }
+
+    @Nullable
+    private static List<MachineGuiStyleManager.SliderStyle> parseSliders(
+        JsonObject node,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        MatchedElement match = findElement(node, "sliders", "guiSliders", "gui_sliders", "rangeControls", "range_controls");
+        if (match == null) {
+            return null;
+        }
+        if (!match.element.isJsonArray()) {
+            result.warnForMachine(scope, field(scope, match.key) + " must be an array.");
+            return null;
+        }
+
+        List<MachineGuiStyleManager.SliderStyle> sliders = new ArrayList<MachineGuiStyleManager.SliderStyle>();
+        JsonArray array = match.element.getAsJsonArray();
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
+            JsonElement child = array.get(i);
+            String itemScope = field(scope, match.key + "[" + i + "]");
+            if (child == null || !child.isJsonObject()) {
+                result.warnForMachine(scope, itemScope + " must be an object.");
+                continue;
+            }
+
+            JsonObject obj = child.getAsJsonObject();
+            Integer x = getInt(obj, result, itemScope, "x");
+            Integer y = getInt(obj, result, itemScope, "y");
+            Integer width = validateRangeInt(getInt(obj, result, itemScope, "width", "w"), 1, MAX_COMPONENT_SIZE, result, itemScope, "width");
+            Integer height = validateRangeInt(getInt(obj, result, itemScope, "height", "h"), 1, MAX_COMPONENT_SIZE, result, itemScope, "height");
+            String key = getTrimmedString(
+                obj,
+                result,
+                itemScope,
+                "key",
+                "virtualKey",
+                "virtual_key",
+                "interfaceType",
+                "interface_type",
+                "dataPortKey",
+                "data_port_key",
+                "portKey",
+                "port_key",
+                "dataPort",
+                "data_port"
+            );
+            if (x == null || y == null || width == null || height == null || key == null || key.isEmpty()) {
+                result.warnForMachine(scope, itemScope + " is missing required fields x, y, width, height or key.");
+                continue;
+            }
+
+            MachineGuiStyleManager.SliderStyle slider = new MachineGuiStyleManager.SliderStyle();
+            slider.id = getTrimmedString(obj, result, itemScope, "id", "name");
+            slider.x = x.intValue();
+            slider.y = y.intValue();
+            slider.width = width.intValue();
+            slider.height = height.intValue();
+            slider.key = key;
+            slider.min = getFloat(obj, result, itemScope, "min", "minimum");
+            slider.max = getFloat(obj, result, itemScope, "max", "maximum");
+            slider.step = getFloat(obj, result, itemScope, "step", "increment");
+            slider.initialValue = getFloat(obj, result, itemScope, "value", "initialValue", "initial_value", "defaultValue", "default_value");
+            slider.direction = normalizeSliderDirection(getTrimmedString(obj, result, itemScope, "direction", "axis", "orientation"), result, itemScope);
+            slider.trackColor = getColor(obj, result, itemScope, "trackColor", "track_color", "backgroundColor", "background_color", "bgColor", "bg_color");
+            slider.fillColor = getColor(obj, result, itemScope, "fillColor", "fill_color", "color", "barColor", "bar_color");
+            slider.thumbColor = getColor(obj, result, itemScope, "thumbColor", "thumb_color", "handleColor", "handle_color");
+            slider.borderColor = getColor(obj, result, itemScope, "borderColor", "border_color", "frameColor", "frame_color");
+            slider.thumbWidth = validateRangeInt(getInt(obj, result, itemScope, "thumbWidth", "thumb_width", "handleWidth", "handle_width"), 1, MAX_COMPONENT_SIZE, result, itemScope, "thumbWidth");
+            slider.thumbHeight = validateRangeInt(getInt(obj, result, itemScope, "thumbHeight", "thumb_height", "handleHeight", "handle_height"), 1, MAX_COMPONENT_SIZE, result, itemScope, "thumbHeight");
+            slider.priority = getInt(obj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
+            slider.foreground = getBoolean(obj, result, itemScope, "foreground", "front", "drawForeground");
+            slider.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
+            slider.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
+            slider.showText = getBoolean(obj, result, itemScope, "showText", "show_text", "displayText", "display_text");
+            slider.textColor = getColor(obj, result, itemScope, "textColor", "text_color");
+            sliders.add(slider);
+        }
+        return sliders.isEmpty() ? null : sliders;
     }
 
     @Nullable
@@ -1368,6 +1518,74 @@ final class MachineGuiStyleParser {
         if ("right".equals(text) || "end".equals(text)) {
             return "right";
         }
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeProgressBarDirection(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("left_to_right".equals(text) || "ltr".equals(text)) {
+            return "left_to_right";
+        }
+        if ("right_to_left".equals(text) || "rtl".equals(text)) {
+            return "right_to_left";
+        }
+        if ("top_to_bottom".equals(text) || "ttb".equals(text)) {
+            return "top_to_bottom";
+        }
+        if ("bottom_to_top".equals(text) || "btt".equals(text)) {
+            return "bottom_to_top";
+        }
+        result.warnForMachine(scope, field(scope, "direction") + " must be left_to_right, right_to_left, top_to_bottom or bottom_to_top.");
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeProgressBarSource(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("machine_progress".equals(text)
+            || "factory_first".equals(text)
+            || "factory_thread".equals(text)
+            || "factory_core".equals(text)
+            || "factory_average".equals(text)
+            || "factory_max".equals(text)) {
+            return text;
+        }
+        result.warnForMachine(scope, field(scope, "source") + " must be machine_progress, factory_first, factory_thread, factory_core, factory_average or factory_max.");
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeSliderDirection(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("horizontal".equals(text) || "x".equals(text) || "left_to_right".equals(text) || "ltr".equals(text)) {
+            return "horizontal";
+        }
+        if ("vertical".equals(text) || "y".equals(text) || "bottom_to_top".equals(text) || "btt".equals(text)) {
+            return "vertical";
+        }
+        result.warnForMachine(scope, field(scope, "direction") + " must be horizontal or vertical.");
         return null;
     }
 

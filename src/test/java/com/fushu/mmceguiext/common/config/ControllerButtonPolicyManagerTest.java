@@ -85,6 +85,26 @@ public class ControllerButtonPolicyManagerTest {
         assertEquals(Float.valueOf(0.0F), policies.get(1).value);
     }
 
+    @Test
+    public void parseEditorKeysCollectsSliderKeys() throws Exception {
+        List<String> keys = parseEditorKeys(
+            "{\n" +
+                "  \"sliders\": [\n" +
+                "    {\"key\": \"speed\"},\n" +
+                "    {\"dataPortKey\": \"pressure\"}\n" +
+                "  ],\n" +
+                "  \"subGuis\": [\n" +
+                "    {\"gui_sliders\": [{\"virtualKey\": \"sub_speed\"}]}\n" +
+                "  ]\n" +
+                "}"
+        );
+
+        assertEquals(3, keys.size());
+        assertEquals("speed", keys.get(0));
+        assertEquals("pressure", keys.get(1));
+        assertEquals("sub_speed", keys.get(2));
+    }
+
     private static ControllerButtonPolicyManager.ButtonPolicy parseButton(String json) throws Exception {
         Method method = ControllerButtonPolicyManager.class.getDeclaredMethod("parseButton", JsonObject.class);
         method.setAccessible(true);
@@ -99,6 +119,16 @@ public class ControllerButtonPolicyManagerTest {
         Method method = ControllerButtonPolicyManager.class.getDeclaredMethod("parseButtons", JsonObject.class);
         method.setAccessible(true);
         return (List<ControllerButtonPolicyManager.ButtonPolicy>) method.invoke(
+            null,
+            new JsonParser().parse(json).getAsJsonObject()
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> parseEditorKeys(String json) throws Exception {
+        Method method = ControllerButtonPolicyManager.class.getDeclaredMethod("parseEditorKeys", JsonObject.class);
+        method.setAccessible(true);
+        return (List<String>) method.invoke(
             null,
             new JsonParser().parse(json).getAsJsonObject()
         );

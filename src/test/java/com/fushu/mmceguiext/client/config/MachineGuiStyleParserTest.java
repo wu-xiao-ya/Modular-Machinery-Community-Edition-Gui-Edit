@@ -225,6 +225,298 @@ public class MachineGuiStyleParserTest {
     }
 
     @Test
+    public void parseMachineJsonParsesProgressBarsAndAliases() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "progress-bars.json",
+            "{\n" +
+                "  \"registryname\": \"demo:progress_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"progressBars\": [\n" +
+                "        {\n" +
+                "          \"id\": \"main_progress\",\n" +
+                "          \"x\": 10,\n" +
+                "          \"y\": 12,\n" +
+                "          \"width\": 120,\n" +
+                "          \"height\": 14,\n" +
+                "          \"backgroundColor\": \"33000000\",\n" +
+                "          \"fillColor\": \"FF00AAFF\",\n" +
+                "          \"borderColor\": \"FFFFFFFF\",\n" +
+                "          \"texture\": \"demo:textures/gui/progress.png\",\n" +
+                "          \"backgroundTexture\": \"demo:textures/gui/progress_bg.png\",\n" +
+                "          \"fillTexture\": \"demo:textures/gui/progress_fill.png\",\n" +
+                "          \"textureWidth\": 128,\n" +
+                "          \"textureHeight\": 16,\n" +
+                "          \"direction\": \"left_to_right\",\n" +
+                "          \"source\": \"factory_average\",\n" +
+                "          \"threadIndex\": 2,\n" +
+                "          \"coreThreadId\": \"core_a\",\n" +
+                "          \"min\": 0.0,\n" +
+                "          \"max\": 100.0,\n" +
+                "          \"priority\": 7,\n" +
+                "          \"foreground\": true,\n" +
+                "          \"visible\": false,\n" +
+                "          \"page\": \"main\",\n" +
+                "          \"showText\": true,\n" +
+                "          \"textColor\": \"FF101010\"\n" +
+                "        }\n" +
+                "      ]\n" +
+                "    },\n" +
+                "    \"factoryController\": {\n" +
+                "      \"gui_progress_bars\": [\n" +
+                "        {\n" +
+                "          \"x\": 4,\n" +
+                "          \"y\": 5,\n" +
+                "          \"width\": 8,\n" +
+                "          \"height\": 9,\n" +
+                "          \"direction\": \"bottom_to_top\",\n" +
+                "          \"source\": \"machine_progress\"\n" +
+                "        }\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.machineStyle);
+        assertNotNull(result.machineStyle.progressBars);
+        assertEquals(1, result.machineStyle.progressBars.size());
+        MachineGuiStyleManager.ProgressBarStyle bar = result.machineStyle.progressBars.get(0);
+        assertEquals("main_progress", bar.id);
+        assertEquals(10, bar.x);
+        assertEquals(12, bar.y);
+        assertEquals(120, bar.width);
+        assertEquals(14, bar.height);
+        assertEquals(Integer.valueOf(0x33000000), bar.backgroundColor);
+        assertEquals(Integer.valueOf(0xFF00AAFF), bar.fillColor);
+        assertEquals(Integer.valueOf(0xFFFFFFFF), bar.borderColor);
+        assertEquals("demo:textures/gui/progress.png", bar.texture);
+        assertEquals("demo:textures/gui/progress_bg.png", bar.backgroundTexture);
+        assertEquals("demo:textures/gui/progress_fill.png", bar.fillTexture);
+        assertEquals(Integer.valueOf(128), bar.textureWidth);
+        assertEquals(Integer.valueOf(16), bar.textureHeight);
+        assertEquals("left_to_right", bar.direction);
+        assertEquals("factory_average", bar.source);
+        assertEquals(Integer.valueOf(2), bar.threadIndex);
+        assertEquals("core_a", bar.coreThreadId);
+        assertEquals(Float.valueOf(0.0F), bar.min);
+        assertEquals(Float.valueOf(100.0F), bar.max);
+        assertEquals(Integer.valueOf(7), bar.priority);
+        assertEquals(Boolean.TRUE, bar.foreground);
+        assertEquals(Boolean.FALSE, bar.visible);
+        assertEquals("main", bar.page);
+        assertEquals(Boolean.TRUE, bar.showText);
+        assertEquals(Integer.valueOf(0xFF101010), bar.textColor);
+        assertNotNull(result.factoryStyle);
+        assertNotNull(result.factoryStyle.progressBars);
+        assertEquals(1, result.factoryStyle.progressBars.size());
+        assertEquals("bottom_to_top", result.factoryStyle.progressBars.get(0).direction);
+        assertEquals("machine_progress", result.factoryStyle.progressBars.get(0).source);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonRejectsInvalidProgressBarDirectionSourceAndSize() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "progress-bars-invalid.json",
+            "{\n" +
+                "  \"registryname\": \"demo:progress_machine_invalid\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"progress_bars\": [\n" +
+                "        {\n" +
+                "          \"x\": 1,\n" +
+                "          \"y\": 2,\n" +
+                "          \"width\": 0,\n" +
+                "          \"height\": 5000,\n" +
+                "          \"direction\": \"sideways\",\n" +
+                "          \"source\": \"unknown_source\"\n" +
+                "        }\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.machineStyle);
+        assertNull(result.machineStyle.progressBars);
+        assertTrue(containsWarning(result, "progress_bars[0].width must be >= 1"));
+        assertTrue(containsWarning(result, "progress_bars[0].height must be <= 4096"));
+    }
+
+    @Test
+    public void controllerStyleCopiesAndMergesProgressBars() {
+        MachineGuiStyleManager.ControllerStyle base = new MachineGuiStyleManager.ControllerStyle();
+        MachineGuiStyleManager.ProgressBarStyle barA = new MachineGuiStyleManager.ProgressBarStyle();
+        barA.id = "a";
+        barA.x = 1;
+        barA.y = 2;
+        barA.width = 3;
+        barA.height = 4;
+        base.progressBars = java.util.Collections.singletonList(barA);
+
+        MachineGuiStyleManager.ControllerStyle overlay = new MachineGuiStyleManager.ControllerStyle();
+        MachineGuiStyleManager.ProgressBarStyle barB = new MachineGuiStyleManager.ProgressBarStyle();
+        barB.id = "b";
+        barB.x = 5;
+        barB.y = 6;
+        barB.width = 7;
+        barB.height = 8;
+        overlay.progressBars = java.util.Collections.singletonList(barB);
+
+        MachineGuiStyleManager.ControllerStyle copy = MachineGuiStyleManager.ControllerStyle.copyOf(base);
+        assertNotNull(copy.progressBars);
+        assertEquals(1, copy.progressBars.size());
+        assertEquals("a", copy.progressBars.get(0).id);
+
+        MachineGuiStyleManager.ControllerStyle merged = MachineGuiStyleManager.ControllerStyle.copyOf(base).mergeFrom(overlay);
+        assertNotNull(merged.progressBars);
+        assertEquals(2, merged.progressBars.size());
+        assertEquals("a", merged.progressBars.get(0).id);
+        assertEquals("b", merged.progressBars.get(1).id);
+        assertFalse(merged.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonParsesSlidersAndAliases() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "sliders.json",
+            "{\n" +
+                "  \"registryname\": \"demo:slider_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"sliders\": [\n" +
+                "        {\n" +
+                "          \"id\": \"speed_slider\",\n" +
+                "          \"x\": 10,\n" +
+                "          \"y\": 12,\n" +
+                "          \"width\": 120,\n" +
+                "          \"height\": 14,\n" +
+                "          \"key\": \"speed\",\n" +
+                "          \"min\": 0.0,\n" +
+                "          \"max\": 10.0,\n" +
+                "          \"step\": 0.5,\n" +
+                "          \"value\": 2.5,\n" +
+                "          \"direction\": \"horizontal\",\n" +
+                "          \"trackColor\": \"33000000\",\n" +
+                "          \"fillColor\": \"FF00AAFF\",\n" +
+                "          \"thumbColor\": \"FFFFFFFF\",\n" +
+                "          \"borderColor\": \"FF101010\",\n" +
+                "          \"thumbWidth\": 8,\n" +
+                "          \"thumbHeight\": 16,\n" +
+                "          \"priority\": 7,\n" +
+                "          \"foreground\": true,\n" +
+                "          \"visible\": false,\n" +
+                "          \"page\": \"main\",\n" +
+                "          \"showText\": true,\n" +
+                "          \"textColor\": \"FFEEDDCC\"\n" +
+                "        }\n" +
+                "      ]\n" +
+                "    },\n" +
+                "    \"factoryController\": {\n" +
+                "      \"gui_sliders\": [\n" +
+                "        {\"x\": 4, \"y\": 5, \"width\": 8, \"height\": 90, \"dataPortKey\": \"pressure\", \"direction\": \"vertical\"}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.machineStyle);
+        assertNotNull(result.machineStyle.sliders);
+        assertEquals(1, result.machineStyle.sliders.size());
+        MachineGuiStyleManager.SliderStyle slider = result.machineStyle.sliders.get(0);
+        assertEquals("speed_slider", slider.id);
+        assertEquals(10, slider.x);
+        assertEquals(12, slider.y);
+        assertEquals(120, slider.width);
+        assertEquals(14, slider.height);
+        assertEquals("speed", slider.key);
+        assertEquals(Float.valueOf(0.0F), slider.min);
+        assertEquals(Float.valueOf(10.0F), slider.max);
+        assertEquals(Float.valueOf(0.5F), slider.step);
+        assertEquals(Float.valueOf(2.5F), slider.initialValue);
+        assertEquals("horizontal", slider.direction);
+        assertEquals(Integer.valueOf(0x33000000), slider.trackColor);
+        assertEquals(Integer.valueOf(0xFF00AAFF), slider.fillColor);
+        assertEquals(Integer.valueOf(0xFFFFFFFF), slider.thumbColor);
+        assertEquals(Integer.valueOf(0xFF101010), slider.borderColor);
+        assertEquals(Integer.valueOf(8), slider.thumbWidth);
+        assertEquals(Integer.valueOf(16), slider.thumbHeight);
+        assertEquals(Integer.valueOf(7), slider.priority);
+        assertEquals(Boolean.TRUE, slider.foreground);
+        assertEquals(Boolean.FALSE, slider.visible);
+        assertEquals("main", slider.page);
+        assertEquals(Boolean.TRUE, slider.showText);
+        assertEquals(Integer.valueOf(0xFFEEDDCC), slider.textColor);
+        assertNotNull(result.factoryStyle);
+        assertNotNull(result.factoryStyle.sliders);
+        assertEquals(1, result.factoryStyle.sliders.size());
+        assertEquals("pressure", result.factoryStyle.sliders.get(0).key);
+        assertEquals("vertical", result.factoryStyle.sliders.get(0).direction);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonRejectsInvalidSliders() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "sliders-invalid.json",
+            "{\n" +
+                "  \"registryname\": \"demo:slider_machine_invalid\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"sliders\": [\n" +
+                "        {\"x\": 1, \"y\": 2, \"width\": 0, \"height\": 5000, \"key\": \"speed\", \"direction\": \"diagonal\"},\n" +
+                "        {\"x\": 1, \"y\": 2, \"width\": 10, \"height\": 10}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.machineStyle);
+        assertNull(result.machineStyle.sliders);
+        assertTrue(containsWarning(result, "sliders[0].width must be >= 1"));
+        assertTrue(containsWarning(result, "sliders[0].height must be <= 4096"));
+        assertTrue(containsWarning(result, "sliders[1] is missing required fields x, y, width, height or key."));
+    }
+
+    @Test
+    public void controllerStyleCopiesAndMergesSliders() {
+        MachineGuiStyleManager.ControllerStyle base = new MachineGuiStyleManager.ControllerStyle();
+        MachineGuiStyleManager.SliderStyle sliderA = new MachineGuiStyleManager.SliderStyle();
+        sliderA.id = "a";
+        sliderA.key = "speed";
+        sliderA.x = 1;
+        sliderA.y = 2;
+        sliderA.width = 3;
+        sliderA.height = 4;
+        base.sliders = java.util.Collections.singletonList(sliderA);
+
+        MachineGuiStyleManager.ControllerStyle overlay = new MachineGuiStyleManager.ControllerStyle();
+        MachineGuiStyleManager.SliderStyle sliderB = new MachineGuiStyleManager.SliderStyle();
+        sliderB.id = "b";
+        sliderB.key = "pressure";
+        sliderB.x = 5;
+        sliderB.y = 6;
+        sliderB.width = 7;
+        sliderB.height = 8;
+        overlay.sliders = java.util.Collections.singletonList(sliderB);
+
+        MachineGuiStyleManager.ControllerStyle copy = MachineGuiStyleManager.ControllerStyle.copyOf(base);
+        assertNotNull(copy.sliders);
+        assertEquals(1, copy.sliders.size());
+        assertEquals("a", copy.sliders.get(0).id);
+
+        MachineGuiStyleManager.ControllerStyle merged = MachineGuiStyleManager.ControllerStyle.copyOf(base).mergeFrom(overlay);
+        assertNotNull(merged.sliders);
+        assertEquals(2, merged.sliders.size());
+        assertEquals("a", merged.sliders.get(0).id);
+        assertEquals("b", merged.sliders.get(1).id);
+        assertFalse(merged.isEmpty());
+    }
+
+    @Test
     public void parseMachineJsonParsesPanelOverridesForPerMachineGui() {
         MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
             "panel-overrides.json",

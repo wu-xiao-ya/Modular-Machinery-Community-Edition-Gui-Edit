@@ -90,6 +90,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     private static final int DEFAULT_SMART_EDITOR_PRIORITY = 10;
     private static final int DEFAULT_BUTTON_WIDTH = 20;
     private static final int DEFAULT_BUTTON_HEIGHT = 20;
+    private static final int DEFAULT_SLIDER_THUMB_SIZE = 8;
 
     private final GuiScrollbar recipeScrollbar = new GuiScrollbar();
     private final TileFactoryController factory;
@@ -151,6 +152,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     private boolean hideDefaultSmartInterfaceEditor = false;
     private List<CustomSmartEditor> customSmartEditors = new ArrayList<CustomSmartEditor>();
     private List<CustomButton> customButtons = new ArrayList<CustomButton>();
+    private List<CustomSlider> customSliders = new ArrayList<CustomSlider>();
     private List<TextureLayerDef> backgroundTextureLayers = new ArrayList<TextureLayerDef>();
     private List<TextureLayerDef> foregroundTextureLayers = new ArrayList<TextureLayerDef>();
     private Map<String, LayerRuntimeState> layerRuntimeStates = new HashMap<String, LayerRuntimeState>();
@@ -162,6 +164,8 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     private GuiRuntimeState baseRuntimeState = null;
     @Nullable
     private ActiveSubGui activeSubGui = null;
+    @Nullable
+    private CustomSlider draggingSlider = null;
 
     public GuiFactoryControllerResizable(ContainerFactoryController container) {
         super(container);
@@ -191,6 +195,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         this.infoScrollbarDragOffset = 0;
         initSmartInterfaceEditor();
         initCustomSmartInterfaceEditors(MMCEGuiExtConfig.factoryController);
+        initCustomSliders();
         initCustomButtons(MMCEGuiExtConfig.factoryController);
         rebuildSubGuiIndex();
         this.baseRuntimeState = captureCurrentRuntimeState();
@@ -379,6 +384,8 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                     drawStatusPanels();
                 }
             }
+            drawProgressBars(Integer.valueOf(priority));
+            drawCustomSliders(Integer.valueOf(priority));
             drawConfiguredTexts(Integer.valueOf(priority));
             if (priority >= 0) {
                 drawConfiguredTextureLayers(true, cfg, Integer.valueOf(priority));
@@ -408,6 +415,8 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             if (priority.intValue() >= 0) {
                 continue;
             }
+            drawProgressBars(priority);
+            drawCustomSliders(priority);
             drawConfiguredTextureLayers(true, cfg, priority);
         }
     }
@@ -423,6 +432,8 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 maskPlayerInventoryArea();
             }
             drawConfiguredTextureLayers(false, cfg);
+            drawBackgroundProgressBars();
+            drawBackgroundSliders();
             drawNegativeForegroundTextureLayers(cfg);
             updateRecipeScrollbar(this.guiLeft, this.guiTop);
             recipeScrollbar.draw(this, mc);
@@ -479,6 +490,8 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         // Custom panel backgrounds are intentionally not rendered.
         // Users should draw panel areas directly in their custom GUI textures.
         drawConfiguredTextureLayers(false, cfg);
+        drawBackgroundProgressBars();
+        drawBackgroundSliders();
         drawNegativeForegroundTextureLayers(cfg);
 
         updateRecipeScrollbar(this.guiLeft, this.guiTop);
@@ -628,6 +641,9 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         if (handleCustomButtonMouseClicked(mouseX, mouseY, mouseButton)) {
             return;
         }
+        if (handleCustomSliderMouseClicked(mouseX, mouseY, mouseButton)) {
+            return;
+        }
         if (handleCustomSmartInterfaceMouseClicked(mouseX, mouseY, mouseButton)) {
             return;
         }
@@ -687,6 +703,11 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             return;
         }
 
+        if (clickedMouseButton == 0 && this.draggingSlider != null) {
+            updateSliderFromMouse(this.draggingSlider, mouseX, mouseY, false);
+            return;
+        }
+
         if (clickedMouseButton == 0 && this.draggingPanelId != null) {
             PanelDef panel = findPanelById(this.draggingPanelId, getActivePanels(MMCEGuiExtConfig.factoryController));
             if (panel != null) {
@@ -724,6 +745,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             mouseY = toLogicalMouseY(mouseY);
         }
         this.draggingPanelId = null;
+        this.draggingSlider = null;
         super.mouseReleased(mouseX, mouseY, state);
     }
 
@@ -1875,6 +1897,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             initTextureLayers(MMCEGuiExtConfig.factoryController);
             initSmartInterfaceEditor();
             initCustomSmartInterfaceEditors(MMCEGuiExtConfig.factoryController);
+            initCustomSliders();
             initCustomButtons(MMCEGuiExtConfig.factoryController);
             return captureCurrentRuntimeState();
         } finally {
@@ -2168,6 +2191,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 moveButton(editor.apply, deltaX, deltaY);
             }
         }
+        this.draggingSlider = null;
     }
 
     private static void moveTextField(@Nullable GuiTextField textField, int deltaX, int deltaY) {
@@ -2238,6 +2262,8 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         state.hideDefaultSmartInterfaceEditor = this.hideDefaultSmartInterfaceEditor;
         state.customSmartEditors = new ArrayList<CustomSmartEditor>(this.customSmartEditors);
         state.customButtons = new ArrayList<CustomButton>(this.customButtons);
+        state.customSliders = new ArrayList<CustomSlider>(this.customSliders);
+        state.draggingSlider = this.draggingSlider;
         state.backgroundTextureLayers = new ArrayList<TextureLayerDef>(this.backgroundTextureLayers);
         state.foregroundTextureLayers = new ArrayList<TextureLayerDef>(this.foregroundTextureLayers);
         state.layerRuntimeStates = new HashMap<String, LayerRuntimeState>(this.layerRuntimeStates);
@@ -2291,6 +2317,8 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         this.hideDefaultSmartInterfaceEditor = state.hideDefaultSmartInterfaceEditor;
         this.customSmartEditors = new ArrayList<CustomSmartEditor>(state.customSmartEditors);
         this.customButtons = new ArrayList<CustomButton>(state.customButtons);
+        this.customSliders = new ArrayList<CustomSlider>(state.customSliders);
+        this.draggingSlider = state.draggingSlider;
         this.backgroundTextureLayers = new ArrayList<TextureLayerDef>(state.backgroundTextureLayers);
         this.foregroundTextureLayers = new ArrayList<TextureLayerDef>(state.foregroundTextureLayers);
         this.layerRuntimeStates = new HashMap<String, LayerRuntimeState>(state.layerRuntimeStates);
@@ -2601,6 +2629,187 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             }
             GlStateManager.popMatrix();
         }
+    }
+
+    private void drawProgressBars(@Nullable Integer priorityFilter) {
+        if (styleOverride.progressBars == null || styleOverride.progressBars.isEmpty()) {
+            return;
+        }
+        for (MachineGuiStyleManager.ProgressBarStyle bar : styleOverride.progressBars) {
+            if (bar == null) {
+                continue;
+            }
+            if (bar.visible != null && !bar.visible.booleanValue()) {
+                continue;
+            }
+            if (!isPageVisible(bar.page)) {
+                continue;
+            }
+            int priority = bar.priority == null ? resolveForegroundContentPriority() : bar.priority.intValue();
+            if (priorityFilter != null && priority != priorityFilter.intValue()) {
+                continue;
+            }
+            drawProgressBar(bar, resolveProgressBarValue(bar));
+        }
+    }
+
+    private void drawBackgroundProgressBars() {
+        if (styleOverride.progressBars == null || styleOverride.progressBars.isEmpty()) {
+            return;
+        }
+        for (MachineGuiStyleManager.ProgressBarStyle bar : styleOverride.progressBars) {
+            if (bar == null || !Boolean.FALSE.equals(bar.foreground)) {
+                continue;
+            }
+            if (bar.visible != null && !bar.visible.booleanValue()) {
+                continue;
+            }
+            if (!isPageVisible(bar.page)) {
+                continue;
+            }
+            drawProgressBar(bar, resolveProgressBarValue(bar));
+        }
+    }
+
+    private float resolveProgressBarValue(MachineGuiStyleManager.ProgressBarStyle bar) {
+        String source = bar.source == null ? "factory_first" : bar.source;
+        if ("factory_average".equals(source)) {
+            return normalizeProgressBarValue(bar, getFactoryAggregateProgress(false));
+        }
+        if ("factory_max".equals(source)) {
+            return normalizeProgressBarValue(bar, getFactoryAggregateProgress(true));
+        }
+        ActiveMachineRecipe recipe;
+        if ("factory_thread".equals(source)) {
+            recipe = getFactoryThreadRecipe(bar.threadIndex == null ? 0 : bar.threadIndex.intValue());
+        } else if ("factory_core".equals(source)) {
+            recipe = getFactoryCoreRecipe(bar.coreThreadId);
+        } else {
+            recipe = getFirstFactoryRecipe();
+        }
+        return normalizeProgressBarValue(bar, recipeProgress(recipe));
+    }
+
+    private float getFactoryAggregateProgress(boolean maxOnly) {
+        float total = 0.0F;
+        float max = 0.0F;
+        int count = 0;
+        for (FactoryRecipeThread thread : factory.getCoreRecipeThreads().values()) {
+            ActiveMachineRecipe recipe = thread.getActiveRecipe();
+            if (recipe == null || recipe.getTotalTick() <= 0) {
+                continue;
+            }
+            float value = recipeProgress(recipe);
+            total += value;
+            max = Math.max(max, value);
+            count++;
+        }
+        for (FactoryRecipeThread thread : factory.getFactoryRecipeThreadList()) {
+            ActiveMachineRecipe recipe = thread.getActiveRecipe();
+            if (recipe == null || recipe.getTotalTick() <= 0) {
+                continue;
+            }
+            float value = recipeProgress(recipe);
+            total += value;
+            max = Math.max(max, value);
+            count++;
+        }
+        if (count <= 0) {
+            return 0.0F;
+        }
+        return maxOnly ? max : total / count;
+    }
+
+    @Nullable
+    private ActiveMachineRecipe getFirstFactoryRecipe() {
+        for (FactoryRecipeThread thread : factory.getCoreRecipeThreads().values()) {
+            ActiveMachineRecipe recipe = thread.getActiveRecipe();
+            if (recipe != null && recipe.getTotalTick() > 0) {
+                return recipe;
+            }
+        }
+        for (FactoryRecipeThread thread : factory.getFactoryRecipeThreadList()) {
+            ActiveMachineRecipe recipe = thread.getActiveRecipe();
+            if (recipe != null && recipe.getTotalTick() > 0) {
+                return recipe;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private ActiveMachineRecipe getFactoryThreadRecipe(int index) {
+        List<FactoryRecipeThread> threads = factory.getFactoryRecipeThreadList();
+        if (index < 0 || index >= threads.size()) {
+            return null;
+        }
+        return threads.get(index).getActiveRecipe();
+    }
+
+    @Nullable
+    private ActiveMachineRecipe getFactoryCoreRecipe(@Nullable String id) {
+        if (id != null && !id.trim().isEmpty()) {
+            FactoryRecipeThread named = factory.getCoreRecipeThreads().get(id.trim());
+            if (named != null) {
+                return named.getActiveRecipe();
+            }
+        }
+        for (FactoryRecipeThread thread : factory.getCoreRecipeThreads().values()) {
+            return thread.getActiveRecipe();
+        }
+        return null;
+    }
+
+    private static float recipeProgress(@Nullable ActiveMachineRecipe recipe) {
+        if (recipe == null || recipe.getTotalTick() <= 0) {
+            return 0.0F;
+        }
+        return (float) recipe.getTick() / (float) recipe.getTotalTick();
+    }
+
+    private float normalizeProgressBarValue(MachineGuiStyleManager.ProgressBarStyle bar, float raw) {
+        float value = Float.isFinite(raw) ? raw : 0.0F;
+        float min = bar.min == null ? 0.0F : bar.min.floatValue();
+        float max = bar.max == null ? 1.0F : bar.max.floatValue();
+        if (Math.abs(max - min) > 1.0E-6F) {
+            value = (value - min) / (max - min);
+        }
+        return MathHelper.clamp(value, 0.0F, 1.0F);
+    }
+
+    private void drawProgressBar(MachineGuiStyleManager.ProgressBarStyle bar, float progress) {
+        int bg = bar.backgroundColor == null ? 0x66000000 : bar.backgroundColor.intValue();
+        int fill = bar.fillColor == null ? 0xFF55CC66 : bar.fillColor.intValue();
+        drawRect(bar.x, bar.y, bar.x + bar.width, bar.y + bar.height, bg);
+        if (bar.borderColor != null) {
+            drawProgressBorder(bar.x, bar.y, bar.width, bar.height, bar.borderColor.intValue());
+        }
+        int fillWidth = MathHelper.floor(bar.width * progress);
+        int fillHeight = MathHelper.floor(bar.height * progress);
+        String direction = bar.direction == null ? "left_to_right" : bar.direction;
+        if ("right_to_left".equals(direction)) {
+            drawRect(bar.x + bar.width - fillWidth, bar.y, bar.x + bar.width, bar.y + bar.height, fill);
+        } else if ("top_to_bottom".equals(direction)) {
+            drawRect(bar.x, bar.y, bar.x + bar.width, bar.y + fillHeight, fill);
+        } else if ("bottom_to_top".equals(direction)) {
+            drawRect(bar.x, bar.y + bar.height - fillHeight, bar.x + bar.width, bar.y + bar.height, fill);
+        } else {
+            drawRect(bar.x, bar.y, bar.x + fillWidth, bar.y + bar.height, fill);
+        }
+        if (Boolean.TRUE.equals(bar.showText)) {
+            String text = Math.round(progress * 100.0F) + "%";
+            int color = bar.textColor == null ? 0xFFFFFFFF : bar.textColor.intValue();
+            int textX = bar.x + Math.max(0, (bar.width - this.fontRenderer.getStringWidth(text)) / 2);
+            int textY = bar.y + Math.max(0, (bar.height - this.fontRenderer.FONT_HEIGHT) / 2);
+            this.fontRenderer.drawStringWithShadow(text, textX, textY, color);
+        }
+    }
+
+    private void drawProgressBorder(int x, int y, int width, int height, int color) {
+        drawRect(x, y, x + width, y + 1, color);
+        drawRect(x, y + height - 1, x + width, y + height, color);
+        drawRect(x, y, x + 1, y + height, color);
+        drawRect(x + width - 1, y, x + width, y + height, color);
     }
 
     private String resolveConfiguredTextValue(@Nullable String raw) {
@@ -3481,6 +3690,187 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         return editor.keys.get(editor.index);
     }
 
+    private void initCustomSliders() {
+        this.customSliders = new ArrayList<CustomSlider>();
+        if (styleOverride.sliders == null) {
+            return;
+        }
+        for (MachineGuiStyleManager.SliderStyle style : styleOverride.sliders) {
+            if (style == null || style.key == null || style.key.trim().isEmpty()) {
+                continue;
+            }
+            CustomSlider slider = new CustomSlider();
+            slider.id = style.id == null || style.id.trim().isEmpty() ? "slider_" + this.customSliders.size() : style.id.trim();
+            slider.key = style.key.trim();
+            slider.x = MathHelper.clamp(style.x, 0, Math.max(0, this.renderWidth - style.width));
+            slider.y = MathHelper.clamp(style.y, 0, Math.max(0, this.renderHeight - style.height));
+            slider.width = Math.max(1, style.width);
+            slider.height = Math.max(1, style.height);
+            slider.min = style.min == null || !Float.isFinite(style.min.floatValue()) ? 0.0F : style.min.floatValue();
+            slider.max = style.max == null || !Float.isFinite(style.max.floatValue()) ? 1.0F : style.max.floatValue();
+            if (slider.min > slider.max) {
+                float swap = slider.min;
+                slider.min = slider.max;
+                slider.max = swap;
+            }
+            slider.step = style.step == null || !Float.isFinite(style.step.floatValue()) || style.step.floatValue() <= 0.0F
+                ? 0.0F : style.step.floatValue();
+            slider.value = resolveSliderValue(style, slider);
+            slider.vertical = "vertical".equals(style.direction);
+            slider.trackColor = style.trackColor == null ? 0x66000000 : style.trackColor.intValue();
+            slider.fillColor = style.fillColor == null ? 0xFF55CC66 : style.fillColor.intValue();
+            slider.thumbColor = style.thumbColor == null ? 0xFFFFFFFF : style.thumbColor.intValue();
+            slider.borderColor = style.borderColor;
+            slider.thumbWidth = style.thumbWidth == null ? (slider.vertical ? slider.width : DEFAULT_SLIDER_THUMB_SIZE) : Math.max(1, style.thumbWidth.intValue());
+            slider.thumbHeight = style.thumbHeight == null ? (slider.vertical ? DEFAULT_SLIDER_THUMB_SIZE : slider.height) : Math.max(1, style.thumbHeight.intValue());
+            slider.priority = style.priority == null ? DEFAULT_SMART_EDITOR_PRIORITY : style.priority.intValue();
+            slider.foreground = style.foreground == null || style.foreground.booleanValue();
+            slider.visible = style.visible == null || style.visible.booleanValue();
+            slider.page = normalizePageIdOrNull(style.page);
+            slider.showText = style.showText != null && style.showText.booleanValue();
+            slider.textColor = style.textColor == null ? 0xFFFFFFFF : style.textColor.intValue();
+            this.customSliders.add(slider);
+        }
+    }
+
+    private float resolveSliderValue(MachineGuiStyleManager.SliderStyle style, CustomSlider slider) {
+        Float customValue = ControllerCustomDataAccess.readNumber(this.factory, slider.key);
+        if (customValue != null && Float.isFinite(customValue.floatValue())) {
+            return clampSliderValue(slider, customValue.floatValue());
+        }
+        SmartInterfaceData current = factory.getSmartInterfaceData(slider.key);
+        if (current != null) {
+            return clampSliderValue(slider, current.getValue());
+        }
+        if (style.initialValue != null && Float.isFinite(style.initialValue.floatValue())) {
+            return clampSliderValue(slider, style.initialValue.floatValue());
+        }
+        return clampSliderValue(slider, slider.min);
+    }
+
+    private void drawBackgroundSliders() {
+        drawSliders(null, false);
+    }
+
+    private void drawCustomSliders(@Nullable Integer priorityFilter) {
+        drawSliders(priorityFilter, true);
+    }
+
+    private void drawSliders(@Nullable Integer priorityFilter, boolean foreground) {
+        for (CustomSlider slider : this.customSliders) {
+            if (!slider.visible || slider.foreground != foreground || !isPageVisible(slider.page)) {
+                continue;
+            }
+            if (priorityFilter != null && slider.priority != priorityFilter.intValue()) {
+                continue;
+            }
+            drawSlider(slider);
+        }
+    }
+
+    private void drawSlider(CustomSlider slider) {
+        int x = slider.x;
+        int y = slider.y;
+        drawRect(x, y, x + slider.width, y + slider.height, slider.trackColor);
+        if (slider.borderColor != null) {
+            drawProgressBorder(x, y, slider.width, slider.height, slider.borderColor.intValue());
+        }
+        float ratio = sliderRatio(slider);
+        if (slider.vertical) {
+            int fillHeight = MathHelper.floor(slider.height * ratio);
+            drawRect(x, y + slider.height - fillHeight, x + slider.width, y + slider.height, slider.fillColor);
+        } else {
+            int fillWidth = MathHelper.floor(slider.width * ratio);
+            drawRect(x, y, x + fillWidth, y + slider.height, slider.fillColor);
+        }
+        Rectangle thumb = sliderThumbRect(slider);
+        drawRect(thumb.x, thumb.y, thumb.x + thumb.width, thumb.y + thumb.height, slider.thumbColor);
+        if (slider.showText) {
+            String text = formatSliderValue(slider.value);
+            int textX = x + Math.max(0, (slider.width - this.fontRenderer.getStringWidth(text)) / 2);
+            int textY = y + Math.max(0, (slider.height - this.fontRenderer.FONT_HEIGHT) / 2);
+            this.fontRenderer.drawStringWithShadow(text, textX, textY, slider.textColor);
+        }
+    }
+
+    private boolean handleCustomSliderMouseClicked(int mouseX, int mouseY, int mouseButton) {
+        if (mouseButton != 0) {
+            return false;
+        }
+        List<CustomSlider> ordered = new ArrayList<CustomSlider>(this.customSliders);
+        ordered.sort((a, b) -> Integer.compare(b.priority, a.priority));
+        for (CustomSlider slider : ordered) {
+            if (!slider.visible || !isPageVisible(slider.page)) {
+                continue;
+            }
+            if (isPointInSlider(slider, mouseX, mouseY)) {
+                this.draggingSlider = slider;
+                updateSliderFromMouse(slider, mouseX, mouseY, true);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void updateSliderFromMouse(CustomSlider slider, int mouseX, int mouseY, boolean forceSend) {
+        float ratio;
+        if (slider.vertical) {
+            ratio = 1.0F - ((float) (mouseY - this.guiTop - slider.y) / (float) Math.max(1, slider.height));
+        } else {
+            ratio = (float) (mouseX - this.guiLeft - slider.x) / (float) Math.max(1, slider.width);
+        }
+        ratio = MathHelper.clamp(ratio, 0.0F, 1.0F);
+        float value = slider.min + (slider.max - slider.min) * ratio;
+        if (slider.step > 0.0F) {
+            value = slider.min + Math.round((value - slider.min) / slider.step) * slider.step;
+        }
+        value = clampSliderValue(slider, value);
+        if (!forceSend && Math.abs(value - slider.value) < 1.0E-6F) {
+            return;
+        }
+        slider.value = value;
+        this.smartInterfaceVirtualInputCache.put(slider.key, Float.toString(value));
+        MMCEGuiExt.NET_CHANNEL.sendToServer(new PktControllerSmartInterfaceUpdate(this.factory.getPos(), slider.key, value));
+    }
+
+    private boolean isPointInSlider(CustomSlider slider, int mouseX, int mouseY) {
+        int x = this.guiLeft + slider.x;
+        int y = this.guiTop + slider.y;
+        return mouseX >= x && mouseY >= y && mouseX < x + slider.width && mouseY < y + slider.height;
+    }
+
+    private Rectangle sliderThumbRect(CustomSlider slider) {
+        float ratio = sliderRatio(slider);
+        if (slider.vertical) {
+            int thumbX = slider.x + Math.max(0, (slider.width - slider.thumbWidth) / 2);
+            int travel = Math.max(0, slider.height - slider.thumbHeight);
+            int thumbY = slider.y + travel - MathHelper.floor(travel * ratio);
+            return new Rectangle(thumbX, thumbY, slider.thumbWidth, slider.thumbHeight);
+        }
+        int thumbY = slider.y + Math.max(0, (slider.height - slider.thumbHeight) / 2);
+        int travel = Math.max(0, slider.width - slider.thumbWidth);
+        int thumbX = slider.x + MathHelper.floor(travel * ratio);
+        return new Rectangle(thumbX, thumbY, slider.thumbWidth, slider.thumbHeight);
+    }
+
+    private float sliderRatio(CustomSlider slider) {
+        if (Math.abs(slider.max - slider.min) <= 1.0E-6F) {
+            return 0.0F;
+        }
+        return MathHelper.clamp((slider.value - slider.min) / (slider.max - slider.min), 0.0F, 1.0F);
+    }
+
+    private static float clampSliderValue(CustomSlider slider, float value) {
+        return MathHelper.clamp(Float.isFinite(value) ? value : slider.min, slider.min, slider.max);
+    }
+
+    private static String formatSliderValue(float value) {
+        if (Math.abs(value - Math.round(value)) < 1.0E-4F) {
+            return Integer.toString(Math.round(value));
+        }
+        return String.format(Locale.ROOT, "%.2f", value);
+    }
+
     private void initCustomButtons(MMCEGuiExtConfig.FactoryController cfg) {
         this.customButtons.clear();
         if (styleOverride.buttons != null) {
@@ -3640,6 +4030,18 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 if (text != null && text.priority != null) {
                     priorities.add(text.priority);
                 }
+            }
+        }
+        if (styleOverride.progressBars != null) {
+            for (MachineGuiStyleManager.ProgressBarStyle bar : styleOverride.progressBars) {
+                if (bar != null && (bar.foreground == null || bar.foreground.booleanValue())) {
+                    priorities.add(Integer.valueOf(bar.priority == null ? resolveForegroundContentPriority() : bar.priority.intValue()));
+                }
+            }
+        }
+        for (CustomSlider slider : this.customSliders) {
+            if (slider.foreground) {
+                priorities.add(Integer.valueOf(slider.priority));
             }
         }
         return priorities;
@@ -4181,6 +4583,34 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         private GuiButton button;
     }
 
+    private static class CustomSlider {
+        private String id;
+        private String key;
+        private int x;
+        private int y;
+        private int width;
+        private int height;
+        private float min;
+        private float max;
+        private float step;
+        private float value;
+        private boolean vertical;
+        private int trackColor;
+        private int fillColor;
+        private int thumbColor;
+        @Nullable
+        private Integer borderColor;
+        private int thumbWidth;
+        private int thumbHeight;
+        private int priority = DEFAULT_SMART_EDITOR_PRIORITY;
+        private boolean foreground = true;
+        private boolean visible = true;
+        @Nullable
+        private String page;
+        private boolean showText;
+        private int textColor = 0xFFFFFFFF;
+    }
+
     private static class ParsedDataPortValue {
         private final boolean numeric;
         private final float number;
@@ -4262,6 +4692,9 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         private boolean hideDefaultSmartInterfaceEditor;
         private List<CustomSmartEditor> customSmartEditors = Collections.emptyList();
         private List<CustomButton> customButtons = Collections.emptyList();
+        private List<CustomSlider> customSliders = Collections.emptyList();
+        @Nullable
+        private CustomSlider draggingSlider = null;
         private List<TextureLayerDef> backgroundTextureLayers = Collections.emptyList();
         private List<TextureLayerDef> foregroundTextureLayers = Collections.emptyList();
         private Map<String, LayerRuntimeState> layerRuntimeStates = Collections.emptyMap();

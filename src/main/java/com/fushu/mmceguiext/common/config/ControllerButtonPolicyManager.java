@@ -408,6 +408,34 @@ public final class ControllerButtonPolicyManager {
         if (out.size() >= MAX_SMART_EDITOR_KEYS_PER_CONTROLLER) {
             return;
         }
+        JsonElement slidersElement = getElement(controllerNode, "sliders", "guiSliders", "gui_sliders", "rangeControls", "range_controls");
+        if (slidersElement != null && slidersElement.isJsonArray()) {
+            JsonArray sliders = slidersElement.getAsJsonArray();
+            int limit = Math.min(sliders.size(), MAX_SMART_EDITOR_KEYS_PER_CONTROLLER - out.size());
+            for (int i = 0; i < limit; i++) {
+                JsonElement child = sliders.get(i);
+                if (child == null || !child.isJsonObject()) {
+                    continue;
+                }
+                addVirtualKeys(out, getString(
+                    child.getAsJsonObject(),
+                    "key",
+                    "virtualKey",
+                    "virtual_key",
+                    "interfaceType",
+                    "interface_type",
+                    "dataPortKey",
+                    "data_port_key",
+                    "portKey",
+                    "port_key",
+                    "dataPort",
+                    "data_port"
+                ));
+            }
+        }
+        if (out.size() >= MAX_SMART_EDITOR_KEYS_PER_CONTROLLER) {
+            return;
+        }
         JsonElement subGuisElement = getElement(controllerNode, "subGuis", "sub_guis", "subGui", "sub_gui");
         if (subGuisElement == null || !subGuisElement.isJsonArray()) {
             return;

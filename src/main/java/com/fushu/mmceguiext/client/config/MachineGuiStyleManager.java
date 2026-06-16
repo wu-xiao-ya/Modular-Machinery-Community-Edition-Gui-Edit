@@ -353,6 +353,10 @@ public final class MachineGuiStyleManager {
         @Nullable
         public List<TextureLayerStyle> textureLayers;
         @Nullable
+        public List<ProgressBarStyle> progressBars;
+        @Nullable
+        public List<SliderStyle> sliders;
+        @Nullable
         public List<SubGuiStyle> subGuis;
 
         public boolean isEmpty() {
@@ -400,6 +404,8 @@ public final class MachineGuiStyleManager {
                    && (smartInterfaceEditors == null || smartInterfaceEditors.isEmpty())
                    && (buttons == null || buttons.isEmpty())
                    && (textureLayers == null || textureLayers.isEmpty())
+                   && (progressBars == null || progressBars.isEmpty())
+                   && (sliders == null || sliders.isEmpty())
                    && (subGuis == null || subGuis.isEmpty());
         }
 
@@ -452,6 +458,8 @@ public final class MachineGuiStyleManager {
             copy.smartInterfaceEditors = source.smartInterfaceEditors == null ? null : new ArrayList<SmartInterfaceEditorStyle>(source.smartInterfaceEditors);
             copy.buttons = source.buttons == null ? null : new ArrayList<ButtonStyle>(source.buttons);
             copy.textureLayers = source.textureLayers == null ? null : new ArrayList<TextureLayerStyle>(source.textureLayers);
+            copy.progressBars = source.progressBars == null ? null : new ArrayList<ProgressBarStyle>(source.progressBars);
+            copy.sliders = source.sliders == null ? null : new ArrayList<SliderStyle>(source.sliders);
             copy.subGuis = source.subGuis == null ? null : copySubGuiList(source.subGuis);
             return copy;
         }
@@ -504,6 +512,8 @@ public final class MachineGuiStyleManager {
             this.smartInterfaceEditors = appendList(this.smartInterfaceEditors, overlay.smartInterfaceEditors);
             this.buttons = appendList(this.buttons, overlay.buttons);
             this.textureLayers = appendList(this.textureLayers, overlay.textureLayers);
+            this.progressBars = appendList(this.progressBars, overlay.progressBars);
+            this.sliders = appendList(this.sliders, overlay.sliders);
             this.subGuis = appendSubGuiList(this.subGuis, overlay.subGuis);
             return this;
         }
@@ -738,4 +748,99 @@ public final class MachineGuiStyleManager {
         @Nullable
         public String page;
     }
+
+    public static class ProgressBarStyle {
+        @Nullable
+        public String id;
+        public int x;
+        public int y;
+        public int width;
+        public int height;
+        @Nullable
+        public Integer backgroundColor;
+        @Nullable
+        public Integer fillColor;
+        @Nullable
+        public Integer borderColor;
+        @Nullable
+        public String texture;
+        @Nullable
+        public String backgroundTexture;
+        @Nullable
+        public String fillTexture;
+        @Nullable
+        public Integer textureWidth;
+        @Nullable
+        public Integer textureHeight;
+        @Nullable
+        public String direction;
+        @Nullable
+        public String source;
+        @Nullable
+        public Integer threadIndex;
+        @Nullable
+        public String coreThreadId;
+        @Nullable
+        public Float min;
+        @Nullable
+        public Float max;
+        @Nullable
+        public Integer priority;
+        @Nullable
+        public Boolean foreground;
+        @Nullable
+        public Boolean visible;
+        @Nullable
+        public String page;
+        @Nullable
+        public Boolean showText;
+        @Nullable
+        public Integer textColor;
+    }
+
+    public static class SliderStyle {
+        @Nullable
+        public String id;
+        public int x;
+        public int y;
+        public int width;
+        public int height;
+        @Nullable
+        public String key;
+        @Nullable
+        public Float min;
+        @Nullable
+        public Float max;
+        @Nullable
+        public Float step;
+        @Nullable
+        public Float initialValue;
+        @Nullable
+        public String direction;
+        @Nullable
+        public Integer trackColor;
+        @Nullable
+        public Integer fillColor;
+        @Nullable
+        public Integer thumbColor;
+        @Nullable
+        public Integer borderColor;
+        @Nullable
+        public Integer thumbWidth;
+        @Nullable
+        public Integer thumbHeight;
+        @Nullable
+        public Integer priority;
+        @Nullable
+        public Boolean foreground;
+        @Nullable
+        public Boolean visible;
+        @Nullable
+        public String page;
+        @Nullable
+        public Boolean showText;
+        @Nullable
+        public Integer textColor;
+    }
+
 }
