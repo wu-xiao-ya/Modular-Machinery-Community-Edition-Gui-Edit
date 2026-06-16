@@ -762,6 +762,11 @@ final class MachineGuiStyleParser {
             button.buttonId = buttonId;
             button.key = key;
             button.value = value;
+            // Modifier-key variant values (data-port smart actions only). Absent -> falls back to value.
+            button.shiftValue = getOptionalFloat(obj, "shiftValue", "shift_value", "shiftDelta", "shift_delta");
+            button.ctrlValue = getOptionalFloat(obj, "ctrlValue", "ctrl_value", "controlValue", "control_value");
+            button.ctrlShiftValue = getOptionalFloat(obj, "ctrlShiftValue", "ctrl_shift_value",
+                "shiftCtrlValue", "shift_ctrl_value", "ctrlShiftDelta", "ctrl_shift_delta");
             button.stringValue = stringValue;
             button.min = getFloat(obj, result, itemScope, "min", "minimum");
             button.max = getFloat(obj, result, itemScope, "max", "maximum");
@@ -842,6 +847,12 @@ final class MachineGuiStyleParser {
         MachineGuiStyleManager.SubGuiStyle subGui = new MachineGuiStyleManager.SubGuiStyle();
         subGui.id = id;
         subGui.mode = normalizeSubGuiMode(getTrimmedString(obj, result, scope, "mode", "openMode", "open_mode", "displayMode", "display_mode"));
+        subGui.draggable = getBoolean(obj, result, scope, "draggable", "subGuiDraggable", "sub_gui_draggable");
+        subGui.dragHandle = getBoolean(obj, result, scope, "dragHandle", "drag_handle", "useDragHandle", "use_drag_handle");
+        subGui.dragX = getInt(obj, result, scope, "dragX", "drag_x", "dragHandleX", "drag_handle_x");
+        subGui.dragY = getInt(obj, result, scope, "dragY", "drag_y", "dragHandleY", "drag_handle_y");
+        subGui.dragWidth = validateRangeInt(getInt(obj, result, scope, "dragWidth", "drag_width", "dragHandleWidth", "drag_handle_width"), 1, MAX_COMPONENT_SIZE, result, scope, "dragWidth");
+        subGui.dragHeight = validateRangeInt(getInt(obj, result, scope, "dragHeight", "drag_height", "dragHandleHeight", "drag_handle_height"), 1, MAX_COMPONENT_SIZE, result, scope, "dragHeight");
         subGui.x = getInt(obj, result, scope, "x");
         subGui.y = getInt(obj, result, scope, "y");
         subGui.width = validateRangeInt(getInt(obj, result, scope, "width", "w", "guiWidth", "gui_width"), 1, MAX_COMPONENT_SIZE, result, scope, "width");
@@ -991,6 +1002,7 @@ final class MachineGuiStyleParser {
         layer.corner = validateRangeInt(getInt(obj, result, scope, "corner", "cornerSize", "corner_size"), 1, MAX_CORNER, result, scope, "corner");
         layer.useNineSlice = getBoolean(obj, result, scope, "useNineSlice", "use_nine_slice", "nineSlice");
         layer.priority = getInt(obj, result, scope, "priority", "zIndex", "z_index", "z", "layer");
+        layer.alpha = normalizeAlpha(getFloat(obj, result, scope, "alpha", "opacity", "transparency"));
         layer.foreground = forceForeground
             ? Boolean.TRUE
             : getBoolean(obj, result, scope, "foreground", "front", "drawForeground");
@@ -1179,6 +1191,24 @@ final class MachineGuiStyleParser {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    @Nullable
+    private static Float normalizeAlpha(@Nullable Float value) {
+        if (value == null) {
+            return null;
+        }
+        float alpha = value.floatValue();
+        if (alpha > 1.0F && alpha <= 255.0F) {
+            alpha /= 255.0F;
+        }
+        if (alpha < 0.0F) {
+            alpha = 0.0F;
+        }
+        if (alpha > 1.0F) {
+            alpha = 1.0F;
+        }
+        return Float.valueOf(alpha);
     }
 
     @Nullable

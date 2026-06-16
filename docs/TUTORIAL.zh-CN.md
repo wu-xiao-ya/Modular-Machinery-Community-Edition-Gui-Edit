@@ -209,6 +209,7 @@ MMCEGE 目前包含四大功能，本教程按部分组织：
 - `[mmcege:layer.<id>.scaleX=1.25]`
 - `[mmcege:layer.<id>.scaleY=0.90]`
 - `[mmcege:layer.<id>.rotation=45]`
+- `[mmcege:layer.<id>.alpha=0.5]`
 - `[mmcege:layer.<id>.priority=30]`
 - `[mmcege:layer.<id>.visible=true]`
 - `[mmcege:layer.<id>.reset]`

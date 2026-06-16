@@ -43,7 +43,7 @@ public class MachineGuiStyleParserTest {
                 "      \"foregroundLayers\": [\n" +
                 "        123,\n" +
                 "        {\"id\": \"missing_texture\"},\n" +
-                "        {\"texture\": \"demo:textures/gui/layer.png\", \"width\": 0}\n" +
+                "        {\"texture\": \"demo:textures/gui/layer.png\", \"width\": 0, \"opacity\": 128}\n" +
                 "      ]\n" +
                 "    }\n" +
                 "  }\n" +
@@ -62,6 +62,7 @@ public class MachineGuiStyleParserTest {
         assertEquals(1, result.machineStyle.textureLayers.size());
         assertEquals("demo:textures/gui/layer.png", result.machineStyle.textureLayers.get(0).texture);
         assertNull(result.machineStyle.textureLayers.get(0).width);
+        assertEquals(Float.valueOf(128.0F / 255.0F), result.machineStyle.textureLayers.get(0).alpha);
         assertTrue(containsWarning(result, "machineController.guiWidth must be >= 1"));
         assertTrue(containsWarning(result, "smartInterfaceEditors[0] is missing required fields"));
         assertTrue(containsWarning(result, "smartInterfaceEditors[1].y must be >= 0"));
@@ -94,7 +95,7 @@ public class MachineGuiStyleParserTest {
                 "        {\"x\": 30, \"y\": 40, \"virtualKey\": \"factory_key\", \"showTitle\": false}\n" +
                 "      ],\n" +
                 "      \"backgroundLayers\": [\n" +
-                "        {\"id\": \"bg\", \"texture\": \"demo:textures/gui/bg_layer.png\", \"texW\": 280, \"texH\": 213}\n" +
+                "        {\"id\": \"bg\", \"texture\": \"demo:textures/gui/bg_layer.png\", \"texW\": 280, \"texH\": 213, \"alpha\": 0.5}\n" +
                 "      ]\n" +
                 "    }\n" +
                 "  }\n" +
@@ -122,6 +123,7 @@ public class MachineGuiStyleParserTest {
         assertNotNull(result.factoryStyle.textureLayers);
         assertEquals(1, result.factoryStyle.textureLayers.size());
         assertNull(result.factoryStyle.textureLayers.get(0).foreground);
+        assertEquals(Float.valueOf(0.5F), result.factoryStyle.textureLayers.get(0).alpha);
         assertTrue(result.warnings.isEmpty());
     }
 
@@ -559,6 +561,12 @@ public class MachineGuiStyleParserTest {
                 "          \"mode\": \"replace\",\n" +
                 "          \"x\": 12,\n" +
                 "          \"y\": 16,\n" +
+                "          \"draggable\": true,\n" +
+                "          \"dragHandle\": true,\n" +
+                "          \"dragX\": 2,\n" +
+                "          \"dragY\": 3,\n" +
+                "          \"dragWidth\": 116,\n" +
+                "          \"dragHeight\": 12,\n" +
                 "          \"width\": 120,\n" +
                 "          \"height\": 80,\n" +
                 "          \"backgroundTexture\": \"demo:textures/gui/sub.png\",\n" +
@@ -589,6 +597,12 @@ public class MachineGuiStyleParserTest {
         assertEquals("replace", subGui.mode);
         assertEquals(Integer.valueOf(12), subGui.x);
         assertEquals(Integer.valueOf(16), subGui.y);
+        assertEquals(Boolean.TRUE, subGui.draggable);
+        assertEquals(Boolean.TRUE, subGui.dragHandle);
+        assertEquals(Integer.valueOf(2), subGui.dragX);
+        assertEquals(Integer.valueOf(3), subGui.dragY);
+        assertEquals(Integer.valueOf(116), subGui.dragWidth);
+        assertEquals(Integer.valueOf(12), subGui.dragHeight);
         assertEquals(Integer.valueOf(120), subGui.width);
         assertEquals(Integer.valueOf(80), subGui.height);
         assertNotNull(subGui.style);

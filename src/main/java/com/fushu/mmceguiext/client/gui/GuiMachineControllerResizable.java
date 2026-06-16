@@ -131,6 +131,17 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     private final List<RuntimeGuiState> replaceSubGuiStack = new ArrayList<RuntimeGuiState>();
     private final List<RuntimeGuiState> modalSubGuiStack = new ArrayList<RuntimeGuiState>();
     private boolean subGuiContextSwitching = false;
+    @Nullable
+    private Boolean modalSubGuiDraggable = null;
+    @Nullable
+    private Boolean modalSubGuiDragHandle = null;
+    private boolean modalSubGuiDragging = false;
+    private int modalSubGuiDragOffsetX = 0;
+    private int modalSubGuiDragOffsetY = 0;
+    private int modalSubGuiDragX = 0;
+    private int modalSubGuiDragY = 0;
+    private int modalSubGuiDragWidth = 0;
+    private int modalSubGuiDragHeight = 0;
 
     public GuiMachineControllerResizable(ContainerController container) {
         super(container);
@@ -148,6 +159,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         super.initGui();
         initializeCurrentContext(null, false, null, this.activePageId);
         this.currentRuntimeState = captureRuntimeState(null, false);
+        this.modalSubGuiDragging = false;
+        this.modalSubGuiDragOffsetX = 0;
+        this.modalSubGuiDragOffsetY = 0;
     }
 
     @Override
@@ -935,6 +949,25 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     private float resolveLayerRotation(TextureLayerDef layer) {
         LayerRuntimeState runtime = this.layerRuntimeStates.get(layer.id);
         return runtime != null && runtime.rotation != null ? runtime.rotation.floatValue() : 0.0F;
+    }
+
+    private float resolveLayerAlpha(TextureLayerDef layer) {
+        LayerRuntimeState runtime = this.layerRuntimeStates.get(layer.id);
+        return runtime != null && runtime.alpha != null ? normalizeLayerAlpha(runtime.alpha.floatValue()) : layer.alpha;
+    }
+
+    private static float normalizeLayerAlpha(float value) {
+        float alpha = value;
+        if (alpha > 1.0F && alpha <= 255.0F) {
+            alpha /= 255.0F;
+        }
+        if (alpha < 0.0F) {
+            alpha = 0.0F;
+        }
+        if (alpha > 1.0F) {
+            alpha = 1.0F;
+        }
+        return alpha;
     }
 
     private int resolveLayerPriority(TextureLayerDef layer) {
@@ -1788,11 +1821,16 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
 
         if (subGui != null) {
             if (subGui.width != null) {
-                this.renderWidth = Math.max(BASE_WIDTH, subGui.width.intValue());
+                this.renderWidth = Math.max(modal ? 24 : BASE_WIDTH, subGui.width.intValue());
             }
             if (subGui.height != null) {
-                this.renderHeight = Math.max(BASE_HEIGHT, subGui.height.intValue());
+                this.renderHeight = Math.max(modal ? 24 : BASE_HEIGHT, subGui.height.intValue());
             }
+        }
+
+        if (modal) {
+            this.xSize = Math.max(1, this.renderWidth);
+            this.ySize = Math.max(1, this.renderHeight);
         }
 
         if (modal) {
@@ -1841,15 +1879,22 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         }
         final RuntimeGuiState modalState = getTopModalSubGui();
         drawGradientRect(0, 0, this.width, this.height, 0x60000000, 0x60000000);
-        withRuntimeState(modalState, new Runnable() {
-            @Override
-            public void run() {
-                int localMouseX = mouseX - guiLeft;
-                int localMouseY = mouseY - guiTop;
-                drawGuiContainerBackgroundLayer(partialTicks, localMouseX, localMouseY);
-                drawGuiContainerForegroundLayer(localMouseX, localMouseY);
-            }
-        });
+        GlStateManager.disableDepth();
+        GlStateManager.depthMask(false);
+        try {
+            withRuntimeState(modalState, new Runnable() {
+                @Override
+                public void run() {
+                    int localMouseX = mouseX - guiLeft;
+                    int localMouseY = mouseY - guiTop;
+                    drawGuiContainerBackgroundLayer(partialTicks, localMouseX, localMouseY);
+                    drawGuiContainerForegroundLayer(localMouseX, localMouseY);
+                }
+            });
+        } finally {
+            GlStateManager.depthMask(true);
+            GlStateManager.enableDepth();
+        }
     }
 
     private boolean handleTopModalMouseWheel() {
@@ -1904,6 +1949,10 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                         }
                     }
                 }
+                if (mouseButton == 0 && isModalSubGuiDragEnabled() && isMouseInModalSubGuiDragHandle(mouseX, mouseY)) {
+                    startModalSubGuiDrag(mouseX, mouseY);
+                    return;
+                }
             }
         });
         return handled[0];
@@ -1933,6 +1982,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         withRuntimeState(getTopModalSubGui(), new Runnable() {
             @Override
             public void run() {
+                modalSubGuiDragging = false;
                 draggingPanelId = null;
             }
         });
@@ -1942,6 +1992,10 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         withRuntimeState(getTopModalSubGui(), new Runnable() {
             @Override
             public void run() {
+                if (clickedMouseButton == 0 && modalSubGuiDragging) {
+                    updateModalSubGuiPosition(mouseX - modalSubGuiDragOffsetX, mouseY - modalSubGuiDragOffsetY);
+                    return;
+                }
                 if (isUsingDefaultBackground(MMCEGuiExtConfig.machineController)) {
                     return;
                 }
@@ -1954,6 +2008,84 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 }
             }
         });
+    }
+
+    private void updateModalSubGuiPosition(int left, int top) {
+        int deltaX = left - this.guiLeft;
+        int deltaY = top - this.guiTop;
+        if (deltaX == 0 && deltaY == 0) {
+            return;
+        }
+        this.guiLeft = left;
+        this.guiTop = top;
+        moveCurrentGuiElementsBy(deltaX, deltaY);
+        if (this.currentRuntimeState != null && this.currentRuntimeState.modal) {
+            this.currentRuntimeState.guiLeft = left;
+            this.currentRuntimeState.guiTop = top;
+        }
+        this.modalSubGuiDragging = true;
+    }
+
+    private void moveCurrentGuiElementsBy(int deltaX, int deltaY) {
+        moveTextField(this.smartInterfaceEditorInput, deltaX, deltaY);
+        moveButton(this.smartInterfacePrevButton, deltaX, deltaY);
+        moveButton(this.smartInterfaceNextButton, deltaX, deltaY);
+        moveButton(this.smartInterfaceApplyButton, deltaX, deltaY);
+        for (CustomButton button : this.customButtons) {
+            if (button != null) {
+                moveButton(button.button, deltaX, deltaY);
+            }
+        }
+        for (CustomSmartEditor editor : this.customSmartEditors) {
+            if (editor != null) {
+                moveTextField(editor.input, deltaX, deltaY);
+                moveButton(editor.prev, deltaX, deltaY);
+                moveButton(editor.next, deltaX, deltaY);
+                moveButton(editor.apply, deltaX, deltaY);
+            }
+        }
+    }
+
+    private static void moveTextField(@Nullable GuiTextField textField, int deltaX, int deltaY) {
+        if (textField == null) {
+            return;
+        }
+        textField.x += deltaX;
+        textField.y += deltaY;
+    }
+
+    private static void moveButton(@Nullable GuiButton button, int deltaX, int deltaY) {
+        if (button == null) {
+            return;
+        }
+        button.x += deltaX;
+        button.y += deltaY;
+    }
+
+    private boolean isModalSubGuiDragEnabled() {
+        RuntimeGuiState state = getTopModalSubGui();
+        return Boolean.TRUE.equals(state.modalSubGuiDraggable);
+    }
+
+    private boolean isMouseInModalSubGuiDragHandle(int mouseX, int mouseY) {
+        RuntimeGuiState state = getTopModalSubGui();
+        if (!state.getBounds().contains(mouseX, mouseY)) {
+            return false;
+        }
+        if (Boolean.FALSE.equals(state.modalSubGuiDragHandle)) {
+            return true;
+        }
+        int handleLeft = this.guiLeft + state.modalSubGuiDragX;
+        int handleTop = this.guiTop + state.modalSubGuiDragY;
+        int handleWidth = state.modalSubGuiDragWidth > 0 ? state.modalSubGuiDragWidth : Math.max(1, this.renderWidth);
+        int handleHeight = state.modalSubGuiDragHeight > 0 ? state.modalSubGuiDragHeight : Math.min(16, Math.max(1, this.renderHeight));
+        return mouseX >= handleLeft && mouseX < handleLeft + handleWidth && mouseY >= handleTop && mouseY < handleTop + handleHeight;
+    }
+
+    private void startModalSubGuiDrag(int mouseX, int mouseY) {
+        this.modalSubGuiDragging = true;
+        this.modalSubGuiDragOffsetX = mouseX - this.guiLeft;
+        this.modalSubGuiDragOffsetY = mouseY - this.guiTop;
     }
 
     private void openSubGui(@Nullable String targetSubGui, @Nullable String requestedMode) {
@@ -2034,6 +2166,12 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         }
         this.styleOverride = nextStyle;
         initializeCurrentContext(subGui, modal, parentState, existingPage);
+        this.modalSubGuiDraggable = subGui.draggable;
+        this.modalSubGuiDragHandle = Boolean.valueOf(subGui.dragHandle == null || subGui.dragHandle.booleanValue());
+        this.modalSubGuiDragX = subGui.dragX == null ? 0 : subGui.dragX.intValue();
+        this.modalSubGuiDragY = subGui.dragY == null ? 0 : subGui.dragY.intValue();
+        this.modalSubGuiDragWidth = subGui.dragWidth == null ? 0 : subGui.dragWidth.intValue();
+        this.modalSubGuiDragHeight = subGui.dragHeight == null ? 0 : subGui.dragHeight.intValue();
         RuntimeGuiState built = captureRuntimeState(normalizeSubGuiId(subGui.id), modal);
         applyRuntimeState(previous);
         return built;
@@ -2073,6 +2211,15 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         state.panelMaxScroll = new HashMap<String, Integer>(this.panelMaxScroll);
         state.draggingPanelId = this.draggingPanelId;
         state.infoScrollbarDragOffset = this.infoScrollbarDragOffset;
+        state.modalSubGuiDraggable = this.modalSubGuiDraggable;
+        state.modalSubGuiDragHandle = this.modalSubGuiDragHandle;
+        state.modalSubGuiDragging = this.modalSubGuiDragging;
+        state.modalSubGuiDragOffsetX = this.modalSubGuiDragOffsetX;
+        state.modalSubGuiDragOffsetY = this.modalSubGuiDragOffsetY;
+        state.modalSubGuiDragX = this.modalSubGuiDragX;
+        state.modalSubGuiDragY = this.modalSubGuiDragY;
+        state.modalSubGuiDragWidth = this.modalSubGuiDragWidth;
+        state.modalSubGuiDragHeight = this.modalSubGuiDragHeight;
         state.smartInterfaceEditorInput = this.smartInterfaceEditorInput;
         state.smartInterfacePrevButton = this.smartInterfacePrevButton;
         state.smartInterfaceNextButton = this.smartInterfaceNextButton;
@@ -2121,6 +2268,15 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         this.renderOriginY = state.renderOriginY;
         this.draggingPanelId = state.draggingPanelId;
         this.infoScrollbarDragOffset = state.infoScrollbarDragOffset;
+        this.modalSubGuiDraggable = state.modalSubGuiDraggable;
+        this.modalSubGuiDragHandle = state.modalSubGuiDragHandle;
+        this.modalSubGuiDragging = state.modalSubGuiDragging;
+        this.modalSubGuiDragOffsetX = state.modalSubGuiDragOffsetX;
+        this.modalSubGuiDragOffsetY = state.modalSubGuiDragOffsetY;
+        this.modalSubGuiDragX = state.modalSubGuiDragX;
+        this.modalSubGuiDragY = state.modalSubGuiDragY;
+        this.modalSubGuiDragWidth = state.modalSubGuiDragWidth;
+        this.modalSubGuiDragHeight = state.modalSubGuiDragHeight;
         this.smartInterfaceEditorInput = state.smartInterfaceEditorInput;
         this.smartInterfacePrevButton = state.smartInterfacePrevButton;
         this.smartInterfaceNextButton = state.smartInterfaceNextButton;
@@ -2239,6 +2395,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             def.corner = layer.corner;
             def.useNineSlice = layer.useNineSlice;
             def.priority = layer.priority == null ? DEFAULT_RENDER_PRIORITY : layer.priority.intValue();
+            def.alpha = layer.alpha == null ? 1.0F : normalizeLayerAlpha(layer.alpha.floatValue());
             def.page = normalizePageIdOrNull(layer.page);
             boolean foreground = layer.foreground != null && layer.foreground.booleanValue();
             String defaultId = foreground ? "fg_" + fgIndex++ : "bg_" + bgIndex++;
@@ -2292,11 +2449,24 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             float scaleX = resolveLayerScaleX(layer);
             float scaleY = resolveLayerScaleY(layer);
             float rotation = resolveLayerRotation(layer);
+            float alpha = resolveLayerAlpha(layer);
             GlStateManager.pushMatrix();
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            if (alpha < 1.0F) {
+                GlStateManager.enableBlend();
+                GlStateManager.tryBlendFuncSeparate(
+                    GlStateManager.SourceFactor.SRC_ALPHA,
+                    GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+                    GlStateManager.SourceFactor.ONE,
+                    GlStateManager.DestFactor.ZERO
+                );
+            }
+            GlStateManager.color(1.0F, 1.0F, 1.0F, alpha);
             drawLayerWithTransform(drawX, drawY, width, height, useNineSlice, texW, texH, corner, scaleX, scaleY, rotation);
             GlStateManager.popMatrix();
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            if (alpha < 1.0F) {
+                GlStateManager.disableBlend();
+            }
         }
     }
 
@@ -2901,6 +3071,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 button.buttonId = style.buttonId == null || style.buttonId.trim().isEmpty() ? button.id : style.buttonId.trim();
                 button.key = style.key;
                 button.value = style.value == null ? ("smart_add".equals(style.action) ? 1.0F : 0.0F) : style.value.floatValue();
+                button.shiftValue = style.shiftValue;
+                button.ctrlValue = style.ctrlValue;
+                button.ctrlShiftValue = style.ctrlShiftValue;
                 button.stringValue = style.stringValue;
                 button.min = style.min;
                 button.max = style.max;
@@ -2987,17 +3160,35 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             ));
             return;
         }
-        if (!Float.isFinite(button.value)) {
+        float effectiveValue = resolveButtonValue(button);
+        if (!Float.isFinite(effectiveValue)) {
             return;
         }
         MMCEGuiExt.NET_CHANNEL.sendToServer(PktControllerButtonAction.smart(
             this.controller.getPos(),
             button.key,
             "smart_add".equals(button.action),
-            button.value,
+            effectiveValue,
             button.min,
             button.max
         ));
+    }
+
+    // Picks the value to apply based on held modifier keys (data-port smart actions).
+    // Missing modifier variants fall back to the base value.
+    private float resolveButtonValue(CustomButton button) {
+        boolean shift = isShiftKeyDown();
+        boolean ctrl = isCtrlKeyDown();
+        if (ctrl && shift && button.ctrlShiftValue != null) {
+            return button.ctrlShiftValue.floatValue();
+        }
+        if (shift && button.shiftValue != null) {
+            return button.shiftValue.floatValue();
+        }
+        if (ctrl && button.ctrlValue != null) {
+            return button.ctrlValue.floatValue();
+        }
+        return button.value;
     }
 
     private TreeSet<Integer> collectForegroundRenderPriorities() {
@@ -3320,6 +3511,13 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             }
             return true;
         }
+        if ("alpha".equals(action) || "opacity".equals(action) || "transparency".equals(action)) {
+            Float value = parseDirectiveFloat(right);
+            if (value != null) {
+                state.alpha = Float.valueOf(normalizeLayerAlpha(value.floatValue()));
+            }
+            return true;
+        }
         if ("priority".equals(action) || "z".equals(action) || "zindex".equals(action) || "z_index".equals(action)) {
             Integer value = parseDirectiveInt(right);
             if (value != null) {
@@ -3458,6 +3656,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         private int offsetX;
         private int offsetY;
         private int priority = DEFAULT_RENDER_PRIORITY;
+        private float alpha = 1.0F;
         @Nullable
         private String page;
         @Nullable
@@ -3489,6 +3688,8 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         private Float rotation;
         @Nullable
         private Integer priority;
+        @Nullable
+        private Float alpha;
         @Nullable
         private Boolean visible;
     }
@@ -3528,6 +3729,12 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         @Nullable
         private String key;
         private float value;
+        @Nullable
+        private Float shiftValue;
+        @Nullable
+        private Float ctrlValue;
+        @Nullable
+        private Float ctrlShiftValue;
         @Nullable
         private String stringValue;
         @Nullable
@@ -3584,6 +3791,17 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         private String draggingPanelId;
         private int infoScrollbarDragOffset;
         @Nullable
+        private Boolean modalSubGuiDraggable;
+        @Nullable
+        private Boolean modalSubGuiDragHandle;
+        private boolean modalSubGuiDragging;
+        private int modalSubGuiDragOffsetX;
+        private int modalSubGuiDragOffsetY;
+        private int modalSubGuiDragX;
+        private int modalSubGuiDragY;
+        private int modalSubGuiDragWidth;
+        private int modalSubGuiDragHeight;
+        @Nullable
         private GuiTextField smartInterfaceEditorInput;
         @Nullable
         private GuiButton smartInterfacePrevButton;
@@ -3614,6 +3832,10 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         private int guiTop;
         private int xSize;
         private int ySize;
+
+        private Rectangle getBounds() {
+            return new Rectangle(this.guiLeft, this.guiTop, Math.max(1, this.renderWidth), Math.max(1, this.renderHeight));
+        }
     }
 
     private static class PanelDef {

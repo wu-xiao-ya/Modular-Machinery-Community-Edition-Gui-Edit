@@ -618,6 +618,12 @@ public final class MachineGuiStyleManager {
         @Nullable
         public Float value;
         @Nullable
+        public Float shiftValue;
+        @Nullable
+        public Float ctrlValue;
+        @Nullable
+        public Float ctrlShiftValue;
+        @Nullable
         public String stringValue;
         @Nullable
         public Float min;
@@ -643,6 +649,18 @@ public final class MachineGuiStyleManager {
         @Nullable
         public String mode;
         @Nullable
+        public Boolean draggable;
+        @Nullable
+        public Boolean dragHandle;
+        @Nullable
+        public Integer dragX;
+        @Nullable
+        public Integer dragY;
+        @Nullable
+        public Integer dragWidth;
+        @Nullable
+        public Integer dragHeight;
+        @Nullable
         public Integer x;
         @Nullable
         public Integer y;
@@ -656,6 +674,12 @@ public final class MachineGuiStyleManager {
         public boolean isEmpty() {
             return (id == null || id.trim().isEmpty())
                    && (mode == null || mode.trim().isEmpty())
+                   && draggable == null
+                   && dragHandle == null
+                   && dragX == null
+                   && dragY == null
+                   && dragWidth == null
+                   && dragHeight == null
                    && x == null
                    && y == null
                    && width == null
@@ -670,6 +694,12 @@ public final class MachineGuiStyleManager {
             }
             copy.id = source.id;
             copy.mode = source.mode;
+            copy.draggable = source.draggable;
+            copy.dragHandle = source.dragHandle;
+            copy.dragX = source.dragX;
+            copy.dragY = source.dragY;
+            copy.dragWidth = source.dragWidth;
+            copy.dragHeight = source.dragHeight;
             copy.x = source.x;
             copy.y = source.y;
             copy.width = source.width;
@@ -703,6 +733,8 @@ public final class MachineGuiStyleManager {
         public Boolean foreground;
         @Nullable
         public Integer priority;
+        @Nullable
+        public Float alpha;
         @Nullable
         public String page;
     }

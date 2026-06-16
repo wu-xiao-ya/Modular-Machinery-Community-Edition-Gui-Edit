@@ -105,6 +105,8 @@ Important keys / 重要键：
 - `machineController.smartInterfaceEditorVirtualKey` (used when no bound DataPort, writes to controller `customData[key]`; supports multiple keys split by `,` or `;`)
 - `factoryController.*` — same keys as `machineController.*` / 与 `machineController.*` 同名键
 - `factoryController.specialThreadBackgroundColor` (hex `RRGGBB` or `AARRGGBB`, for core/special thread row tint / 十六进制颜色，用于核心/特殊线程行着色)
+- `factoryController.threadQueueX/Y`, `threadScrollbarX/Y`, `threadVisibleRows`, `threadRowWidth/Height` customize the integrated-controller thread queue and can trigger self-proxy replacement by themselves.
+  / 这些字段自定义集成控制器线程队列位置，也能单独触发自代理替换。
 
 Rules / 规则：
 
@@ -206,8 +208,8 @@ These directives are read from text lines pushed into MMCE's `ControllerGUIRende
 
 **Texture layer control / 纹理图层控制**
 
-- `[mmcege:layer.<layerId>.<action>=<value>]` where action ∈ `x`, `y`, `scale`, `scaleX`, `scaleY`, `rotation`, `priority`, `visible`, `reset`, `clear`
-  / action 可为 `x`、`y`、`scale`、`scaleX`、`scaleY`、`rotation`、`priority`、`visible`、`reset`、`clear`
+- `[mmcege:layer.<layerId>.<action>=<value>]` where action ∈ `x`, `y`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `opacity`, `transparency`, `priority`, `visible`, `reset`, `clear`
+  / action 可为 `x`、`y`、`scale`、`scaleX`、`scaleY`、`rotation`、`alpha`、`opacity`、`transparency`、`priority`、`visible`、`reset`、`clear`
 - `[mmcege:layer.reset_all]` / `[mmcege:layer.clear_all]` — reset all layer states / 重置所有图层状态
 
 ## Controller Buttons | 控制器按钮

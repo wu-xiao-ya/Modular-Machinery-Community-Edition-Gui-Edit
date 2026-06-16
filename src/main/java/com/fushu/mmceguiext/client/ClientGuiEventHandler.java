@@ -37,6 +37,13 @@ public class ClientGuiEventHandler {
     private static final String DEFAULT_MACHINE_BG = "modularmachinery:textures/gui/guicontroller_large.png";
     private static final String DEFAULT_FACTORY_BG = "modularmachinery:textures/gui/guifactory.png";
     private static final int DEFAULT_SPECIAL_THREAD_BG_COLOR = 0xFFB2E5FF;
+    private static final int DEFAULT_THREAD_QUEUE_X = 8;
+    private static final int DEFAULT_THREAD_QUEUE_Y = 8;
+    private static final int DEFAULT_THREAD_SCROLLBAR_X = 94;
+    private static final int DEFAULT_THREAD_SCROLLBAR_Y = 8;
+    private static final int DEFAULT_THREAD_VISIBLE_ROWS = 6;
+    private static final int DEFAULT_THREAD_ROW_WIDTH = 86;
+    private static final int DEFAULT_THREAD_ROW_HEIGHT = 32;
 
     @SubscribeEvent
     public void onGuiOpen(GuiOpenEvent event) {
@@ -135,7 +142,8 @@ public class ClientGuiEventHandler {
         boolean hideDefault = pickHideDefault(style.hideDefaultBackground, MMCEGuiExtConfig.factoryController.hideDefaultBackground);
         boolean hasMachineStyleOverride = hasMachineStyleOverride(style);
         boolean customSpecialThreadColor = hasCustomSpecialThreadColor(style);
-        return hasCustomTexture || hideDefault || hasMachineStyleOverride || customSpecialThreadColor;
+        boolean customThreadLayout = hasCustomFactoryThreadLayout(style);
+        return hasCustomTexture || hideDefault || hasMachineStyleOverride || customSpecialThreadColor || customThreadLayout;
     }
 
     private DynamicMachine resolveMachine(DynamicMachine found, DynamicMachine blueprint) {
@@ -169,6 +177,27 @@ public class ClientGuiEventHandler {
             DEFAULT_SPECIAL_THREAD_BG_COLOR
         );
         return global != DEFAULT_SPECIAL_THREAD_BG_COLOR;
+    }
+
+    private boolean hasCustomFactoryThreadLayout(MachineGuiStyleManager.ControllerStyle style) {
+        return isCustomInt(style.threadQueueX, DEFAULT_THREAD_QUEUE_X)
+            || isCustomInt(style.threadQueueY, DEFAULT_THREAD_QUEUE_Y)
+            || isCustomInt(style.threadScrollbarX, DEFAULT_THREAD_SCROLLBAR_X)
+            || isCustomInt(style.threadScrollbarY, DEFAULT_THREAD_SCROLLBAR_Y)
+            || isCustomInt(style.threadVisibleRows, DEFAULT_THREAD_VISIBLE_ROWS)
+            || isCustomInt(style.threadRowWidth, DEFAULT_THREAD_ROW_WIDTH)
+            || isCustomInt(style.threadRowHeight, DEFAULT_THREAD_ROW_HEIGHT)
+            || MMCEGuiExtConfig.factoryController.threadQueueX != DEFAULT_THREAD_QUEUE_X
+            || MMCEGuiExtConfig.factoryController.threadQueueY != DEFAULT_THREAD_QUEUE_Y
+            || MMCEGuiExtConfig.factoryController.threadScrollbarX != DEFAULT_THREAD_SCROLLBAR_X
+            || MMCEGuiExtConfig.factoryController.threadScrollbarY != DEFAULT_THREAD_SCROLLBAR_Y
+            || MMCEGuiExtConfig.factoryController.queueVisibleRows != DEFAULT_THREAD_VISIBLE_ROWS
+            || MMCEGuiExtConfig.factoryController.threadRowWidth != DEFAULT_THREAD_ROW_WIDTH
+            || MMCEGuiExtConfig.factoryController.threadRowHeight != DEFAULT_THREAD_ROW_HEIGHT;
+    }
+
+    private boolean isCustomInt(Integer value, int defaultValue) {
+        return value != null && value.intValue() != defaultValue;
     }
 
     private boolean hasMachineStyleOverride(MachineGuiStyleManager.ControllerStyle style) {

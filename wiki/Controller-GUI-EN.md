@@ -69,7 +69,7 @@ Aliases:
 Per-machine values override global. Since `1.0.1+`, if a machine defines any `mmce_gui_ext` node, unspecified GUI size falls back to the MMCE base size (`176x213` / `280x213`) first, reducing coupling to global cfg.
 
 Common per-machine fields (see the quick reference for the full list): `backgroundTexture`, `backgroundTextureOffsetX/Y`, `hideDefaultBackground`, `guiWidth`, `guiHeight`, `enableRightExtension`, `useNineSlice`, `backgroundTextureWidth/Height`, `backgroundCorner`, `centerFullGui`, `specialThreadBackgroundColor`, `enableSmartInterfaceEditor`, `smartInterfaceEditorX/Y`, `smartInterfaceEditorInputWidth`, `smartInterfaceEditorVirtualKey`, `smartInterfaceEditorPriority`, `foregroundContentPriority`, `hideDefaultSmartInterfaceEditor`, `defaultPanelId`, `customPanels`, `smartInterfaceEditors`, `textureLayers`/`backgroundLayers`/`foregroundLayers`, `buttons`.
-For the factory thread queue, the copy-paste fields are `threadQueueX`, `threadQueueY`, `threadScrollbarX`, `threadScrollbarY`, `threadVisibleRows`, `threadRowWidth`, and `threadRowHeight`; aliases like `queueX`, `queueY`, `queueScrollbarX`, `queueScrollbarY`, `queueVisibleRows`, `queueRowWidth`, and `queueRowHeight` are accepted.
+For the factory thread queue, the copy-paste fields are `threadQueueX`, `threadQueueY`, `threadScrollbarX`, `threadScrollbarY`, `threadVisibleRows`, `threadRowWidth`, and `threadRowHeight`; aliases like `queueX`, `queueY`, `queueScrollbarX`, `queueScrollbarY`, `queueVisibleRows`, `queueRowWidth`, and `queueRowHeight` are accepted. Customizing these fields also triggers the integrated-controller self proxy.
 
 ---
 
@@ -132,7 +132,7 @@ Read from text lines pushed into MMCE's `ControllerGUIRenderEvent.extraInfo[]` (
 - `[mmcege:si.clear_title]` — restore default title
 
 **Texture layer control** (`<id>` is the layer's id)
-- `[mmcege:layer.<id>.x=300]`, `.y=186`, `.scale=1.25`, `.scaleX=1.25`, `.scaleY=0.90`, `.rotation=45`, `.priority=30`, `.visible=true`, `.reset`, `.clear`
+- `[mmcege:layer.<id>.x=300]`, `.y=186`, `.scale=1.25`, `.scaleX=1.25`, `.scaleY=0.90`, `.rotation=45`, `.alpha=0.5`, `.priority=30`, `.visible=true`, `.reset`, `.clear`
 - `[mmcege:layer.reset_all]` / `[mmcege:layer.clear_all]` — reset all layer states
 
 ---

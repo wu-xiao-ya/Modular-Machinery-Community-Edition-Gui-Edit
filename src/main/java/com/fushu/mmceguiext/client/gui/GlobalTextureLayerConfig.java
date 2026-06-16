@@ -1,6 +1,7 @@
 package com.fushu.mmceguiext.client.gui;
 
 import com.fushu.mmceguiext.common.config.TextureLayerDef;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.ResourceLocation;
 
 import javax.annotation.Nullable;
@@ -66,6 +67,7 @@ public final class GlobalTextureLayerConfig {
             def.corner = clamp(Integer.parseInt(parts[8].trim()), 0, MAX_CORNER);
             def.useNineSlice = Boolean.parseBoolean(parts[9].trim());
             def.priority = parts.length >= 11 ? Integer.parseInt(parts[10].trim()) : 0;
+            def.alpha = parts.length >= 12 ? normalizeAlpha(Float.parseFloat(parts[11].trim())) : 1.0F;
             return def;
         } catch (Exception ignored) {
             return null;
@@ -74,6 +76,20 @@ public final class GlobalTextureLayerConfig {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static float normalizeAlpha(float value) {
+        float alpha = value;
+        if (alpha > 1.0F && alpha <= 255.0F) {
+            alpha /= 255.0F;
+        }
+        if (alpha < 0.0F) {
+            alpha = 0.0F;
+        }
+        if (alpha > 1.0F) {
+            alpha = 1.0F;
+        }
+        return alpha;
     }
 
     public static void drawLayers(List<? extends TextureLayerDef> layers, boolean foreground, int guiLeft, int guiTop, int originOffsetX, int originOffsetY) {
@@ -97,6 +113,17 @@ public final class GlobalTextureLayerConfig {
                 continue;
             }
             net.minecraft.client.Minecraft.getMinecraft().getTextureManager().bindTexture(layer.texture);
+            float alpha = normalizeAlpha(layer.alpha);
+            if (alpha < 1.0F) {
+                GlStateManager.enableBlend();
+                GlStateManager.tryBlendFuncSeparate(
+                    GlStateManager.SourceFactor.SRC_ALPHA,
+                    GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+                    GlStateManager.SourceFactor.ONE,
+                    GlStateManager.DestFactor.ZERO
+                );
+            }
+            GlStateManager.color(1.0F, 1.0F, 1.0F, alpha);
             int baseX = guiLeft - originOffsetX;
             int baseY = guiTop - originOffsetY;
             int drawX = foreground ? baseX + layer.x : baseX + layer.x;
@@ -105,6 +132,10 @@ public final class GlobalTextureLayerConfig {
                 GuiRenderUtils.drawNineSlice(drawX, drawY, layer.width, layer.height, layer.textureWidth, layer.textureHeight, layer.corner);
             } else {
                 net.minecraft.client.gui.Gui.drawModalRectWithCustomSizedTexture(drawX, drawY, 0, 0, layer.width, layer.height, layer.textureWidth, layer.textureHeight);
+            }
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            if (alpha < 1.0F) {
+                GlStateManager.disableBlend();
             }
         }
     }

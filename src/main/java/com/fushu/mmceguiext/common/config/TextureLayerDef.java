@@ -14,4 +14,5 @@ public class TextureLayerDef {
     public int corner;
     public boolean useNineSlice;
     public int priority;
+    public float alpha = 1.0F;
 }

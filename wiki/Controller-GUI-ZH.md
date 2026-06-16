@@ -69,7 +69,7 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 机器级值覆盖全局。自 `1.0.1+`，只要机器定义了 `mmce_gui_ext` 节点，未填的 GUI 尺寸优先回退到 MMCE 基础尺寸（`176x213` / `280x213`），降低对全局 cfg 的耦合。
 
 机器级常用字段（详见速查表）：`backgroundTexture`、`backgroundTextureOffsetX/Y`、`hideDefaultBackground`、`guiWidth`、`guiHeight`、`enableRightExtension`、`useNineSlice`、`backgroundTextureWidth/Height`、`backgroundCorner`、`centerFullGui`、`specialThreadBackgroundColor`、`enableSmartInterfaceEditor`、`smartInterfaceEditorX/Y`、`smartInterfaceEditorInputWidth`、`smartInterfaceEditorVirtualKey`、`smartInterfaceEditorPriority`、`foregroundContentPriority`、`hideDefaultSmartInterfaceEditor`、`defaultPanelId`、`customPanels`、`smartInterfaceEditors`、`textureLayers`/`backgroundLayers`/`foregroundLayers`、`buttons`。
-工厂线程队列可直接照抄的字段是 `threadQueueX`、`threadQueueY`、`threadScrollbarX`、`threadScrollbarY`、`threadVisibleRows`、`threadRowWidth`、`threadRowHeight`；别名 `queueX`、`queueY`、`queueScrollbarX`、`queueScrollbarY`、`queueVisibleRows`、`queueRowWidth`、`queueRowHeight` 也可用。
+工厂线程队列可直接照抄的字段是 `threadQueueX`、`threadQueueY`、`threadScrollbarX`、`threadScrollbarY`、`threadVisibleRows`、`threadRowWidth`、`threadRowHeight`；别名 `queueX`、`queueY`、`queueScrollbarX`、`queueScrollbarY`、`queueVisibleRows`、`queueRowWidth`、`queueRowHeight` 也可用。自定义这些字段也会触发集成控制器自代理。
 
 ---
 
@@ -132,7 +132,7 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 - `[mmcege:si.clear_title]` —— 恢复默认标题
 
 **纹理图层控制**（`<id>` 为该层 id）
-- `[mmcege:layer.<id>.x=300]`、`.y=186`、`.scale=1.25`、`.scaleX=1.25`、`.scaleY=0.90`、`.rotation=45`、`.priority=30`、`.visible=true`、`.reset`、`.clear`
+- `[mmcege:layer.<id>.x=300]`、`.y=186`、`.scale=1.25`、`.scaleX=1.25`、`.scaleY=0.90`、`.rotation=45`、`.alpha=0.5`、`.priority=30`、`.visible=true`、`.reset`、`.clear`
 - `[mmcege:layer.reset_all]` / `[mmcege:layer.clear_all]` —— 重置所有图层状态
 
 ---

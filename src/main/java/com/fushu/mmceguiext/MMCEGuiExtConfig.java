@@ -328,7 +328,7 @@ public class MMCEGuiExtConfig {
         @Config.Comment("按尺寸覆盖 Item Bus 槽位坐标。格式：size=x1:y1;x2:y2... 例如 normal=61:18;79:18;97:18;61:36;79:36;97:36")
         public String[] slotLayouts = new String[0];
 
-        @Config.Comment("Item Bus 纹理图层。格式：fg|bg,texture,x,y,width,height,texWidth,texHeight,corner,useNineSlice,priority")
+        @Config.Comment("Item Bus 纹理图层。格式：fg|bg,texture,x,y,width,height,texWidth,texHeight,corner,useNineSlice,priority,alpha。alpha 可省略，支持 0.0-1.0 或 0-255")
         public String[] textureLayers = new String[0];
     }
 
@@ -422,7 +422,7 @@ public class MMCEGuiExtConfig {
         @Config.RangeInt(min = 8, max = 2048)
         public int scrollbarHeight = 106;
 
-        @Config.Comment("Upgrade Bus 纹理图层。格式：fg|bg,texture,x,y,width,height,texWidth,texHeight,corner,useNineSlice,priority")
+        @Config.Comment("Upgrade Bus 纹理图层。格式：fg|bg,texture,x,y,width,height,texWidth,texHeight,corner,useNineSlice,priority,alpha。alpha 可省略，支持 0.0-1.0 或 0-255")
         public String[] textureLayers = new String[0];
     }
 
@@ -470,7 +470,7 @@ public class MMCEGuiExtConfig {
         @Config.Comment("未提供自定义贴图时是否隐藏 MMCE 默认背景 / Hide MMCE default background when no custom texture is provided.")
         public boolean hideDefaultBackground = false;
 
-        @Config.Comment("Fluid Hatch 纹理图层。格式：fg|bg,texture,x,y,width,height,texWidth,texHeight,corner,useNineSlice,priority")
+        @Config.Comment("Fluid Hatch 纹理图层。格式：fg|bg,texture,x,y,width,height,texWidth,texHeight,corner,useNineSlice,priority,alpha。alpha 可省略，支持 0.0-1.0 或 0-255")
         public String[] textureLayers = new String[0];
     }
 

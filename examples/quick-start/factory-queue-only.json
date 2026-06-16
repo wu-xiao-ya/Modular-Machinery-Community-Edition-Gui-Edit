@@ -19,6 +19,15 @@
       // 线程背景色，工厂核心区域会用到。
       // Background tint color used by the factory core/thread area.
       "specialThreadBackgroundColor": "FF7DD3FC",
+      // 线程队列位置。仅配置这些字段也会启用集成控制器自代理 GUI。
+      // Thread queue placement. These fields alone also trigger the integrated-controller self proxy GUI.
+      "threadQueueX": 14,
+      "threadQueueY": 18,
+      "threadScrollbarX": 104,
+      "threadScrollbarY": 18,
+      "threadVisibleRows": 5,
+      "threadRowWidth": 88,
+      "threadRowHeight": 34,
       // 这两个分区会把右侧空间切成上、下两块。
       // These two panels split the right side into upper and lower zones.
       "customPanels": [

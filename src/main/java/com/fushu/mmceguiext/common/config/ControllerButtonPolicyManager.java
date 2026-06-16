@@ -73,8 +73,19 @@ public final class ControllerButtonPolicyManager {
             if (policy.value != null && floatsMatch(policy.value.floatValue(), value)) {
                 return policy;
             }
+            for (Float alt : policy.altValues) {
+                if (alt != null && floatsMatch(alt.floatValue(), value)) {
+                    return policy;
+                }
+            }
         }
         return null;
+    }
+
+    private static void addAltValue(ButtonPolicy policy, @Nullable Float value) {
+        if (value != null && Float.isFinite(value.floatValue())) {
+            policy.altValues.add(value);
+        }
     }
 
     @Nullable
@@ -481,6 +492,13 @@ public final class ControllerButtonPolicyManager {
             policy.value = null;
         }
         policy.stringValue = value == null && "smart_set".equals(action) ? stringValue : null;
+        if (policy.value != null) {
+            // Register modifier-key variant values so the server accepts them too.
+            addAltValue(policy, getFloat(obj, "shiftValue", "shift_value", "shiftDelta", "shift_delta"));
+            addAltValue(policy, getFloat(obj, "ctrlValue", "ctrl_value", "controlValue", "control_value"));
+            addAltValue(policy, getFloat(obj, "ctrlShiftValue", "ctrl_shift_value",
+                "shiftCtrlValue", "shift_ctrl_value", "ctrlShiftDelta", "ctrl_shift_delta"));
+        }
         policy.min = getFloat(obj, "min", "minimum");
         policy.max = getFloat(obj, "max", "maximum");
 
@@ -624,6 +642,8 @@ public final class ControllerButtonPolicyManager {
         public String key;
         @Nullable
         public Float value;
+        // Extra numeric values allowed for this button via modifier-key clicks (shift/ctrl/ctrl+shift).
+        public final List<Float> altValues = new ArrayList<Float>();
         @Nullable
         public String stringValue;
         @Nullable

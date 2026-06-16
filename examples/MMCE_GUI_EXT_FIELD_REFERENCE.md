@@ -160,6 +160,15 @@ This file is a quick reference for pack authors.
 - `guiWidth`, `guiHeight`
   - CN: 子 GUI 尺寸。也兼容 `width` / `height`。
   - EN: Sub GUI size. `width` / `height` are also accepted.
+- `draggable`
+  - CN: 仅对 `modal` 浮窗子 GUI 生效；设为 `true` 后允许拖动。
+  - EN: Modal sub GUI only. Set `true` to allow dragging.
+- `dragHandle`
+  - CN: 可选。`false` 表示整个浮窗可拖；省略或 `true` 表示只允许拖动拖拽区域。
+  - EN: Optional. `false` makes the whole modal draggable; omitted or `true` uses a drag handle.
+- `dragX`, `dragY`, `dragWidth`, `dragHeight`
+  - CN: 可选拖拽区域，坐标相对子 GUI 左上角。未设置时默认顶部 16 像素。
+  - EN: Optional drag handle rectangle relative to the sub GUI top-left. Defaults to the top 16 pixels.
 - `backgroundTexture`
   - CN: 子 GUI 背景贴图。
   - EN: Sub GUI background texture.
@@ -288,6 +297,9 @@ This file is a quick reference for pack authors.
 - `textureHeight`
   - CN: 源贴图高度。
   - EN: Source texture height.
+- `alpha` / `opacity` / `transparency`
+  - CN: 图层整体透明度。支持 `0.0` 到 `1.0`，也支持 `0` 到 `255`。
+  - EN: Whole-layer alpha. Accepts `0.0` to `1.0`, or `0` to `255`.
 - `corner`
   - CN: 9 宫格角大小。
   - EN: 9-slice corner size.
