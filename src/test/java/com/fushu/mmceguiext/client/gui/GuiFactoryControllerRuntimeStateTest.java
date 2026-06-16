@@ -29,6 +29,7 @@ public class GuiFactoryControllerRuntimeStateTest {
 
         set(gui, "customButtons", parentButtons);
         set(gui, "customSmartEditors", new ArrayList<Object>());
+        set(gui, "customSliders", new ArrayList<Object>());
         set(gui, "backgroundTextureLayers", new ArrayList<Object>());
         set(gui, "foregroundTextureLayers", new ArrayList<Object>());
         set(gui, "layerRuntimeStates", new HashMap<Object, Object>());
@@ -161,6 +162,7 @@ public class GuiFactoryControllerRuntimeStateTest {
         GuiFactoryControllerResizable gui = allocateGui();
         set(gui, "customButtons", new ArrayList<Object>());
         set(gui, "customSmartEditors", new ArrayList<Object>());
+        set(gui, "customSliders", new ArrayList<Object>());
         set(gui, "backgroundTextureLayers", new ArrayList<Object>());
         set(gui, "foregroundTextureLayers", new ArrayList<Object>());
         set(gui, "layerRuntimeStates", new HashMap<Object, Object>());
