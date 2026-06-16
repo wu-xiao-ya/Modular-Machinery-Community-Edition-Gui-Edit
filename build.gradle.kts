@@ -1,7 +1,7 @@
 ﻿plugins {
     id("java-library")
     id("maven-publish")
-    id("com.gtnewhorizons.retrofuturagradle") version "1.4.0"
+    id("com.gtnewhorizons.retrofuturagradle") version "1.4.1"
 }
 
 group = "com.fushu.mmce"
