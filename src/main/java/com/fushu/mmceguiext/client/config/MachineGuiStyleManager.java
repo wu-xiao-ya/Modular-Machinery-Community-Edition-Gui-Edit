@@ -650,6 +650,10 @@ public final class MachineGuiStyleManager {
         @Nullable
         public Boolean visible;
         @Nullable
+        public List<String> hotkeys;
+        @Nullable
+        public Boolean consumeHotkey;
+        @Nullable
         public String page;
     }
 

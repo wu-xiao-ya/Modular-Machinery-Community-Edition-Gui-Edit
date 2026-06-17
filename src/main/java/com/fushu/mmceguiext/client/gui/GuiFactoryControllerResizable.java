@@ -3894,7 +3894,13 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         if (styleOverride.buttons != null) {
             int buttonId = CUSTOM_BUTTON_ID_BASE;
             for (MachineGuiStyleManager.ButtonStyle style : styleOverride.buttons) {
-                if (style == null || style.label == null || style.label.trim().isEmpty() || style.action == null || style.action.trim().isEmpty()) {
+                if (style == null || style.action == null || style.action.trim().isEmpty()) {
+                    continue;
+                }
+                boolean visible = style.visible == null || style.visible.booleanValue();
+                boolean hasLabel = style.label != null && !style.label.trim().isEmpty();
+                boolean hasHotkey = style.hotkeys != null && !style.hotkeys.isEmpty();
+                if (!hasLabel && !hasHotkey) {
                     continue;
                 }
                 int width = style.width == null ? DEFAULT_BUTTON_WIDTH : Math.max(8, style.width.intValue());
@@ -3919,8 +3925,12 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 button.openMode = normalizeSubGuiMode(style.openMode);
                 button.priority = style.priority == null ? DEFAULT_SMART_EDITOR_PRIORITY : style.priority.intValue();
                 button.page = normalizePageIdOrNull(style.page);
-                button.visible = style.visible == null || style.visible.booleanValue();
-                button.button = new GuiButton(buttonId++, this.guiLeft + x, this.guiTop + y, width, height, style.label);
+                button.visible = visible;
+                button.hotkeys = style.hotkeys == null ? Collections.<String>emptyList() : new ArrayList<String>(style.hotkeys);
+                button.consumeHotkey = style.consumeHotkey == null || style.consumeHotkey.booleanValue();
+                if (visible && hasLabel) {
+                    button.button = new GuiButton(buttonId++, this.guiLeft + x, this.guiTop + y, width, height, style.label);
+                }
                 this.customButtons.add(button);
             }
         }
@@ -3963,7 +3973,143 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     }
 
     private boolean handleCustomButtonKeyTyped(char typedChar, int keyCode) {
+        if (hasFocusedTextInput()) {
+            return false;
+        }
+        List<CustomButton> ordered = new ArrayList<CustomButton>(this.customButtons);
+        ordered.sort((a, b) -> Integer.compare(b.priority, a.priority));
+        for (CustomButton button : ordered) {
+            if (!isPageVisible(button.page) || button.hotkeys.isEmpty()) {
+                continue;
+            }
+            if ("page".equals(button.action) && button.targetPage.equals(this.activePageId)) {
+                continue;
+            }
+            if (matchesCustomButtonHotkey(button, typedChar, keyCode)) {
+                activateCustomButton(button);
+                return button.consumeHotkey;
+            }
+        }
         return false;
+    }
+
+    private boolean hasFocusedTextInput() {
+        if (this.smartInterfaceEditorInput != null && this.smartInterfaceEditorInput.isFocused()) {
+            return true;
+        }
+        for (CustomSmartEditor editor : this.customSmartEditors) {
+            if (editor.input != null && editor.input.isFocused()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesCustomButtonHotkey(CustomButton button, char typedChar, int keyCode) {
+        for (String hotkey : button.hotkeys) {
+            if (matchesHotkey(hotkey, typedChar, keyCode)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesHotkey(@Nullable String raw, char typedChar, int keyCode) {
+        return matchesHotkey(raw, typedChar, keyCode, isShiftKeyDown(), isCtrlKeyDown(), isAltKeyDown());
+    }
+
+    private static boolean matchesHotkey(@Nullable String raw, char typedChar, int keyCode, boolean shiftDown, boolean ctrlDown, boolean altDown) {
+        HotkeySpec spec = parseHotkeySpec(raw);
+        if (spec == null) {
+            return false;
+        }
+        if (spec.shiftRequired != shiftDown) {
+            return false;
+        }
+        if (spec.ctrlRequired != ctrlDown) {
+            return false;
+        }
+        if (spec.altRequired != altDown) {
+            return false;
+        }
+        if (spec.keyCode > 0) {
+            return keyCode == spec.keyCode;
+        }
+        return spec.character != 0 && Character.toUpperCase(typedChar) == Character.toUpperCase(spec.character);
+    }
+
+    @Nullable
+    private static HotkeySpec parseHotkeySpec(@Nullable String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String text = raw.trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        HotkeySpec spec = new HotkeySpec();
+        String keyToken = null;
+        String[] parts = text.split("\\+");
+        for (String part : parts) {
+            String token = part.trim();
+            if (token.isEmpty()) {
+                continue;
+            }
+            String normalized = token.toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+            if ("CTRL".equals(normalized) || "CONTROL".equals(normalized) || "LCONTROL".equals(normalized) || "RCONTROL".equals(normalized)) {
+                spec.ctrlRequired = true;
+            } else if ("SHIFT".equals(normalized) || "LSHIFT".equals(normalized) || "RSHIFT".equals(normalized)) {
+                spec.shiftRequired = true;
+            } else if ("ALT".equals(normalized) || "LMENU".equals(normalized) || "RMENU".equals(normalized)) {
+                spec.altRequired = true;
+            } else {
+                keyToken = normalized;
+            }
+        }
+        if (keyToken == null || keyToken.isEmpty()) {
+            return null;
+        }
+        if (keyToken.startsWith("KEY_")) {
+            keyToken = keyToken.substring(4);
+        }
+        keyToken = normalizeHotkeyToken(keyToken);
+        int code = getKeyboardKeyIndex(keyToken);
+        if (code > 0) {
+            spec.keyCode = code;
+            return spec;
+        }
+        if (keyToken.length() == 1) {
+            spec.character = keyToken.charAt(0);
+            return spec;
+        }
+        return null;
+    }
+
+    private static String normalizeHotkeyToken(String token) {
+        if ("ESC".equals(token)) {
+            return "ESCAPE";
+        }
+        if ("ENTER".equals(token)) {
+            return "RETURN";
+        }
+        if ("SPACEBAR".equals(token)) {
+            return "SPACE";
+        }
+        if ("PLUS".equals(token)) {
+            return "ADD";
+        }
+        if ("NUM_ENTER".equals(token) || "NUMPAD_ENTER".equals(token)) {
+            return "NUMPADENTER";
+        }
+        return token;
+    }
+
+    private static int getKeyboardKeyIndex(String token) {
+        try {
+            return Keyboard.getKeyIndex(token);
+        } catch (Throwable ignored) {
+            return 0;
+        }
     }
 
     private void activateCustomButton(CustomButton button) {
@@ -4597,8 +4743,18 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         @Nullable
         private String page;
         private boolean visible = true;
+        private List<String> hotkeys = Collections.emptyList();
+        private boolean consumeHotkey = true;
         @Nullable
         private GuiButton button;
+    }
+
+    private static class HotkeySpec {
+        private int keyCode;
+        private char character;
+        private boolean shiftRequired;
+        private boolean ctrlRequired;
+        private boolean altRequired;
     }
 
     private static class CustomSlider {

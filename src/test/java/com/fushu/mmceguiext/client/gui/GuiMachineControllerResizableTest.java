@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class GuiMachineControllerResizableTest {
@@ -50,6 +51,40 @@ public class GuiMachineControllerResizableTest {
 
         assertNull(get(runtime, "draggingSlider"));
         assertNull(get(gui, "draggingSlider"));
+    }
+
+    @Test
+    public void hotkeyMatcherAcceptsNamedKeysAndExactModifiers() throws Exception {
+        assertEquals(Boolean.TRUE, invokeStatic(
+            "matchesHotkey",
+            new Class<?>[] {String.class, char.class, int.class, boolean.class, boolean.class, boolean.class},
+            "C",
+            Character.valueOf('c'),
+            Integer.valueOf(0),
+            Boolean.FALSE,
+            Boolean.FALSE,
+            Boolean.FALSE
+        ));
+        assertEquals(Boolean.TRUE, invokeStatic(
+            "matchesHotkey",
+            new Class<?>[] {String.class, char.class, int.class, boolean.class, boolean.class, boolean.class},
+            "ctrl+KEY_C",
+            Character.valueOf('c'),
+            Integer.valueOf(0),
+            Boolean.FALSE,
+            Boolean.TRUE,
+            Boolean.FALSE
+        ));
+        assertEquals(Boolean.FALSE, invokeStatic(
+            "matchesHotkey",
+            new Class<?>[] {String.class, char.class, int.class, boolean.class, boolean.class, boolean.class},
+            "ctrl+KEY_C",
+            Character.valueOf('c'),
+            Integer.valueOf(0),
+            Boolean.FALSE,
+            Boolean.FALSE,
+            Boolean.FALSE
+        ));
     }
 
     private static GuiMachineControllerResizable allocateGui() throws Exception {
@@ -105,6 +140,12 @@ public class GuiMachineControllerResizableTest {
         Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
         return method.invoke(target, args);
+    }
+
+    private static Object invokeStatic(String methodName, Class<?>[] parameterTypes, Object... args) throws Exception {
+        Method method = GuiMachineControllerResizable.class.getDeclaredMethod(methodName, parameterTypes);
+        method.setAccessible(true);
+        return method.invoke(null, args);
     }
 
     private static void set(Object target, String fieldName, Object value) throws Exception {

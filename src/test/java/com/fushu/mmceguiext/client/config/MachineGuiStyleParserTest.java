@@ -593,6 +593,43 @@ public class MachineGuiStyleParserTest {
     }
 
     @Test
+    public void parseMachineJsonParsesButtonHotkeysAndGuiOnlyHotkeys() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "button-hotkeys.json",
+            "{\n" +
+                "  \"registryname\": \"demo:hotkey_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"buttons\": [\n" +
+                "        {\"x\": 140, \"y\": 8, \"label\": \"Run\", \"action\": \"event\", \"buttonId\": \"run_event\", \"hotkey\": \"C\"}\n" +
+                "      ],\n" +
+                "      \"hotkeys\": [\n" +
+                "        {\"key\": \"ctrl+r\", \"action\": \"event\", \"buttonId\": \"reset_event\", \"page\": \"settings\"},\n" +
+                "        {\"hotkeys\": [\"G\", \"shift+G\"], \"action\": \"smart_add\", \"dataPortKey\": \"gear\", \"value\": 1.0, \"consumeHotkey\": false}\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.machineStyle);
+        assertNotNull(result.machineStyle.buttons);
+        assertEquals(3, result.machineStyle.buttons.size());
+        assertEquals("event", result.machineStyle.buttons.get(0).action);
+        assertEquals("C", result.machineStyle.buttons.get(0).hotkeys.get(0));
+        assertEquals("event", result.machineStyle.buttons.get(1).action);
+        assertEquals("reset_event", result.machineStyle.buttons.get(1).buttonId);
+        assertEquals(Boolean.FALSE, result.machineStyle.buttons.get(1).visible);
+        assertEquals("ctrl+r", result.machineStyle.buttons.get(1).hotkeys.get(0));
+        assertEquals("settings", result.machineStyle.buttons.get(1).page);
+        assertEquals("smart_add", result.machineStyle.buttons.get(2).action);
+        assertEquals("gear", result.machineStyle.buttons.get(2).key);
+        assertEquals(2, result.machineStyle.buttons.get(2).hotkeys.size());
+        assertEquals(Boolean.FALSE, result.machineStyle.buttons.get(2).consumeHotkey);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
     public void parseMachineJsonSupportsSmartSetStringValuesAndNumericAdds() {
         MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
             "smart-string-values.json",

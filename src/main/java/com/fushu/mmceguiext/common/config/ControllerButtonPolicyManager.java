@@ -356,6 +356,24 @@ public final class ControllerButtonPolicyManager {
         if (out.size() >= MAX_BUTTONS_PER_CONTROLLER) {
             return;
         }
+        JsonElement hotkeysElement = getElement(controllerNode, "hotkeys", "hotKeys", "guiHotkeys", "gui_hotkeys", "shortcuts");
+        if (hotkeysElement != null && hotkeysElement.isJsonArray()) {
+            JsonArray hotkeys = hotkeysElement.getAsJsonArray();
+            int limit = Math.min(hotkeys.size(), MAX_BUTTONS_PER_CONTROLLER - out.size());
+            for (int i = 0; i < limit; i++) {
+                JsonElement child = hotkeys.get(i);
+                if (child == null || !child.isJsonObject()) {
+                    continue;
+                }
+                ButtonPolicy policy = parseButton(child.getAsJsonObject(), true);
+                if (policy != null) {
+                    out.add(policy);
+                }
+            }
+        }
+        if (out.size() >= MAX_BUTTONS_PER_CONTROLLER) {
+            return;
+        }
         JsonElement subGuisElement = getElement(controllerNode, "subGuis", "sub_guis", "subGui", "sub_gui");
         if (subGuisElement == null || !subGuisElement.isJsonArray()) {
             return;
@@ -478,8 +496,13 @@ public final class ControllerButtonPolicyManager {
 
     @Nullable
     private static ButtonPolicy parseButton(JsonObject obj) {
+        return parseButton(obj, false);
+    }
+
+    @Nullable
+    private static ButtonPolicy parseButton(JsonObject obj, boolean hotkeyOnly) {
         Boolean visible = getBoolean(obj, "visible", "show", "enabled");
-        if (visible != null && !visible.booleanValue()) {
+        if (!hotkeyOnly && visible != null && !visible.booleanValue() && !hasHotkey(obj)) {
             return null;
         }
 
@@ -496,17 +519,17 @@ public final class ControllerButtonPolicyManager {
         policy.buttonId = getString(obj, "buttonId", "button_id", "eventId", "event_id", "id", "name");
         policy.key = getString(
             obj,
-            "key",
-            "virtualKey",
-            "virtual_key",
-            "interfaceType",
-            "interface_type",
             "dataPortKey",
             "data_port_key",
             "portKey",
             "port_key",
             "dataPort",
-            "data_port"
+            "data_port",
+            "virtualKey",
+            "virtual_key",
+            "interfaceType",
+            "interface_type",
+            hotkeyOnly ? "\u0000" : "key"
         );
         Float value = getFloat(obj, "value", "delta", "amount");
         String stringValue = getStringAllowNonString(obj, "value", "textValue", "text_value", "stringValue", "string_value");
@@ -543,6 +566,10 @@ public final class ControllerButtonPolicyManager {
             return null;
         }
         return policy;
+    }
+
+    private static boolean hasHotkey(JsonObject obj) {
+        return getElement(obj, "hotkey", "hotKey", "hotkeys", "hotKeys", "shortcut", "shortcuts") != null;
     }
 
     @Nullable

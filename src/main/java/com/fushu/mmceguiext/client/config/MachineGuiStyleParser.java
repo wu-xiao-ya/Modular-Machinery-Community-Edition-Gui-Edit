@@ -623,74 +623,119 @@ final class MachineGuiStyleParser {
         MachineFileParseResult result,
         String scope
     ) {
-        MatchedElement match = findElement(node, "buttons", "buttonList", "button_list", "guiButtons", "gui_buttons");
+        List<MachineGuiStyleManager.ButtonStyle> buttons = new ArrayList<MachineGuiStyleManager.ButtonStyle>();
+        appendButtons(buttons, findElement(node, "buttons", "buttonList", "button_list", "guiButtons", "gui_buttons"), false, result, scope);
+        appendButtons(buttons, findElement(node, "hotkeys", "hotKeys", "guiHotkeys", "gui_hotkeys", "shortcuts"), true, result, scope);
+
+        return buttons.isEmpty() ? null : buttons;
+    }
+
+    private static void appendButtons(
+        List<MachineGuiStyleManager.ButtonStyle> buttons,
+        @Nullable MatchedElement match,
+        boolean hotkeyOnly,
+        MachineFileParseResult result,
+        String scope
+    ) {
         if (match == null) {
-            return null;
+            return;
         }
         if (!match.element.isJsonArray()) {
             result.warnForMachine(scope, field(scope, match.key) + " must be an array.");
-            return null;
+            return;
         }
 
-        List<MachineGuiStyleManager.ButtonStyle> buttons = new ArrayList<MachineGuiStyleManager.ButtonStyle>();
         JsonArray array = match.element.getAsJsonArray();
         int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
         for (int i = 0; i < limit; i++) {
-            JsonElement child = array.get(i);
-            String itemScope = field(scope, match.key + "[" + i + "]");
-            if (child == null || !child.isJsonObject()) {
-                result.warnForMachine(scope, itemScope + " must be an object.");
-                continue;
+            MachineGuiStyleManager.ButtonStyle button = parseButtonStyle(
+                array.get(i),
+                hotkeyOnly,
+                result,
+                field(scope, match.key + "[" + i + "]")
+            );
+            if (button != null) {
+                buttons.add(button);
             }
+        }
+    }
 
-            JsonObject obj = child.getAsJsonObject();
-            Integer x = validateMinInt(getInt(obj, result, itemScope, "x"), 0, result, itemScope, "x");
-            Integer y = validateMinInt(getInt(obj, result, itemScope, "y"), 0, result, itemScope, "y");
-            String label = getTrimmedString(obj, result, itemScope, "label", "text", "title");
-            String action = getTrimmedString(obj, result, itemScope, "action", "mode", "type");
-            String buttonId = getTrimmedString(obj, result, itemScope, "buttonId", "button_id", "eventId", "event_id", "id", "name");
-            String targetPage = getTrimmedString(
+    @Nullable
+    private static MachineGuiStyleManager.ButtonStyle parseButtonStyle(
+        @Nullable JsonElement node,
+        boolean hotkeyOnly,
+        MachineFileParseResult result,
+        String itemScope
+    ) {
+        if (node == null || !node.isJsonObject()) {
+            result.warnForMachine(itemScope, itemScope + " must be an object.");
+            return null;
+        }
+
+        JsonObject obj = node.getAsJsonObject();
+        Integer x = validateMinInt(getInt(obj, result, itemScope, "x"), 0, result, itemScope, "x");
+        Integer y = validateMinInt(getInt(obj, result, itemScope, "y"), 0, result, itemScope, "y");
+        String label = getTrimmedString(obj, result, itemScope, "label", "text", "title");
+        String action = getTrimmedString(obj, result, itemScope, "action", "mode", "type");
+        String buttonId = getTrimmedString(obj, result, itemScope, "buttonId", "button_id", "eventId", "event_id", "id", "name");
+        String targetPage = getTrimmedString(
+            obj,
+            result,
+            itemScope,
+            "targetPage",
+            "target_page",
+            "pageTarget",
+            "page_target",
+            "targetState",
+            "target_state",
+            "stateTarget",
+            "state_target",
+            "targetGuiState",
+            "target_gui_state"
+        );
+        String targetSubGui = getTrimmedString(
+            obj,
+            result,
+            itemScope,
+            "targetSubGui",
+            "target_sub_gui",
+            "targetSubgui",
+            "target_subgui",
+            "subGui",
+            "sub_gui",
+            "subgui",
+            "subGuiId",
+            "sub_gui_id",
+            "subguiId",
+            "subgui_id"
+        );
+        String openMode = normalizeSubGuiMode(getTrimmedString(
+            obj,
+            result,
+            itemScope,
+            "openMode",
+            "open_mode",
+            "targetMode",
+            "target_mode",
+            "mode"
+        ));
+        String key = hotkeyOnly
+            ? getTrimmedString(
                 obj,
                 result,
                 itemScope,
-                "targetPage",
-                "target_page",
-                "pageTarget",
-                "page_target",
-                "targetState",
-                "target_state",
-                "stateTarget",
-                "state_target",
-                "targetGuiState",
-                "target_gui_state"
-            );
-            String targetSubGui = getTrimmedString(
-                obj,
-                result,
-                itemScope,
-                "targetSubGui",
-                "target_sub_gui",
-                "targetSubgui",
-                "target_subgui",
-                "subGui",
-                "sub_gui",
-                "subgui",
-                "subGuiId",
-                "sub_gui_id",
-                "subguiId",
-                "subgui_id"
-            );
-            String openMode = normalizeSubGuiMode(getTrimmedString(
-                obj,
-                result,
-                itemScope,
-                "openMode",
-                "open_mode",
-                "targetMode",
-                "target_mode",
-                "mode"
-            ));
-            String key = getTrimmedString(
+                "dataPortKey",
+                "data_port_key",
+                "portKey",
+                "port_key",
+                "dataPort",
+                "data_port",
+                "virtualKey",
+                "virtual_key",
+                "interfaceType",
+                "interface_type"
+            )
+            : getTrimmedString(
                 obj,
                 result,
                 itemScope,
@@ -706,82 +751,86 @@ final class MachineGuiStyleParser {
                 "dataPort",
                 "data_port"
             );
-            Float value = getOptionalFloat(obj, "value", "delta", "amount");
-            String stringValue = value == null
-                ? getValueAsString(obj, result, itemScope, "value", "textValue", "text_value", "stringValue", "string_value")
-                : null;
-            if (x == null || y == null || label == null || label.isEmpty()) {
-                result.warnForMachine(scope, itemScope + " is missing required fields x, y or label.");
-                continue;
-            }
-            if ((action == null || action.isEmpty()) && targetPage != null && !targetPage.isEmpty()) {
-                action = "page";
-            }
-            if (action == null || action.isEmpty()) {
-                result.warnForMachine(scope, itemScope + " is missing required field action.");
-                continue;
-            }
-
-            String normalizedAction = normalizeButtonAction(action);
-            if (normalizedAction == null) {
-                result.warnForMachine(scope, itemScope + ".action is invalid: " + action);
-                continue;
-            }
-            if ("page".equals(normalizedAction) && (targetPage == null || targetPage.isEmpty())) {
-                result.warnForMachine(scope, itemScope + " page action requires targetPage.");
-                continue;
-            }
-            if ("event".equals(normalizedAction) && (buttonId == null || buttonId.isEmpty())) {
-                result.warnForMachine(scope, itemScope + " event action requires buttonId.");
-                continue;
-            }
-            if ("subgui".equals(normalizedAction) && (targetSubGui == null || targetSubGui.isEmpty())) {
-                result.warnForMachine(scope, itemScope + " subgui action requires targetSubGui.");
-                continue;
-            }
-            if (("smart_set".equals(normalizedAction) || "smart_add".equals(normalizedAction))
-                && (key == null || key.isEmpty())) {
-                result.warnForMachine(scope, itemScope + " smart action requires key.");
-                continue;
-            }
-            if ("smart_set".equals(normalizedAction) && value == null && stringValue == null) {
-                result.warnForMachine(scope, itemScope + " smart_set action requires value.");
-                continue;
-            }
-            if ("smart_add".equals(normalizedAction) && value == null) {
-                result.warnForMachine(scope, itemScope + " smart_add action requires numeric value.");
-                continue;
-            }
-
-            MachineGuiStyleManager.ButtonStyle button = new MachineGuiStyleManager.ButtonStyle();
-            button.id = getTrimmedString(obj, result, itemScope, "id", "name");
-            button.x = x.intValue();
-            button.y = y.intValue();
-            button.width = validateRangeInt(getInt(obj, result, itemScope, "width", "w"), 1, MAX_COMPONENT_SIZE, result, itemScope, "width");
-            button.height = validateRangeInt(getInt(obj, result, itemScope, "height", "h"), 1, MAX_COMPONENT_SIZE, result, itemScope, "height");
-            button.label = label;
-            button.action = normalizedAction;
-            button.buttonId = buttonId;
-            button.key = key;
-            button.value = value;
-            // Modifier-key variant values (data-port smart actions only). Absent -> falls back to value.
-            button.shiftValue = getOptionalFloat(obj, "shiftValue", "shift_value", "shiftDelta", "shift_delta");
-            button.ctrlValue = getOptionalFloat(obj, "ctrlValue", "ctrl_value", "controlValue", "control_value");
-            button.ctrlShiftValue = getOptionalFloat(obj, "ctrlShiftValue", "ctrl_shift_value",
-                "shiftCtrlValue", "shift_ctrl_value", "ctrlShiftDelta", "ctrl_shift_delta");
-            button.stringValue = stringValue;
-            button.min = getFloat(obj, result, itemScope, "min", "minimum");
-            button.max = getFloat(obj, result, itemScope, "max", "maximum");
-            button.targetPage = targetPage;
-            button.targetSubGui = targetSubGui;
-            button.openMode = openMode;
-            button.priority = getInt(obj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
-            button.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
-            button.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
-            buttons.add(button);
+        Float value = getOptionalFloat(obj, "value", "delta", "amount");
+        String stringValue = value == null
+            ? getValueAsString(obj, result, itemScope, "value", "textValue", "text_value", "stringValue", "string_value")
+            : null;
+        List<String> hotkeys = parseHotkeys(obj, result, itemScope, hotkeyOnly);
+        if (!hotkeyOnly && (x == null || y == null || label == null || label.isEmpty())) {
+            result.warnForMachine(itemScope, itemScope + " is missing required fields x, y or label.");
+            return null;
+        }
+        if (hotkeyOnly && hotkeys.isEmpty()) {
+            result.warnForMachine(itemScope, itemScope + " is missing required field key or hotkey.");
+            return null;
+        }
+        if ((action == null || action.isEmpty()) && targetPage != null && !targetPage.isEmpty()) {
+            action = "page";
+        }
+        if (action == null || action.isEmpty()) {
+            result.warnForMachine(itemScope, itemScope + " is missing required field action.");
+            return null;
         }
 
-        return buttons.isEmpty() ? null : buttons;
+        String normalizedAction = normalizeButtonAction(action);
+        if (normalizedAction == null) {
+            result.warnForMachine(itemScope, itemScope + ".action is invalid: " + action);
+            return null;
+        }
+        if ("page".equals(normalizedAction) && (targetPage == null || targetPage.isEmpty())) {
+            result.warnForMachine(itemScope, itemScope + " page action requires targetPage.");
+            return null;
+        }
+        if ("event".equals(normalizedAction) && (buttonId == null || buttonId.isEmpty())) {
+            result.warnForMachine(itemScope, itemScope + " event action requires buttonId.");
+            return null;
+        }
+        if ("subgui".equals(normalizedAction) && (targetSubGui == null || targetSubGui.isEmpty())) {
+            result.warnForMachine(itemScope, itemScope + " subgui action requires targetSubGui.");
+            return null;
+        }
+        if (("smart_set".equals(normalizedAction) || "smart_add".equals(normalizedAction))
+            && (key == null || key.isEmpty())) {
+            result.warnForMachine(itemScope, itemScope + " smart action requires key.");
+            return null;
+        }
+        if ("smart_set".equals(normalizedAction) && value == null && stringValue == null) {
+            result.warnForMachine(itemScope, itemScope + " smart_set action requires value.");
+            return null;
+        }
+        if ("smart_add".equals(normalizedAction) && value == null) {
+            result.warnForMachine(itemScope, itemScope + " smart_add action requires numeric value.");
+            return null;
+        }
+
+        MachineGuiStyleManager.ButtonStyle button = new MachineGuiStyleManager.ButtonStyle();
+        button.id = getTrimmedString(obj, result, itemScope, "id", "name");
+        button.x = x == null ? 0 : x.intValue();
+        button.y = y == null ? 0 : y.intValue();
+        button.width = validateRangeInt(getInt(obj, result, itemScope, "width", "w"), 1, MAX_COMPONENT_SIZE, result, itemScope, "width");
+        button.height = validateRangeInt(getInt(obj, result, itemScope, "height", "h"), 1, MAX_COMPONENT_SIZE, result, itemScope, "height");
+        button.label = label;
+        button.action = normalizedAction;
+        button.buttonId = buttonId;
+        button.key = key;
+        button.value = value;
+        // Modifier-key variant values (data-port smart actions only). Absent -> falls back to value.
+        button.shiftValue = getOptionalFloat(obj, "shiftValue", "shift_value", "shiftDelta", "shift_delta");
+        button.ctrlValue = getOptionalFloat(obj, "ctrlValue", "ctrl_value", "controlValue", "control_value");
+        button.ctrlShiftValue = getOptionalFloat(obj, "ctrlShiftValue", "ctrl_shift_value",
+            "shiftCtrlValue", "shift_ctrl_value", "ctrlShiftDelta", "ctrl_shift_delta");
+        button.stringValue = stringValue;
+        button.min = getFloat(obj, result, itemScope, "min", "minimum");
+        button.max = getFloat(obj, result, itemScope, "max", "maximum");
+        button.targetPage = targetPage;
+        button.targetSubGui = targetSubGui;
+        button.openMode = openMode;
+        button.priority = getInt(obj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
+        button.visible = hotkeyOnly ? Boolean.FALSE : getBoolean(obj, result, itemScope, "visible", "show", "enabled");
+        button.hotkeys = hotkeys.isEmpty() ? null : hotkeys;
+        button.consumeHotkey = getBoolean(obj, result, itemScope, "consumeHotkey", "consume_hotkey", "consume", "cancelKey", "cancel_key");
+        button.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
+        return button;
     }
 
     @Nullable
@@ -1064,6 +1113,63 @@ final class MachineGuiStyleParser {
         }
 
         return values.isEmpty() ? null : values;
+    }
+
+    private static List<String> parseHotkeys(
+        JsonObject node,
+        MachineFileParseResult result,
+        String scope,
+        boolean includeKeyAlias
+    ) {
+        List<String> values = new ArrayList<String>();
+        appendHotkeyValues(values, node, result, scope, "hotkey", "hotKey", "shortcut");
+        appendHotkeyValues(values, node, result, scope, "hotkeys", "hotKeys", "shortcuts");
+        if (includeKeyAlias) {
+            appendHotkeyValues(values, node, result, scope, "key");
+        }
+        return values;
+    }
+
+    private static void appendHotkeyValues(
+        List<String> values,
+        JsonObject node,
+        MachineFileParseResult result,
+        String scope,
+        String... keys
+    ) {
+        MatchedElement match = findElement(node, keys);
+        if (match == null) {
+            return;
+        }
+        if (match.element.isJsonArray()) {
+            JsonArray array = match.element.getAsJsonArray();
+            int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+            for (int i = 0; i < limit; i++) {
+                addHotkeyValue(values, array.get(i), result, field(scope, match.key + "[" + i + "]"));
+            }
+            return;
+        }
+        addHotkeyValue(values, match.element, result, field(scope, match.key));
+    }
+
+    private static void addHotkeyValue(
+        List<String> values,
+        @Nullable JsonElement element,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        if (element == null || !element.isJsonPrimitive() || !element.getAsJsonPrimitive().isString()) {
+            result.warn(scope + " must be a string.");
+            return;
+        }
+        String value = safeTrim(element.getAsString());
+        if (value.isEmpty()) {
+            result.warn(scope + " must not be empty.");
+            return;
+        }
+        if (!values.contains(value)) {
+            values.add(value);
+        }
     }
 
     private static void appendTextureLayers(

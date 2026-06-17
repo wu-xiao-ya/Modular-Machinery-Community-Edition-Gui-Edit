@@ -60,6 +60,17 @@ public class ControllerButtonPolicyManagerTest {
     }
 
     @Test
+    public void parseButtonAcceptsInvisibleButtonsWhenHotkeyConfigured() throws Exception {
+        ControllerButtonPolicyManager.ButtonPolicy policy = parseButton(
+            "{ \"visible\": false, \"hotkey\": \"C\", \"action\": \"event\", \"buttonId\": \"evt_hidden\" }"
+        );
+
+        assertNotNull(policy);
+        assertEquals("event", policy.action);
+        assertEquals("evt_hidden", policy.buttonId);
+    }
+
+    @Test
     public void parseButtonsCollectsSubGuiDataPortAliases() throws Exception {
         List<ControllerButtonPolicyManager.ButtonPolicy> policies = parseButtons(
             "{\n" +
@@ -83,6 +94,25 @@ public class ControllerButtonPolicyManagerTest {
         assertEquals("smart_set", policies.get(1).action);
         assertEquals("speed", policies.get(1).key);
         assertEquals(Float.valueOf(0.0F), policies.get(1).value);
+    }
+
+    @Test
+    public void parseButtonsCollectsGuiOnlyHotkeyPolicies() throws Exception {
+        List<ControllerButtonPolicyManager.ButtonPolicy> policies = parseButtons(
+            "{\n" +
+                "  \"hotkeys\": [\n" +
+                "    {\"key\": \"C\", \"action\": \"event\", \"buttonId\": \"evt_c\"},\n" +
+                "    {\"key\": \"ctrl+g\", \"action\": \"smart_add\", \"dataPortKey\": \"gear\", \"value\": 1.0}\n" +
+                "  ]\n" +
+                "}"
+        );
+
+        assertEquals(2, policies.size());
+        assertEquals("event", policies.get(0).action);
+        assertEquals("evt_c", policies.get(0).buttonId);
+        assertEquals("smart_add", policies.get(1).action);
+        assertEquals("gear", policies.get(1).key);
+        assertEquals(Float.valueOf(1.0F), policies.get(1).value);
     }
 
     @Test
