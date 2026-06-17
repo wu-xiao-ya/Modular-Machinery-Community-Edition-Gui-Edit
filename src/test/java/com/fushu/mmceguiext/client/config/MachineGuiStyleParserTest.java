@@ -270,7 +270,7 @@ public class MachineGuiStyleParserTest {
                 "          \"width\": 8,\n" +
                 "          \"height\": 9,\n" +
                 "          \"direction\": \"bottom_to_top\",\n" +
-                "          \"source\": \"machine_progress\"\n" +
+                "          \"source\": \"active_recipe\"\n" +
                 "        }\n" +
                 "      ]\n" +
                 "    }\n" +

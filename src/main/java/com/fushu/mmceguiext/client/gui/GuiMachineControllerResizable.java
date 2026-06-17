@@ -3,6 +3,7 @@ package com.fushu.mmceguiext.client.gui;
 import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import com.fushu.mmceguiext.client.config.MachineGuiStyleManager;
+import com.fushu.mmceguiext.client.config.ProgressBarStyleSupport;
 import com.fushu.mmceguiext.common.network.PktControllerButtonAction;
 import com.fushu.mmceguiext.common.network.PktControllerSmartInterfaceUpdate;
 import com.fushu.mmceguiext.common.util.ControllerCustomDataAccess;
@@ -895,43 +896,15 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     }
 
     private float resolveProgressBarValue(MachineGuiStyleManager.ProgressBarStyle bar) {
-        ActiveMachineRecipe recipe = controller.getActiveRecipe();
-        float raw = 0.0F;
-        if (recipe != null && recipe.getTotalTick() > 0) {
-            raw = (float) recipe.getTick() / (float) recipe.getTotalTick();
+        String source = ProgressBarStyleSupport.normalizeProgressBarSource(bar.source);
+        if (source == null || "machine_progress".equals(source)) {
+            return ProgressBarStyleSupport.normalizeProgressValue(bar, ProgressBarStyleSupport.recipeProgress(controller.getActiveRecipe()));
         }
-        return normalizeProgressBarValue(bar, raw);
-    }
-
-    private float normalizeProgressBarValue(MachineGuiStyleManager.ProgressBarStyle bar, float raw) {
-        float value = Float.isFinite(raw) ? raw : 0.0F;
-        float min = bar.min == null ? 0.0F : bar.min.floatValue();
-        float max = bar.max == null ? 1.0F : bar.max.floatValue();
-        if (Math.abs(max - min) > 1.0E-6F) {
-            value = (value - min) / (max - min);
-        }
-        return MathHelper.clamp(value, 0.0F, 1.0F);
+        return ProgressBarStyleSupport.normalizeProgressValue(bar, 0.0F);
     }
 
     private void drawProgressBar(MachineGuiStyleManager.ProgressBarStyle bar, float progress) {
-        int bg = bar.backgroundColor == null ? 0x66000000 : bar.backgroundColor.intValue();
-        int fill = bar.fillColor == null ? 0xFF55CC66 : bar.fillColor.intValue();
-        drawRect(bar.x, bar.y, bar.x + bar.width, bar.y + bar.height, bg);
-        if (bar.borderColor != null) {
-            drawProgressBorder(bar.x, bar.y, bar.width, bar.height, bar.borderColor.intValue());
-        }
-        int fillWidth = MathHelper.floor(bar.width * progress);
-        int fillHeight = MathHelper.floor(bar.height * progress);
-        String direction = bar.direction == null ? "left_to_right" : bar.direction;
-        if ("right_to_left".equals(direction)) {
-            drawRect(bar.x + bar.width - fillWidth, bar.y, bar.x + bar.width, bar.y + bar.height, fill);
-        } else if ("top_to_bottom".equals(direction)) {
-            drawRect(bar.x, bar.y, bar.x + bar.width, bar.y + fillHeight, fill);
-        } else if ("bottom_to_top".equals(direction)) {
-            drawRect(bar.x, bar.y + bar.height - fillHeight, bar.x + bar.width, bar.y + bar.height, fill);
-        } else {
-            drawRect(bar.x, bar.y, bar.x + fillWidth, bar.y + bar.height, fill);
-        }
+        drawProgressBarBody(bar, progress);
         if (Boolean.TRUE.equals(bar.showText)) {
             String text = Math.round(progress * 100.0F) + "%";
             int color = bar.textColor == null ? 0xFFFFFFFF : bar.textColor.intValue();
@@ -939,6 +912,46 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             int textY = bar.y + Math.max(0, (bar.height - this.fontRenderer.FONT_HEIGHT) / 2);
             this.fontRenderer.drawStringWithShadow(text, textX, textY, color);
         }
+    }
+
+    private void drawProgressBarBody(MachineGuiStyleManager.ProgressBarStyle bar, float progress) {
+        int textureWidth = bar.textureWidth == null ? bar.width : Math.max(1, bar.textureWidth.intValue());
+        int textureHeight = bar.textureHeight == null ? bar.height : Math.max(1, bar.textureHeight.intValue());
+        int bgX = bar.x;
+        int bgY = bar.y;
+        ResourceLocation backgroundTexture = resolveProgressBarTexture(bar, false);
+        if (backgroundTexture != null) {
+            this.mc.getTextureManager().bindTexture(backgroundTexture);
+            Gui.drawModalRectWithCustomSizedTexture(bgX, bgY, 0, 0, bar.width, bar.height, textureWidth, textureHeight);
+        } else {
+            int bg = bar.backgroundColor == null ? 0x66000000 : bar.backgroundColor.intValue();
+            drawRect(bgX, bgY, bgX + bar.width, bgY + bar.height, bg);
+        }
+        if (bar.borderColor != null) {
+            drawProgressBorder(bar.x, bar.y, bar.width, bar.height, bar.borderColor.intValue());
+        }
+
+        int[] fillBounds = ProgressBarStyleSupport.computeFillBounds(bar.x, bar.y, bar.width, bar.height, bar.direction, progress);
+        if (fillBounds[2] <= 0 || fillBounds[3] <= 0) {
+            return;
+        }
+        ResourceLocation fillTexture = resolveProgressBarTexture(bar, true);
+        if (fillTexture != null) {
+            this.mc.getTextureManager().bindTexture(fillTexture);
+            Gui.drawModalRectWithCustomSizedTexture(fillBounds[0], fillBounds[1], 0, 0, fillBounds[2], fillBounds[3], textureWidth, textureHeight);
+        } else {
+            int fill = bar.fillColor == null ? 0xFF55CC66 : bar.fillColor.intValue();
+            drawRect(fillBounds[0], fillBounds[1], fillBounds[0] + fillBounds[2], fillBounds[1] + fillBounds[3], fill);
+        }
+    }
+
+    @Nullable
+    private ResourceLocation resolveProgressBarTexture(MachineGuiStyleManager.ProgressBarStyle bar, boolean fillLayer) {
+        String raw = fillLayer ? bar.fillTexture : bar.backgroundTexture;
+        if (raw == null || raw.trim().isEmpty()) {
+            raw = bar.texture;
+        }
+        return GuiRenderUtils.parseOptionalTexture(raw);
     }
 
     private void drawProgressBorder(int x, int y, int width, int height, int color) {
@@ -2100,8 +2113,10 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             public void run() {
                 modalSubGuiDragging = false;
                 draggingPanelId = null;
+                draggingSlider = null;
             }
         });
+        this.draggingSlider = null;
     }
 
     private void handleTopModalMouseClickMove(final int mouseX, final int mouseY, final int clickedMouseButton, final long timeSinceLastClick) {
@@ -2110,6 +2125,10 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             public void run() {
                 if (clickedMouseButton == 0 && modalSubGuiDragging) {
                     updateModalSubGuiPosition(mouseX - modalSubGuiDragOffsetX, mouseY - modalSubGuiDragOffsetY);
+                    return;
+                }
+                if (clickedMouseButton == 0 && draggingSlider != null) {
+                    updateSliderFromMouse(draggingSlider, mouseX, mouseY, false);
                     return;
                 }
                 if (isUsingDefaultBackground(MMCEGuiExtConfig.machineController)) {
@@ -2336,6 +2355,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         state.modalSubGuiDragY = this.modalSubGuiDragY;
         state.modalSubGuiDragWidth = this.modalSubGuiDragWidth;
         state.modalSubGuiDragHeight = this.modalSubGuiDragHeight;
+        state.draggingSlider = this.draggingSlider;
         state.smartInterfaceEditorInput = this.smartInterfaceEditorInput;
         state.smartInterfacePrevButton = this.smartInterfacePrevButton;
         state.smartInterfaceNextButton = this.smartInterfaceNextButton;
@@ -2394,6 +2414,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         this.modalSubGuiDragY = state.modalSubGuiDragY;
         this.modalSubGuiDragWidth = state.modalSubGuiDragWidth;
         this.modalSubGuiDragHeight = state.modalSubGuiDragHeight;
+        this.draggingSlider = state.draggingSlider;
         this.smartInterfaceEditorInput = state.smartInterfaceEditorInput;
         this.smartInterfacePrevButton = state.smartInterfacePrevButton;
         this.smartInterfaceNextButton = state.smartInterfaceNextButton;
@@ -3280,19 +3301,42 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         if (mouseButton != 0) {
             return false;
         }
-        List<CustomSlider> ordered = new ArrayList<CustomSlider>(this.customSliders);
-        ordered.sort((a, b) -> Integer.compare(b.priority, a.priority));
-        for (CustomSlider slider : ordered) {
+        CustomSlider slider = findTopmostSliderAt(mouseX, mouseY);
+        if (slider == null) {
+            return false;
+        }
+        this.draggingSlider = slider;
+        updateSliderFromMouse(slider, mouseX, mouseY, true);
+        return true;
+    }
+
+    @Nullable
+    private CustomSlider findTopmostSliderAt(int mouseX, int mouseY) {
+        List<IndexedSlider> ordered = new ArrayList<IndexedSlider>(this.customSliders.size());
+        for (int i = 0; i < this.customSliders.size(); i++) {
+            ordered.add(new IndexedSlider(this.customSliders.get(i), i));
+        }
+        ordered.sort((left, right) -> {
+            int foregroundCmp = Boolean.compare(left.slider.foreground, right.slider.foreground);
+            if (foregroundCmp != 0) {
+                return -foregroundCmp;
+            }
+            int priorityCmp = Integer.compare(left.slider.priority, right.slider.priority);
+            if (priorityCmp != 0) {
+                return -priorityCmp;
+            }
+            return Integer.compare(right.index, left.index);
+        });
+        for (IndexedSlider candidate : ordered) {
+            CustomSlider slider = candidate.slider;
             if (!slider.visible || !isPageVisible(slider.page)) {
                 continue;
             }
             if (isPointInSlider(slider, mouseX, mouseY)) {
-                this.draggingSlider = slider;
-                updateSliderFromMouse(slider, mouseX, mouseY, true);
-                return true;
+                return slider;
             }
         }
-        return false;
+        return null;
     }
 
     private void updateSliderFromMouse(CustomSlider slider, int mouseX, int mouseY, boolean forceSend) {
@@ -4094,6 +4138,16 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         private int textColor = 0xFFFFFFFF;
     }
 
+    private static class IndexedSlider {
+        private final CustomSlider slider;
+        private final int index;
+
+        private IndexedSlider(CustomSlider slider, int index) {
+            this.slider = slider;
+            this.index = index;
+        }
+    }
+
     private static class ParsedDataPortValue {
         private final boolean numeric;
         private final float number;
@@ -4143,6 +4197,8 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         private int modalSubGuiDragY;
         private int modalSubGuiDragWidth;
         private int modalSubGuiDragHeight;
+        @Nullable
+        private CustomSlider draggingSlider;
         @Nullable
         private GuiTextField smartInterfaceEditorInput;
         @Nullable

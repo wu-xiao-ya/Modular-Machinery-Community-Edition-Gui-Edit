@@ -1553,19 +1553,11 @@ final class MachineGuiStyleParser {
         MachineFileParseResult result,
         String scope
     ) {
-        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
-        if (text.isEmpty()) {
-            return null;
-        }
-        if ("machine_progress".equals(text)
-            || "factory_first".equals(text)
-            || "factory_thread".equals(text)
-            || "factory_core".equals(text)
-            || "factory_average".equals(text)
-            || "factory_max".equals(text)) {
+        String text = ProgressBarStyleSupport.normalizeProgressBarSource(raw);
+        if (text != null) {
             return text;
         }
-        result.warnForMachine(scope, field(scope, "source") + " must be machine_progress, factory_first, factory_thread, factory_core, factory_average or factory_max.");
+        result.warnForMachine(scope, field(scope, "source") + " must be machine_progress, active_recipe, factory_first, factory_thread, factory_core, factory_average or factory_max.");
         return null;
     }
 
