@@ -310,12 +310,15 @@ public final class CustomHatchRegistry {
             def.spacingY = clamp(getInt(obj, "spacingY", getInt(obj, "spacing_y", 2)), 0, MAX_SLOT_SPACING);
             def.slotSize = clamp(getInt(obj, "slotSize", getInt(obj, "slot_size", getInt(obj, "size", 16))), 1, 256);
             def.scrollMode = lower(getString(obj, "scrollMode"));
+            def.scrollAxis = normalizeScrollAxis(getFirstString(obj, "scrollAxis", "scroll_axis", "scrollDirection", "scroll_direction", "axis", "orientation"));
             def.scrollbar = getBoolean(obj, "scrollbar");
             def.scrollbarX = getInt(obj, "scrollbarX", getInt(obj, "scrollbar_x", 0));
             def.scrollbarY = getInt(obj, "scrollbarY", getInt(obj, "scrollbar_y", 0));
+            def.scrollbarLength = clampOptionalSize(getFirstInt(obj, 0, "scrollbarLength", "scrollbar_length"));
             def.scrollbarHeight = clampOptionalSize(getInt(obj, "scrollbarHeight", getInt(obj, "scrollbar_height", 0)));
             def.scrollbarWidth = clamp(getInt(obj, "scrollbarWidth", getInt(obj, "scrollbar_width", 12)), 1, MAX_COMPONENT_SIZE);
             def.scrollbarThumbHeight = clamp(getInt(obj, "scrollbarThumbHeight", getInt(obj, "scrollbar_thumb_height", 15)), 1, MAX_COMPONENT_SIZE);
+            def.scrollbarThumbWidth = clampOptionalSize(getFirstInt(obj, 0, "scrollbarThumbWidth", "scrollbar_thumb_width"));
             def.scrollbarTexture = getString(obj, "scrollbarTexture");
             def.scrollbarHoverTexture = getString(obj, "scrollbarHoverTexture");
             def.scrollbarPressedTexture = getString(obj, "scrollbarPressedTexture");
@@ -378,9 +381,11 @@ public final class CustomHatchRegistry {
         int visibleColumns = clampOptionalSize(getFirstInt(obj, 0, "visibleColumns", "visible_columns"));
         int scrollbarX = getFirstInt(obj, 0, "scrollbarX", "scrollbar_x");
         int scrollbarY = getFirstInt(obj, 0, "scrollbarY", "scrollbar_y");
+        int scrollbarLength = clampOptionalSize(getFirstInt(obj, 0, "scrollbarLength", "scrollbar_length"));
         int scrollbarHeight = clampOptionalSize(getFirstInt(obj, 0, "scrollbarHeight", "scrollbar_height"));
         int scrollbarWidth = clamp(getFirstInt(obj, 12, "scrollbarWidth", "scrollbar_width"), 1, MAX_COMPONENT_SIZE);
         int scrollbarThumbHeight = clamp(getFirstInt(obj, 15, "scrollbarThumbHeight", "scrollbar_thumb_height"), 1, MAX_COMPONENT_SIZE);
+        int scrollbarThumbWidth = clampOptionalSize(getFirstInt(obj, 0, "scrollbarThumbWidth", "scrollbar_thumb_width"));
         String scrollbarTexture = getString(obj, "scrollbarTexture");
         String scrollbarHoverTexture = getString(obj, "scrollbarHoverTexture");
         String scrollbarPressedTexture = getString(obj, "scrollbarPressedTexture");
@@ -402,6 +407,7 @@ public final class CustomHatchRegistry {
         int itemOverlayU = getFirstInt(obj, 0, "itemOverlayU", "item_overlay_u");
         int itemOverlayV = getFirstInt(obj, 0, "itemOverlayV", "item_overlay_v");
         String scrollMode = lower(getString(obj, "scrollMode"));
+        String scrollAxis = normalizeScrollAxis(getFirstString(obj, "scrollAxis", "scroll_axis", "scrollDirection", "scroll_direction", "axis", "orientation"));
         Boolean scrollbar = getBoolean(obj, "scrollbar");
         int baseIndex = grid.index >= 0 ? grid.index : nextAutoSlotIndex;
         if (baseIndex > Integer.MAX_VALUE - (rows * columns)) {
@@ -432,12 +438,15 @@ public final class CustomHatchRegistry {
                 slot.spacingY = spacingY;
                 slot.slotSize = slotSize;
                 slot.scrollMode = scrollMode;
+                slot.scrollAxis = scrollAxis;
                 slot.scrollbar = scrollbar;
                 slot.scrollbarX = scrollbarX;
                 slot.scrollbarY = scrollbarY;
+                slot.scrollbarLength = scrollbarLength;
                 slot.scrollbarHeight = scrollbarHeight;
                 slot.scrollbarWidth = scrollbarWidth;
                 slot.scrollbarThumbHeight = scrollbarThumbHeight;
+                slot.scrollbarThumbWidth = scrollbarThumbWidth;
                 slot.scrollbarTexture = scrollbarTexture;
                 slot.scrollbarHoverTexture = scrollbarHoverTexture;
                 slot.scrollbarPressedTexture = scrollbarPressedTexture;
@@ -672,6 +681,25 @@ public final class CustomHatchRegistry {
             if (e != null && !e.isJsonNull()) {
                 return asString(e, null);
             }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeScrollAxis(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String text = value.trim().toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("horizontal".equals(text) || "x".equals(text) || "left_to_right".equals(text) || "ltr".equals(text)) {
+            return "horizontal";
+        }
+        if ("vertical".equals(text) || "y".equals(text) || "top_to_bottom".equals(text) || "ttb".equals(text)
+            || "bottom_to_top".equals(text) || "btt".equals(text)) {
+            return "vertical";
         }
         return null;
     }
@@ -919,12 +947,16 @@ public final class CustomHatchRegistry {
         @Nullable
         public String scrollMode;
         @Nullable
+        public String scrollAxis;
+        @Nullable
         public Boolean scrollbar;
         public int scrollbarX;
         public int scrollbarY;
+        public int scrollbarLength;
         public int scrollbarHeight;
         public int scrollbarWidth = 12;
         public int scrollbarThumbHeight = 15;
+        public int scrollbarThumbWidth;
         @Nullable
         public String scrollbarTexture;
         @Nullable
