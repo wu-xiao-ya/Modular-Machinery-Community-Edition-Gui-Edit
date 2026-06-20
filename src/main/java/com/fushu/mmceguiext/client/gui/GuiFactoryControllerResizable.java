@@ -220,8 +220,13 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         int requestedWidth = getRequestedGuiWidth(cfg);
         int requestedHeight = getRequestedGuiHeight(cfg);
         int targetWidth = getDisableRightExtension() ? BASE_WIDTH : requestedWidth;
-        this.renderWidth = MathHelper.clamp(targetWidth, BASE_WIDTH, maxWidth);
-        this.renderHeight = MathHelper.clamp(requestedHeight, BASE_HEIGHT, maxHeight);
+        if (getAllowOffscreenGui(cfg)) {
+            this.renderWidth = Math.max(BASE_WIDTH, targetWidth);
+            this.renderHeight = Math.max(BASE_HEIGHT, requestedHeight);
+        } else {
+            this.renderWidth = MathHelper.clamp(targetWidth, BASE_WIDTH, maxWidth);
+            this.renderHeight = MathHelper.clamp(requestedHeight, BASE_HEIGHT, maxHeight);
+        }
 
         this.xSize = BASE_WIDTH;
         this.ySize = BASE_HEIGHT;
@@ -2509,6 +2514,13 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         return cfg.guiHeight;
     }
 
+    private boolean getAllowOffscreenGui(MMCEGuiExtConfig.FactoryController cfg) {
+        if (styleOverride.allowOffscreenGui != null) {
+            return styleOverride.allowOffscreenGui.booleanValue();
+        }
+        return cfg.allowOffscreenGui;
+    }
+
     private int resolveSpecialThreadBgColor() {
         if (styleOverride.specialThreadBackgroundColor != null) {
             return styleOverride.specialThreadBackgroundColor.intValue();
@@ -3899,8 +3911,11 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 }
                 boolean visible = style.visible == null || style.visible.booleanValue();
                 boolean hasLabel = style.label != null && !style.label.trim().isEmpty();
+                boolean hasTexture = style.texture != null && !style.texture.trim().isEmpty()
+                    || style.hoverTexture != null && !style.hoverTexture.trim().isEmpty()
+                    || style.disabledTexture != null && !style.disabledTexture.trim().isEmpty();
                 boolean hasHotkey = style.hotkeys != null && !style.hotkeys.isEmpty();
-                if (!hasLabel && !hasHotkey) {
+                if (!hasLabel && !hasTexture && !hasHotkey) {
                     continue;
                 }
                 int width = style.width == null ? DEFAULT_BUTTON_WIDTH : Math.max(8, style.width.intValue());
@@ -3928,8 +3943,10 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 button.visible = visible;
                 button.hotkeys = style.hotkeys == null ? Collections.<String>emptyList() : new ArrayList<String>(style.hotkeys);
                 button.consumeHotkey = style.consumeHotkey == null || style.consumeHotkey.booleanValue();
-                if (visible && hasLabel) {
-                    button.button = new GuiButton(buttonId++, this.guiLeft + x, this.guiTop + y, width, height, style.label);
+                if (visible && (hasLabel || hasTexture)) {
+                    button.button = GuiTexturedButton.forStyle(
+                        buttonId++, this.guiLeft + x, this.guiTop + y, width, height, style.label, style
+                    );
                 }
                 this.customButtons.add(button);
             }

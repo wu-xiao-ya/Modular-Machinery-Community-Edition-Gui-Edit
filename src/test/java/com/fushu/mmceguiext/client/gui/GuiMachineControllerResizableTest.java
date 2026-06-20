@@ -1,5 +1,7 @@
 package com.fushu.mmceguiext.client.gui;
 
+import com.fushu.mmceguiext.MMCEGuiExtConfig;
+import com.fushu.mmceguiext.client.config.MachineGuiStyleManager;
 import sun.misc.Unsafe;
 
 import org.junit.Test;
@@ -85,6 +87,29 @@ public class GuiMachineControllerResizableTest {
             Boolean.FALSE,
             Boolean.FALSE
         ));
+    }
+
+    @Test
+    public void setWidthHeightKeepsOversizedGuiWhenOffscreenIsAllowed() throws Exception {
+        GuiMachineControllerResizable gui = allocateGui();
+        MMCEGuiExtConfig.MachineController original = MMCEGuiExtConfig.machineController;
+        MMCEGuiExtConfig.MachineController cfg = new MMCEGuiExtConfig.MachineController();
+        cfg.guiWidth = 900;
+        cfg.guiHeight = 500;
+        cfg.allowOffscreenGui = true;
+
+        try {
+            MMCEGuiExtConfig.machineController = cfg;
+            set(gui, "width", Integer.valueOf(400));
+            set(gui, "height", Integer.valueOf(240));
+            set(gui, "styleOverride", MachineGuiStyleManager.ControllerStyle.EMPTY);
+            invoke(gui, "setWidthHeight", new Class<?>[0]);
+
+            assertEquals(Integer.valueOf(900), get(gui, "renderWidth"));
+            assertEquals(Integer.valueOf(500), get(gui, "renderHeight"));
+        } finally {
+            MMCEGuiExtConfig.machineController = original;
+        }
     }
 
     private static GuiMachineControllerResizable allocateGui() throws Exception {

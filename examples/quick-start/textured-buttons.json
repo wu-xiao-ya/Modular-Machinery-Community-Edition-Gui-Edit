@@ -1,0 +1,60 @@
+{
+  "registryname": "demo:textured_buttons",
+  "localizedname": "MMCEGE Textured Button Demo",
+  "parts": [],
+  "mmce_gui_ext": {
+    "machineController": {
+      "backgroundTexture": "demo:textures/gui/paged_controller.png",
+      "guiWidth": 300,
+      "guiHeight": 213,
+      "texts": [
+        {
+          "x": 186,
+          "y": 14,
+          "value": "Textured Buttons"
+        }
+      ],
+      "buttons": [
+        {
+          "x": 186,
+          "y": 96,
+          "width": 48,
+          "height": 20,
+          "label": "Run",
+          "texture": "demo:textures/gui/controller_buttons.png",
+          "textureWidth": 128,
+          "textureHeight": 20,
+          "u": 0,
+          "v": 0,
+          "hoverU": 48,
+          "hoverV": 0,
+          "disabledU": 96,
+          "disabledV": 0,
+          "textColor": "FFFFFF",
+          "hoverTextColor": "FFFFA0",
+          "disabledTextColor": "808080",
+          "action": "event",
+          "buttonId": "run_textured"
+        },
+        {
+          "x": 242,
+          "y": 96,
+          "width": 18,
+          "height": 18,
+          "texture": "demo:textures/gui/controller_icons.png",
+          "textureWidth": 64,
+          "textureHeight": 18,
+          "u": 0,
+          "v": 0,
+          "hoverU": 18,
+          "hoverV": 0,
+          "disabledU": 36,
+          "disabledV": 0,
+          "drawLabel": false,
+          "action": "event",
+          "buttonId": "icon_textured"
+        }
+      ]
+    }
+  }
+}

@@ -47,6 +47,9 @@ public class MMCEGuiExtConfig {
         @Config.RangeInt(min = 213, max = 1024)
         public int guiHeight = 213;
 
+        @Config.Comment("Allow requested GUI size to exceed the current screen. Disables the safety clamp that normally fits guiWidth/guiHeight into the Minecraft window.")
+        public boolean allowOffscreenGui = false;
+
         @Config.Comment("信息区 X 偏移，0 表示自动布局 / Info panel X offset, 0 means auto layout.")
         @Config.RangeInt(min = 0, max = 1024)
         public int panelX = 0;
@@ -146,6 +149,9 @@ public class MMCEGuiExtConfig {
         @Config.Comment("GUI 高度，最小 213 / GUI height, minimum 213.")
         @Config.RangeInt(min = 213, max = 1024)
         public int guiHeight = 213;
+
+        @Config.Comment("Allow requested GUI size to exceed the current screen. Disables the safety clamp that normally fits guiWidth/guiHeight into the Minecraft window.")
+        public boolean allowOffscreenGui = false;
 
         @Config.Comment("信息区 X 偏移，0 表示使用 MMCE 默认值（113） / Info panel X offset, 0 means MMCE default (113).")
         @Config.RangeInt(min = 0, max = 1024)

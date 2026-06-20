@@ -131,6 +131,19 @@ final class MachineGuiStyleParser {
             scope,
             "guiHeight"
         );
+        style.allowOffscreenGui = getBoolean(
+            node,
+            result,
+            scope,
+            "allowOffscreenGui",
+            "allow_offscreen_gui",
+            "allowOffscreen",
+            "allow_offscreen",
+            "allowOversizedGui",
+            "allow_oversized_gui",
+            "disableScreenClamp",
+            "disable_screen_clamp"
+        );
         style.coordinateWidth = validateRangeInt(
             getInt(node, result, scope, "coordinateWidth", "coordinate_width", "logicalWidth", "logical_width",
                 "canvasWidth", "canvas_width"),
@@ -676,6 +689,9 @@ final class MachineGuiStyleParser {
         Integer x = validateMinInt(getInt(obj, result, itemScope, "x"), 0, result, itemScope, "x");
         Integer y = validateMinInt(getInt(obj, result, itemScope, "y"), 0, result, itemScope, "y");
         String label = getTrimmedString(obj, result, itemScope, "label", "text", "title");
+        String texture = getTrimmedString(obj, result, itemScope, "texture", "buttonTexture", "button_texture", "backgroundTexture", "background_texture");
+        String hoverTexture = getTrimmedString(obj, result, itemScope, "hoverTexture", "hover_texture", "highlightTexture", "highlight_texture");
+        String disabledTexture = getTrimmedString(obj, result, itemScope, "disabledTexture", "disabled_texture", "inactiveTexture", "inactive_texture");
         String action = getTrimmedString(obj, result, itemScope, "action", "mode", "type");
         String buttonId = getTrimmedString(obj, result, itemScope, "buttonId", "button_id", "eventId", "event_id", "id", "name");
         String targetPage = getTrimmedString(
@@ -756,8 +772,11 @@ final class MachineGuiStyleParser {
             ? getValueAsString(obj, result, itemScope, "value", "textValue", "text_value", "stringValue", "string_value")
             : null;
         List<String> hotkeys = parseHotkeys(obj, result, itemScope, hotkeyOnly);
-        if (!hotkeyOnly && (x == null || y == null || label == null || label.isEmpty())) {
-            result.warnForMachine(itemScope, itemScope + " is missing required fields x, y or label.");
+        boolean hasButtonTexture = (texture != null && !texture.isEmpty())
+            || (hoverTexture != null && !hoverTexture.isEmpty())
+            || (disabledTexture != null && !disabledTexture.isEmpty());
+        if (!hotkeyOnly && (x == null || y == null || ((label == null || label.isEmpty()) && !hasButtonTexture))) {
+            result.warnForMachine(itemScope, itemScope + " is missing required fields x, y, and label or texture.");
             return null;
         }
         if (hotkeyOnly && hotkeys.isEmpty()) {
@@ -830,6 +849,23 @@ final class MachineGuiStyleParser {
         button.hotkeys = hotkeys.isEmpty() ? null : hotkeys;
         button.consumeHotkey = getBoolean(obj, result, itemScope, "consumeHotkey", "consume_hotkey", "consume", "cancelKey", "cancel_key");
         button.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
+        button.texture = texture;
+        button.hoverTexture = hoverTexture;
+        button.disabledTexture = disabledTexture;
+        button.textureWidth = validateRangeInt(getInt(obj, result, itemScope, "textureWidth", "texture_width", "texW"), 1, MAX_COMPONENT_SIZE, result, itemScope, "textureWidth");
+        button.textureHeight = validateRangeInt(getInt(obj, result, itemScope, "textureHeight", "texture_height", "texH"), 1, MAX_COMPONENT_SIZE, result, itemScope, "textureHeight");
+        button.u = validateMinInt(getInt(obj, result, itemScope, "u", "textureU", "texture_u"), 0, result, itemScope, "u");
+        button.v = validateMinInt(getInt(obj, result, itemScope, "v", "textureV", "texture_v"), 0, result, itemScope, "v");
+        button.hoverU = validateMinInt(getInt(obj, result, itemScope, "hoverU", "hover_u", "textureHoverU", "texture_hover_u"), 0, result, itemScope, "hoverU");
+        button.hoverV = validateMinInt(getInt(obj, result, itemScope, "hoverV", "hover_v", "textureHoverV", "texture_hover_v"), 0, result, itemScope, "hoverV");
+        button.disabledU = validateMinInt(getInt(obj, result, itemScope, "disabledU", "disabled_u", "textureDisabledU", "texture_disabled_u"), 0, result, itemScope, "disabledU");
+        button.disabledV = validateMinInt(getInt(obj, result, itemScope, "disabledV", "disabled_v", "textureDisabledV", "texture_disabled_v"), 0, result, itemScope, "disabledV");
+        button.useNineSlice = getBoolean(obj, result, itemScope, "useNineSlice", "use_nine_slice", "nineSlice", "nine_slice");
+        button.corner = validateRangeInt(getInt(obj, result, itemScope, "corner", "cornerSize", "corner_size"), 1, MAX_CORNER, result, itemScope, "corner");
+        button.textColor = getColor(obj, result, itemScope, "textColor", "text_color", "labelColor", "label_color");
+        button.hoverTextColor = getColor(obj, result, itemScope, "hoverTextColor", "hover_text_color", "labelHoverColor", "label_hover_color");
+        button.disabledTextColor = getColor(obj, result, itemScope, "disabledTextColor", "disabled_text_color", "labelDisabledColor", "label_disabled_color");
+        button.drawLabel = getBoolean(obj, result, itemScope, "drawLabel", "draw_label", "showLabel", "show_label");
         return button;
     }
 

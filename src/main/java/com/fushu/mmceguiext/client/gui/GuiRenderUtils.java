@@ -136,6 +136,20 @@ public final class GuiRenderUtils {
     }
 
     public static void drawNineSlice(int x, int y, int width, int height, int textureWidth, int textureHeight, int corner) {
+        drawNineSlice(x, y, width, height, 0, 0, textureWidth, textureHeight, corner);
+    }
+
+    public static void drawNineSlice(
+        int x,
+        int y,
+        int width,
+        int height,
+        int u,
+        int v,
+        int textureWidth,
+        int textureHeight,
+        int corner
+    ) {
         if (width <= 0 || height <= 0 || textureWidth <= 0 || textureHeight <= 0) {
             return;
         }
@@ -149,44 +163,44 @@ public final class GuiRenderUtils {
         int destMiddleWidth = Math.max(0, width - destCorner * 2);
         int destMiddleHeight = Math.max(0, height - destCorner * 2);
 
-        Gui.drawModalRectWithCustomSizedTexture(x, y, 0, 0, destCorner, destCorner, textureWidth, textureHeight);
+        Gui.drawModalRectWithCustomSizedTexture(x, y, u, v, destCorner, destCorner, textureWidth, textureHeight);
         Gui.drawModalRectWithCustomSizedTexture(
-            x + width - destCorner, y, textureWidth - srcCorner, 0, destCorner, destCorner, textureWidth, textureHeight
+            x + width - destCorner, y, u + textureWidth - srcCorner, v, destCorner, destCorner, textureWidth, textureHeight
         );
         Gui.drawModalRectWithCustomSizedTexture(
-            x, y + height - destCorner, 0, textureHeight - srcCorner, destCorner, destCorner, textureWidth, textureHeight
+            x, y + height - destCorner, u, v + textureHeight - srcCorner, destCorner, destCorner, textureWidth, textureHeight
         );
         Gui.drawModalRectWithCustomSizedTexture(
             x + width - destCorner, y + height - destCorner,
-            textureWidth - srcCorner, textureHeight - srcCorner,
+            u + textureWidth - srcCorner, v + textureHeight - srcCorner,
             destCorner, destCorner, textureWidth, textureHeight
         );
 
         if (destMiddleWidth > 0) {
             Gui.drawModalRectWithCustomSizedTexture(
-                x + destCorner, y, srcCorner, 0, destMiddleWidth, destCorner, textureWidth, textureHeight
+                x + destCorner, y, u + srcCorner, v, destMiddleWidth, destCorner, textureWidth, textureHeight
             );
             Gui.drawModalRectWithCustomSizedTexture(
                 x + destCorner, y + height - destCorner,
-                srcCorner, textureHeight - srcCorner,
+                u + srcCorner, v + textureHeight - srcCorner,
                 destMiddleWidth, destCorner, textureWidth, textureHeight
             );
         }
 
         if (destMiddleHeight > 0) {
             Gui.drawModalRectWithCustomSizedTexture(
-                x, y + destCorner, 0, srcCorner, destCorner, destMiddleHeight, textureWidth, textureHeight
+                x, y + destCorner, u, v + srcCorner, destCorner, destMiddleHeight, textureWidth, textureHeight
             );
             Gui.drawModalRectWithCustomSizedTexture(
                 x + width - destCorner, y + destCorner,
-                textureWidth - srcCorner, srcCorner, destCorner, destMiddleHeight, textureWidth, textureHeight
+                u + textureWidth - srcCorner, v + srcCorner, destCorner, destMiddleHeight, textureWidth, textureHeight
             );
         }
 
         if (destMiddleWidth > 0 && destMiddleHeight > 0) {
             Gui.drawModalRectWithCustomSizedTexture(
                 x + destCorner, y + destCorner,
-                srcCorner, srcCorner, destMiddleWidth, destMiddleHeight, textureWidth, textureHeight
+                u + srcCorner, v + srcCorner, destMiddleWidth, destMiddleHeight, textureWidth, textureHeight
             );
         }
     }

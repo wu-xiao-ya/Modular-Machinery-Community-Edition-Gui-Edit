@@ -279,6 +279,8 @@ public final class MachineGuiStyleManager {
         @Nullable
         public Integer guiHeight;
         @Nullable
+        public Boolean allowOffscreenGui;
+        @Nullable
         public Integer coordinateWidth;
         @Nullable
         public Integer coordinateHeight;
@@ -367,6 +369,7 @@ public final class MachineGuiStyleManager {
                    && hideDefaultBackground == null
                    && guiWidth == null
                    && guiHeight == null
+                   && allowOffscreenGui == null
                    && coordinateWidth == null
                    && coordinateHeight == null
                    && backgroundTextureWidth == null
@@ -421,6 +424,7 @@ public final class MachineGuiStyleManager {
             copy.hideDefaultBackground = source.hideDefaultBackground;
             copy.guiWidth = source.guiWidth;
             copy.guiHeight = source.guiHeight;
+            copy.allowOffscreenGui = source.allowOffscreenGui;
             copy.coordinateWidth = source.coordinateWidth;
             copy.coordinateHeight = source.coordinateHeight;
             copy.backgroundTextureWidth = source.backgroundTextureWidth;
@@ -475,6 +479,7 @@ public final class MachineGuiStyleManager {
             if (overlay.hideDefaultBackground != null) this.hideDefaultBackground = overlay.hideDefaultBackground;
             if (overlay.guiWidth != null) this.guiWidth = overlay.guiWidth;
             if (overlay.guiHeight != null) this.guiHeight = overlay.guiHeight;
+            if (overlay.allowOffscreenGui != null) this.allowOffscreenGui = overlay.allowOffscreenGui;
             if (overlay.coordinateWidth != null) this.coordinateWidth = overlay.coordinateWidth;
             if (overlay.coordinateHeight != null) this.coordinateHeight = overlay.coordinateHeight;
             if (overlay.backgroundTextureWidth != null) this.backgroundTextureWidth = overlay.backgroundTextureWidth;
@@ -655,6 +660,40 @@ public final class MachineGuiStyleManager {
         public Boolean consumeHotkey;
         @Nullable
         public String page;
+        @Nullable
+        public String texture;
+        @Nullable
+        public String hoverTexture;
+        @Nullable
+        public String disabledTexture;
+        @Nullable
+        public Integer textureWidth;
+        @Nullable
+        public Integer textureHeight;
+        @Nullable
+        public Integer u;
+        @Nullable
+        public Integer v;
+        @Nullable
+        public Integer hoverU;
+        @Nullable
+        public Integer hoverV;
+        @Nullable
+        public Integer disabledU;
+        @Nullable
+        public Integer disabledV;
+        @Nullable
+        public Boolean useNineSlice;
+        @Nullable
+        public Integer corner;
+        @Nullable
+        public Integer textColor;
+        @Nullable
+        public Integer hoverTextColor;
+        @Nullable
+        public Integer disabledTextColor;
+        @Nullable
+        public Boolean drawLabel;
     }
 
     public static class SubGuiStyle {

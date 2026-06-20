@@ -82,6 +82,7 @@ public class MachineGuiStyleParserTest {
                 "      \"backgroundTexture\": \"demo:textures/gui/factory.png\",\n" +
                 "      \"guiWidth\": 420,\n" +
                 "      \"guiHeight\": 240,\n" +
+                "      \"allowOffscreenGui\": true,\n" +
                 "      \"enableRightExtension\": false,\n" +
                 "      \"specialThreadBgColor\": \"7DD3FC\",\n" +
                 "      \"threadQueueX\": 12,\n" +
@@ -108,6 +109,7 @@ public class MachineGuiStyleParserTest {
         assertNotNull(result.factoryStyle);
         assertEquals(Integer.valueOf(420), result.factoryStyle.guiWidth);
         assertEquals(Integer.valueOf(240), result.factoryStyle.guiHeight);
+        assertEquals(Boolean.TRUE, result.factoryStyle.allowOffscreenGui);
         assertEquals(Boolean.TRUE, result.factoryStyle.disableRightExtension);
         assertEquals(Integer.valueOf(0xFF7DD3FC), result.factoryStyle.specialThreadBackgroundColor);
         assertEquals(Integer.valueOf(12), result.factoryStyle.threadQueueX);
@@ -626,6 +628,59 @@ public class MachineGuiStyleParserTest {
         assertEquals("gear", result.machineStyle.buttons.get(2).key);
         assertEquals(2, result.machineStyle.buttons.get(2).hotkeys.size());
         assertEquals(Boolean.FALSE, result.machineStyle.buttons.get(2).consumeHotkey);
+        assertTrue(result.warnings.isEmpty());
+    }
+
+    @Test
+    public void parseMachineJsonAcceptsTexturedButtonsWithoutLabels() {
+        MachineGuiStyleParser.MachineFileParseResult result = MachineGuiStyleParser.parseMachineJson(
+            "button-textures.json",
+            "{\n" +
+                "  \"registryname\": \"demo:textured_button_machine\",\n" +
+                "  \"mmce_gui_ext\": {\n" +
+                "    \"machineController\": {\n" +
+                "      \"buttons\": [\n" +
+                "        {\n" +
+                "          \"x\": 12, \"y\": 8, \"width\": 18, \"height\": 18,\n" +
+                "          \"texture\": \"demo:textures/gui/buttons.png\",\n" +
+                "          \"hoverTexture\": \"demo:textures/gui/buttons_hover.png\",\n" +
+                "          \"disabledTexture\": \"demo:textures/gui/buttons_disabled.png\",\n" +
+                "          \"textureWidth\": 64, \"textureHeight\": 64,\n" +
+                "          \"u\": 2, \"v\": 4, \"hoverU\": 22, \"hoverV\": 4, \"disabledU\": 42, \"disabledV\": 4,\n" +
+                "          \"useNineSlice\": true, \"corner\": 3,\n" +
+                "          \"drawLabel\": false,\n" +
+                "          \"textColor\": \"FFFFFF\", \"hoverTextColor\": \"FFFFA0\", \"disabledTextColor\": \"808080\",\n" +
+                "          \"action\": \"event\", \"buttonId\": \"icon_event\"\n" +
+                "        }\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+        );
+
+        assertNotNull(result.machineStyle);
+        assertNotNull(result.machineStyle.buttons);
+        assertEquals(1, result.machineStyle.buttons.size());
+        MachineGuiStyleManager.ButtonStyle button = result.machineStyle.buttons.get(0);
+        assertEquals("event", button.action);
+        assertEquals("icon_event", button.buttonId);
+        assertEquals("demo:textures/gui/buttons.png", button.texture);
+        assertEquals("demo:textures/gui/buttons_hover.png", button.hoverTexture);
+        assertEquals("demo:textures/gui/buttons_disabled.png", button.disabledTexture);
+        assertEquals(Integer.valueOf(64), button.textureWidth);
+        assertEquals(Integer.valueOf(64), button.textureHeight);
+        assertEquals(Integer.valueOf(2), button.u);
+        assertEquals(Integer.valueOf(4), button.v);
+        assertEquals(Integer.valueOf(22), button.hoverU);
+        assertEquals(Integer.valueOf(4), button.hoverV);
+        assertEquals(Integer.valueOf(42), button.disabledU);
+        assertEquals(Integer.valueOf(4), button.disabledV);
+        assertEquals(Boolean.TRUE, button.useNineSlice);
+        assertEquals(Integer.valueOf(3), button.corner);
+        assertEquals(Boolean.FALSE, button.drawLabel);
+        assertEquals(Integer.valueOf(0xFFFFFFFF), button.textColor);
+        assertEquals(Integer.valueOf(0xFFFFFFA0), button.hoverTextColor);
+        assertEquals(Integer.valueOf(0xFF808080), button.disabledTextColor);
         assertTrue(result.warnings.isEmpty());
     }
 
