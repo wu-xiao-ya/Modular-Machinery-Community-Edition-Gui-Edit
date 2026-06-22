@@ -1287,12 +1287,14 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         String statusPanel = resolveInfoSectionPanel(defaultPanelId, "status", "status_info");
         String parallelismPanel = resolveInfoSectionPanel(defaultPanelId, "parallelism", "parallelism_info", "threads", "thread_info");
         String performancePanel = resolveInfoSectionPanel(defaultPanelId, "performance", "performance_info", "perf");
+        DynamicMachine found = controller.getFoundMachine();
 
         int redstone = controller.getWorld().getStrongPower(controller.getPos());
         if (redstone > 0) {
             if (getShowStatusInfo(cfg)) {
                 addWrapped(linesByPanel, panelMap, statusPanel, I18n.format("gui.controller.status.redstone_stopped"), defaultPanelId);
             }
+            addControllerExtraInfo(linesByPanel, panelMap, defaultPanelId, structurePanel);
             return linesByPanel;
         }
 
@@ -1312,21 +1314,9 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             addBlank(linesByPanel, blueprintPanel);
         }
 
-        DynamicMachine found = controller.getFoundMachine();
         if (getShowStructureInfo(cfg) && found != null) {
             addWrapped(linesByPanel, panelMap, structurePanel, I18n.format("gui.controller.structure", ""), defaultPanelId);
             addWrapped(linesByPanel, panelMap, structurePanel, found.getLocalizedName(), defaultPanelId);
-            ControllerGUIRenderEvent event = new ControllerGUIRenderEvent(controller);
-            event.postEvent();
-            for (String extra : event.getExtraInfo()) {
-                if (consumeGuiDirective(extra)) {
-                    continue;
-                }
-                RoutedText routed = parseRoutedText(extra, defaultPanelId);
-                String targetPanel = panelMap.containsKey(routed.panelId) ? routed.panelId : structurePanel;
-                addWrapped(linesByPanel, panelMap, targetPanel, routed.text, defaultPanelId);
-            }
-            addBlank(linesByPanel, structurePanel);
         } else if (getShowStructureInfo(cfg)) {
             addWrapped(
                 linesByPanel,
@@ -1336,12 +1326,11 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 defaultPanelId
             );
             addBlank(linesByPanel, structurePanel);
-        } else if (found != null) {
-            ControllerGUIRenderEvent event = new ControllerGUIRenderEvent(controller);
-            event.postEvent();
-            for (String extra : event.getExtraInfo()) {
-                consumeGuiDirective(extra);
-            }
+        }
+
+        addControllerExtraInfo(linesByPanel, panelMap, defaultPanelId, structurePanel);
+        if (getShowStructureInfo(cfg) && found != null) {
+            addBlank(linesByPanel, structurePanel);
         }
 
         if (getShowStatusInfo(cfg)) {
@@ -1400,6 +1389,24 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         }
 
         return linesByPanel;
+    }
+
+    private void addControllerExtraInfo(
+        Map<String, List<String>> linesByPanel,
+        Map<String, PanelDef> panelMap,
+        String defaultPanelId,
+        String fallbackPanel
+    ) {
+        ControllerGUIRenderEvent event = new ControllerGUIRenderEvent(controller);
+        event.postEvent();
+        for (String extra : event.getExtraInfo()) {
+            if (consumeGuiDirective(extra)) {
+                continue;
+            }
+            RoutedText routed = parseRoutedText(extra, defaultPanelId);
+            String targetPanel = panelMap.containsKey(routed.panelId) ? routed.panelId : fallbackPanel;
+            addWrapped(linesByPanel, panelMap, targetPanel, routed.text, defaultPanelId);
+        }
     }
 
     private void addWrapped(

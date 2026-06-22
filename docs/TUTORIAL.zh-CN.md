@@ -89,6 +89,7 @@ MMCEGE 目前包含四大功能，本教程按部分组织：
 - `sliders`
 - `textureLayers` / `backgroundLayers` / `foregroundLayers`
 - `subGuis`
+- `showBlueprintInfo` / `showStructureInfo` / `showStatusInfo` / `showParallelismInfo` / `showPerformanceInfo` 只隐藏 MMCE 内置默认信息，不会隐藏 ZS `extraInfo`、`[panel:id]` 路由文本或自定义 panel。
 
 ### 4.4 `subGuis` 格式
 

@@ -111,6 +111,8 @@ Important keys / 重要键：
 - `factoryController.specialThreadBackgroundColor` (hex `RRGGBB` or `AARRGGBB`, for core/special thread row tint / 十六进制颜色，用于核心/特殊线程行着色)
 - `factoryController.threadQueueX/Y`, `threadScrollbarX/Y`, `threadVisibleRows`, `threadRowWidth/Height` customize the integrated-controller thread queue and can trigger self-proxy replacement by themselves.
   / 这些字段自定义集成控制器线程队列位置，也能单独触发自代理替换。
+- `showBlueprintInfo`, `showStructureInfo`, `showStatusInfo`, `showParallelismInfo`, `showPerformanceInfo` hide only MMCE built-in/default info lines. They do **not** hide CraftTweaker `ControllerGUIRenderEvent.extraInfo[]`, `[panel:id]` routed text, or custom panels.
+  / 这些显示开关只隐藏 MMCE 内置/默认信息行，**不会**隐藏 CraftTweaker `ControllerGUIRenderEvent.extraInfo[]`、`[panel:id]` 路由文本或自定义信息区。
 
 Rules / 规则：
 
