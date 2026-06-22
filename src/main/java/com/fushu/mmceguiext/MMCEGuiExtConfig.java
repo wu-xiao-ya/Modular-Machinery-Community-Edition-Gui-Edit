@@ -233,12 +233,12 @@ public class MMCEGuiExtConfig {
         @Config.RangeInt(min = 0, max = 2048)
         public int threadQueueY = 8;
 
-        @Config.Comment("线程队列滚动条左侧 X / Thread queue scrollbar X.")
-        @Config.RangeInt(min = 0, max = 2048)
+        @Config.Comment("线程队列滚动条左侧 X，可为负数用于偏移 / Thread queue scrollbar X, negative values allowed for offsets.")
+        @Config.RangeInt(min = -2048, max = 2048)
         public int threadScrollbarX = 94;
 
-        @Config.Comment("线程队列滚动条顶部 Y / Thread queue scrollbar Y.")
-        @Config.RangeInt(min = 0, max = 2048)
+        @Config.Comment("线程队列滚动条顶部 Y，可为负数用于偏移 / Thread queue scrollbar Y, negative values allowed for offsets.")
+        @Config.RangeInt(min = -2048, max = 2048)
         public int threadScrollbarY = 8;
 
         @Config.Comment("Custom factory thread scrollbar. New JSON styles should use factoryController.threadScrollbar.")
@@ -278,12 +278,12 @@ public class MMCEGuiExtConfig {
             @Config.Comment("Whether to draw the factory thread scrollbar.")
             public boolean visible = true;
 
-            @Config.Comment("Scrollbar X. -1 = use legacy threadScrollbarX.")
-            @Config.RangeInt(min = -1, max = 2048)
+            @Config.Comment("Scrollbar X. -1 = use legacy threadScrollbarX; other negative values are valid offsets.")
+            @Config.RangeInt(min = -2048, max = 2048)
             public int x = -1;
 
-            @Config.Comment("Scrollbar Y. -1 = use legacy threadScrollbarY.")
-            @Config.RangeInt(min = -1, max = 2048)
+            @Config.Comment("Scrollbar Y. -1 = use legacy threadScrollbarY; other negative values are valid offsets.")
+            @Config.RangeInt(min = -2048, max = 2048)
             public int y = -1;
 
             @Config.Comment("Scrollbar width.")

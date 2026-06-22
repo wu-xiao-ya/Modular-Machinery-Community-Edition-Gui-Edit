@@ -212,8 +212,8 @@ public class ClientGuiEventHandler {
             return false;
         }
         return !scrollbar.visible
-            || scrollbar.x >= 0
-            || scrollbar.y >= 0
+            || scrollbar.x != -1
+            || scrollbar.y != -1
             || scrollbar.width != DEFAULT_THREAD_SCROLLBAR_WIDTH
             || scrollbar.height != DEFAULT_THREAD_SCROLLBAR_HEIGHT
             || hasText(scrollbar.trackTexture)

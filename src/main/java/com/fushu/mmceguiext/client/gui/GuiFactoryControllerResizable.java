@@ -1758,31 +1758,31 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     private int getThreadScrollbarX() {
         MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
         if (scrollbar != null && scrollbar.x != null) {
-            return Math.max(0, scrollbar.x.intValue());
+            return scrollbar.x.intValue();
         }
         if (styleOverride.threadScrollbarX != null) {
-            return Math.max(0, styleOverride.threadScrollbarX.intValue());
+            return styleOverride.threadScrollbarX.intValue();
         }
         MMCEGuiExtConfig.FactoryController.ThreadScrollbar cfg = MMCEGuiExtConfig.factoryController.threadScrollbar;
-        if (cfg.x >= 0) {
+        if (cfg.x != -1) {
             return cfg.x;
         }
-        return Math.max(0, MMCEGuiExtConfig.factoryController.threadScrollbarX);
+        return MMCEGuiExtConfig.factoryController.threadScrollbarX;
     }
 
     private int getThreadScrollbarY() {
         MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
         if (scrollbar != null && scrollbar.y != null) {
-            return Math.max(0, scrollbar.y.intValue());
+            return scrollbar.y.intValue();
         }
         if (styleOverride.threadScrollbarY != null) {
-            return Math.max(0, styleOverride.threadScrollbarY.intValue());
+            return styleOverride.threadScrollbarY.intValue();
         }
         MMCEGuiExtConfig.FactoryController.ThreadScrollbar cfg = MMCEGuiExtConfig.factoryController.threadScrollbar;
-        if (cfg.y >= 0) {
+        if (cfg.y != -1) {
             return cfg.y;
         }
-        return Math.max(0, MMCEGuiExtConfig.factoryController.threadScrollbarY);
+        return MMCEGuiExtConfig.factoryController.threadScrollbarY;
     }
 
     private int getThreadScrollbarWidth() {

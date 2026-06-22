@@ -497,8 +497,8 @@ final class MachineGuiStyleParser {
         }
         String itemScope = field(scope, "threadScrollbar");
         MachineGuiStyleManager.ThreadScrollbarStyle style = new MachineGuiStyleManager.ThreadScrollbarStyle();
-        style.x = validateMinInt(getInt(obj, result, itemScope, "x"), 0, result, itemScope, "x");
-        style.y = validateMinInt(getInt(obj, result, itemScope, "y"), 0, result, itemScope, "y");
+        style.x = validateRangeInt(getInt(obj, result, itemScope, "x"), -MAX_COMPONENT_SIZE, MAX_COMPONENT_SIZE, result, itemScope, "x");
+        style.y = validateRangeInt(getInt(obj, result, itemScope, "y"), -MAX_COMPONENT_SIZE, MAX_COMPONENT_SIZE, result, itemScope, "y");
         style.width = validateRangeInt(getInt(obj, result, itemScope, "width", "w"), 1, MAX_COMPONENT_SIZE, result, itemScope, "width");
         style.height = validateRangeInt(getInt(obj, result, itemScope, "height", "h"), 1, MAX_COMPONENT_SIZE, result, itemScope, "height");
         style.trackTexture = getTrimmedString(obj, result, itemScope, "trackTexture", "track_texture", "texture");
