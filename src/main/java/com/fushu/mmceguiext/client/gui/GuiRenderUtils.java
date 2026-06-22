@@ -3,7 +3,10 @@ package com.fushu.mmceguiext.client.gui;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.util.ResourceLocation;
 import org.lwjgl.opengl.GL11;
@@ -137,6 +140,53 @@ public final class GuiRenderUtils {
 
     public static void drawNineSlice(int x, int y, int width, int height, int textureWidth, int textureHeight, int corner) {
         drawNineSlice(x, y, width, height, 0, 0, textureWidth, textureHeight, corner);
+    }
+
+    public static void drawTexturedRect(
+        int x,
+        int y,
+        int u,
+        int v,
+        int width,
+        int height,
+        int textureWidth,
+        int textureHeight
+    ) {
+        if (width <= 0 || height <= 0 || textureWidth <= 0 || textureHeight <= 0) {
+            return;
+        }
+        Gui.drawModalRectWithCustomSizedTexture(x, y, u, v, width, height, textureWidth, textureHeight);
+    }
+
+    public static void drawScaledTexturedRect(
+        int x,
+        int y,
+        int width,
+        int height,
+        int u,
+        int v,
+        int sourceWidth,
+        int sourceHeight,
+        int textureWidth,
+        int textureHeight
+    ) {
+        if (width <= 0 || height <= 0 || sourceWidth <= 0 || sourceHeight <= 0 || textureWidth <= 0 || textureHeight <= 0) {
+            return;
+        }
+
+        double u0 = (double) u / (double) textureWidth;
+        double v0 = (double) v / (double) textureHeight;
+        double u1 = (double) (u + sourceWidth) / (double) textureWidth;
+        double v1 = (double) (v + sourceHeight) / (double) textureHeight;
+
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder buffer = tessellator.getBuffer();
+        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_TEX);
+        buffer.pos((double) x, (double) (y + height), 0.0D).tex(u0, v1).endVertex();
+        buffer.pos((double) (x + width), (double) (y + height), 0.0D).tex(u1, v1).endVertex();
+        buffer.pos((double) (x + width), (double) y, 0.0D).tex(u1, v0).endVertex();
+        buffer.pos((double) x, (double) y, 0.0D).tex(u0, v0).endVertex();
+        tessellator.draw();
     }
 
     public static void drawNineSlice(

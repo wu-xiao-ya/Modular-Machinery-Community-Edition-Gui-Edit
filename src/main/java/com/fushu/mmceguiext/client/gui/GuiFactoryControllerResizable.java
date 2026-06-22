@@ -2783,7 +2783,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
 
         if (backgroundTexture != null) {
             this.mc.getTextureManager().bindTexture(backgroundTexture);
-            Gui.drawModalRectWithCustomSizedTexture(bar.x, bar.y, 0, 0, bar.width, bar.height, textureWidth, textureHeight);
+            GuiRenderUtils.drawTexturedRect(bar.x, bar.y, 0, 0, bar.width, bar.height, textureWidth, textureHeight);
         } else {
             drawRect(bar.x, bar.y, bar.x + bar.width, bar.y + bar.height, bg);
         }
@@ -2795,8 +2795,25 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         if (fillBounds[2] > 0 && fillBounds[3] > 0) {
             ResourceLocation fillTexture = resolveProgressBarTexture(bar, true);
             if (fillTexture != null) {
+                int[] textureBounds = ProgressBarStyleSupport.computeFillTextureBounds(
+                    textureWidth,
+                    textureHeight,
+                    bar.direction,
+                    progress
+                );
                 this.mc.getTextureManager().bindTexture(fillTexture);
-                Gui.drawModalRectWithCustomSizedTexture(fillBounds[0], fillBounds[1], 0, 0, fillBounds[2], fillBounds[3], textureWidth, textureHeight);
+                GuiRenderUtils.drawScaledTexturedRect(
+                    fillBounds[0],
+                    fillBounds[1],
+                    fillBounds[2],
+                    fillBounds[3],
+                    textureBounds[0],
+                    textureBounds[1],
+                    textureBounds[2],
+                    textureBounds[3],
+                    textureWidth,
+                    textureHeight
+                );
             } else {
                 drawRect(fillBounds[0], fillBounds[1], fillBounds[0] + fillBounds[2], fillBounds[1] + fillBounds[3], fill);
             }

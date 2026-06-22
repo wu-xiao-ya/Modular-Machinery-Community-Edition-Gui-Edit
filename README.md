@@ -179,7 +179,7 @@ Supported aliases / 支持的别名：
 Per-machine values override global config for that machine. Since `1.0.1+`, if a machine defines any `mmce_gui_ext` node, unspecified GUI size falls back to MMCE base size (`176x213` / `280x213`) first, reducing coupling to global `client.cfg`.
 机器级值会覆盖该机器对应的全局配置。自 `1.0.1+` 起，只要机器定义了 `mmce_gui_ext` 节点，未显式填写的 GUI 尺寸会优先回退到 MMCE 基础尺寸，从而降低对全局 `client.cfg` 的耦合。
 
-For the full per-machine field list (panels, buttons, sliders, sub GUIs, texts, texture layers, Smart Interface editors), see `examples/MMCE_GUI_EXT_FIELD_REFERENCE.md`.
+For the full per-machine field list (panels, buttons, progress bars, sliders, sub GUIs, texts, texture layers, Smart Interface editors), see `examples/MMCE_GUI_EXT_FIELD_REFERENCE.md`.
 完整的机器级字段列表（信息区、按钮、滑块、子 GUI、文字、纹理图层、Smart Interface 编辑器）见 `examples/MMCE_GUI_EXT_FIELD_REFERENCE.md`。
 
 ### Texture Offset For Left/Top Decorations | 左上装饰偏移
@@ -229,6 +229,49 @@ Buttons are defined per-machine (`buttons[]`) and validated server-side by a pol
 
 See `examples/quick-start/buttons-and-pages.json`, `event-button-test.json`, `controller-button-test.json`, `subgui-page-reference.json`.
 示例见 `examples/quick-start/` 下相应文件。
+
+## Controller Progress Bars | 控制器进度条
+
+Progress bars are defined per-machine with `progressBars[]` (aliases: `progress_bars`, `guiProgressBars`, `gui_progress_bars`). The main mode uses two textures: an empty/background texture and a full/fill texture. MMCEGE draws the empty texture first, then clips the full texture by the current progress. This works in both Machine and Factory controller GUIs.
+进度条在机器级 JSON 中通过 `progressBars[]` 定义（别名：`progress_bars`、`guiProgressBars`、`gui_progress_bars`）。主模式使用两张贴图：空槽/背景贴图和满槽/填充贴图。MMCEGE 会先绘制空槽，再按当前进度裁剪满槽。普通控制器和集成控制器都支持。
+
+Minimal two-texture example / 双贴图最小示例：
+
+```json
+{
+  "progressBars": [
+    {
+      "id": "recipe_progress",
+      "x": 80,
+      "y": 38,
+      "width": 64,
+      "height": 12,
+      "source": "machine_progress",
+      "direction": "left_to_right",
+      "backgroundTexture": "yourmod:textures/gui/progress_empty.png",
+      "fillTexture": "yourmod:textures/gui/progress_full.png",
+      "textureWidth": 64,
+      "textureHeight": 12,
+      "showText": true
+    }
+  ]
+}
+```
+
+Supported directions / 支持方向：`left_to_right`, `right_to_left`, `top_to_bottom`, `bottom_to_top`.
+
+Supported sources / 支持数据源：
+
+- Machine controller / 普通控制器：`machine_progress` (aliases: `active_recipe`, `recipe_progress`, `current_recipe`, `default`)
+- Factory controller / 集成控制器：`factory_first`, `factory_average`, `factory_max`, `factory_thread` (with `threadIndex`), `factory_core` (with `coreThreadId`)
+
+Supported fields / 支持字段：`id`, `x`, `y`, `width`, `height`, `source`, `direction`, `backgroundTexture`, `fillTexture`, `texture`, `textureWidth`, `textureHeight`, `backgroundColor`, `fillColor`, `borderColor`, `threadIndex`, `coreThreadId`, `min`, `max`, `priority`, `foreground`, `visible`, `page`, `showText`, `textColor`.
+
+If no textures are configured, MMCEGE falls back to colored rectangles (`backgroundColor`, `fillColor`, `borderColor`).
+若未配置贴图，MMCEGE 会退回使用纯色矩形（`backgroundColor`、`fillColor`、`borderColor`）。
+
+See `examples/quick-start/progress-bars.json`.
+示例见 `examples/quick-start/progress-bars.json`。
 
 ## Controller Sliders | 控制器滑块
 

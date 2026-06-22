@@ -232,6 +232,101 @@ MMCEGE 目前包含四大功能，本教程按部分组织：
 
 可直接复制的完整示例：`examples/quick-start/sliders.json`。
 
+### 4.6 `progressBars` 进度条格式
+
+`progressBars` 是控制器下的进度条数组，普通控制器和集成控制器都可用。别名也支持 `progress_bars`、`guiProgressBars`、`gui_progress_bars`。
+
+推荐主方案是双贴图：
+
+- `backgroundTexture`：空槽 / 背景贴图。
+- `fillTexture`：满槽 / 填充贴图。
+
+MMCEGE 会先完整绘制空槽，再按进度裁剪满槽。这样最适合常见 GUI 美术资源。
+
+每个进度条至少写：
+
+- `x`
+- `y`
+- `width`
+- `height`
+
+常用字段：
+
+- `id`
+- `source`
+- `direction`
+- `backgroundTexture`
+- `fillTexture`
+- `textureWidth`
+- `textureHeight`
+- `backgroundColor`
+- `fillColor`
+- `borderColor`
+- `threadIndex`
+- `coreThreadId`
+- `min`
+- `max`
+- `priority`
+- `foreground`
+- `visible`
+- `page`
+- `showText`
+- `textColor`
+
+`direction` 可填：
+
+- `left_to_right`
+- `right_to_left`
+- `top_to_bottom`
+- `bottom_to_top`
+
+`source` 可填：
+
+- 普通控制器：`machine_progress`（也可用 `active_recipe`、`recipe_progress`、`current_recipe`、`default`）
+- 集成控制器：`factory_first`、`factory_average`、`factory_max`、`factory_thread`、`factory_core`
+
+示例：
+
+```json
+"progressBars": [
+  {
+    "id": "recipe_progress",
+    "x": 80,
+    "y": 38,
+    "width": 64,
+    "height": 12,
+    "source": "machine_progress",
+    "direction": "left_to_right",
+    "backgroundTexture": "yourmod:textures/gui/progress_empty.png",
+    "fillTexture": "yourmod:textures/gui/progress_full.png",
+    "textureWidth": 64,
+    "textureHeight": 12,
+    "showText": true,
+    "textColor": "FFFFFFFF"
+  }
+]
+```
+
+没有贴图时，也可以使用纯色 fallback：
+
+```json
+"progressBars": [
+  {
+    "id": "debug_progress",
+    "x": 80,
+    "y": 56,
+    "width": 64,
+    "height": 8,
+    "source": "machine_progress",
+    "backgroundColor": "66000000",
+    "fillColor": "FF55CC66",
+    "borderColor": "FFFFFFFF"
+  }
+]
+```
+
+可直接复制的完整示例：`examples/quick-start/progress-bars.json`。
+
 ## 5. ZS 指令写法（`onControllerGUIRender` 的 `extraInfo`）
 
 ### 5.1 Smart Interface 显示控制

@@ -1,0 +1,101 @@
+﻿{
+  "registryname": "demo:progress_bar_controller",
+  "localizedname": "Progress Bar Controller Demo",
+  "parts": [],
+  "mmce_gui_ext": {
+    "machineController": {
+      "backgroundTexture": "demo:textures/gui/progress_controller.png",
+      "guiWidth": 320,
+      "guiHeight": 213,
+      "defaultPageId": "main",
+      "customPanels": [
+        "main,180,8,124,92,main"
+      ],
+      "texts": [
+        {
+          "x": 186,
+          "y": 14,
+          "value": "Recipe progress",
+          "scale": 0.8,
+          "page": "main"
+        }
+      ],
+      "progressBars": [
+        {
+          "id": "recipe_progress_textured",
+          "x": 186,
+          "y": 36,
+          "width": 96,
+          "height": 12,
+          "source": "machine_progress",
+          "direction": "left_to_right",
+          "backgroundTexture": "demo:textures/gui/progress_empty.png",
+          "fillTexture": "demo:textures/gui/progress_full.png",
+          "textureWidth": 96,
+          "textureHeight": 12,
+          "showText": true,
+          "textColor": "FFFFFFFF",
+          "page": "main"
+        },
+        {
+          "id": "recipe_progress_vertical",
+          "x": 292,
+          "y": 28,
+          "width": 10,
+          "height": 64,
+          "source": "machine_progress",
+          "direction": "bottom_to_top",
+          "backgroundTexture": "demo:textures/gui/progress_vertical_empty.png",
+          "fillTexture": "demo:textures/gui/progress_vertical_full.png",
+          "textureWidth": 10,
+          "textureHeight": 64,
+          "page": "main"
+        },
+        {
+          "id": "recipe_progress_color_fallback",
+          "x": 186,
+          "y": 58,
+          "width": 96,
+          "height": 8,
+          "source": "machine_progress",
+          "direction": "right_to_left",
+          "backgroundColor": "66000000",
+          "fillColor": "FF55CC66",
+          "borderColor": "FFFFFFFF",
+          "page": "main"
+        }
+      ]
+    },
+    "factoryController": {
+      "guiWidth": 360,
+      "guiHeight": 213,
+      "progressBars": [
+        {
+          "id": "factory_average_progress",
+          "x": 286,
+          "y": 36,
+          "width": 64,
+          "height": 12,
+          "source": "factory_average",
+          "direction": "left_to_right",
+          "backgroundTexture": "demo:textures/gui/progress_empty.png",
+          "fillTexture": "demo:textures/gui/progress_full.png",
+          "textureWidth": 64,
+          "textureHeight": 12,
+          "showText": true
+        },
+        {
+          "id": "factory_thread_0_progress",
+          "x": 286,
+          "y": 56,
+          "width": 64,
+          "height": 8,
+          "source": "factory_thread",
+          "threadIndex": 0,
+          "backgroundColor": "66000000",
+          "fillColor": "FF4CA3FF"
+        }
+      ]
+    }
+  }
+}

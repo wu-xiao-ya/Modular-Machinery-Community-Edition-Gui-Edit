@@ -110,6 +110,30 @@ public final class ProgressBarStyleSupport {
         return new int[] {x, y, fillWidth, height};
     }
 
+    public static int[] computeFillTextureBounds(
+        int textureWidth,
+        int textureHeight,
+        @Nullable String direction,
+        float progress
+    ) {
+        int safeTextureWidth = Math.max(1, textureWidth);
+        int safeTextureHeight = Math.max(1, textureHeight);
+        int fillWidth = Math.max(0, Math.min(safeTextureWidth, (int) Math.floor(safeTextureWidth * clamp01(progress))));
+        int fillHeight = Math.max(0, Math.min(safeTextureHeight, (int) Math.floor(safeTextureHeight * clamp01(progress))));
+        String trimmedDirection = safeTrim(direction);
+        String normalizedDirection = trimmedDirection.isEmpty() ? "" : trimmedDirection.toLowerCase(Locale.ROOT);
+        if ("right_to_left".equals(normalizedDirection)) {
+            return new int[] {safeTextureWidth - fillWidth, 0, fillWidth, safeTextureHeight};
+        }
+        if ("top_to_bottom".equals(normalizedDirection)) {
+            return new int[] {0, 0, safeTextureWidth, fillHeight};
+        }
+        if ("bottom_to_top".equals(normalizedDirection)) {
+            return new int[] {0, safeTextureHeight - fillHeight, safeTextureWidth, fillHeight};
+        }
+        return new int[] {0, 0, fillWidth, safeTextureHeight};
+    }
+
     public static float clamp01(float value) {
         return value < 0.0F ? 0.0F : Math.min(1.0F, value);
     }
