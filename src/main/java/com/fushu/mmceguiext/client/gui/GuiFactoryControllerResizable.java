@@ -73,6 +73,10 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     private static final int SCROLLBAR_TOP = 8;
     private static final int SCROLLBAR_LEFT = 94;
     private static final int SCROLLBAR_HEIGHT = 197;
+    private static final int SCROLLBAR_WIDTH = 12;
+    private static final int SCROLLBAR_THUMB_HEIGHT = 15;
+    private static final int DEFAULT_SCROLLBAR_TRACK_COLOR = 0x66000000;
+    private static final int DEFAULT_SCROLLBAR_THUMB_COLOR = 0xFFFFFFFF;
     private static final int MAX_PAGE_ELEMENTS = 6;
     private static final int FACTORY_ELEMENT_WIDTH = 86;
     private static final int FACTORY_ELEMENT_HEIGHT = 32;
@@ -442,7 +446,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             drawBackgroundSliders();
             drawNegativeForegroundTextureLayers(cfg);
             updateRecipeScrollbar(this.guiLeft, this.guiTop);
-            recipeScrollbar.draw(this, mc);
+            drawRecipeScrollbar();
             return;
         }
 
@@ -501,7 +505,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         drawNegativeForegroundTextureLayers(cfg);
 
         updateRecipeScrollbar(this.guiLeft, this.guiTop);
-        recipeScrollbar.draw(this, mc);
+        drawRecipeScrollbar();
     }
 
     @Override
@@ -657,7 +661,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             return;
         }
         if (isUsingDefaultBackground(MMCEGuiExtConfig.factoryController)) {
-            recipeScrollbar.click(mouseX, mouseY);
+            clickRecipeScrollbarIfVisible(mouseX, mouseY);
             super.mouseClicked(mouseX, mouseY, mouseButton);
             return;
         }
@@ -675,7 +679,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             }
         }
 
-        recipeScrollbar.click(mouseX, mouseY);
+        clickRecipeScrollbarIfVisible(mouseX, mouseY);
         super.mouseClicked(mouseX, mouseY, mouseButton);
     }
 
@@ -704,7 +708,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             mouseY = toLogicalMouseY(mouseY);
         }
         if (isUsingDefaultBackground(MMCEGuiExtConfig.factoryController)) {
-            recipeScrollbar.click(mouseX, mouseY);
+            clickRecipeScrollbarIfVisible(mouseX, mouseY);
             super.mouseClickMove(mouseX, mouseY, clickedMouseButton, timeSinceLastClick);
             return;
         }
@@ -721,7 +725,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 updatePanelScrollFromMouse(panel.id, panel.rect, localY);
             }
         } else {
-            recipeScrollbar.click(mouseX, mouseY);
+            clickRecipeScrollbarIfVisible(mouseX, mouseY);
         }
         super.mouseClickMove(mouseX, mouseY, clickedMouseButton, timeSinceLastClick);
     }
@@ -1609,15 +1613,108 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
 
     private void updateRecipeScrollbar(int displayX, int displayY) {
         int visibleRows = getVisibleQueueRows();
-        int scrollbarHeight = Math.max(getThreadRowHeight(), visibleRows * (getThreadRowHeight() + 1) - 1);
+        int autoHeight = Math.max(getThreadRowHeight(), visibleRows * (getThreadRowHeight() + 1) - 1);
         recipeScrollbar
             .setLeft(getThreadScrollbarX() + displayX)
             .setTop(getThreadScrollbarY() + displayY)
-            .setHeight(scrollbarHeight);
+            .setWidth(getThreadScrollbarWidth())
+            .setHeight(getThreadScrollbarHeight(autoHeight));
 
         Map<String, FactoryRecipeThread> coreThreads = factory.getCoreRecipeThreads();
         List<FactoryRecipeThread> threadList = factory.getFactoryRecipeThreadList();
-        recipeScrollbar.setRange(0, Math.max(0, coreThreads.size() + threadList.size() - visibleRows), 1);
+        recipeScrollbar.setRange(0, getThreadScrollbarRange(coreThreads.size() + threadList.size(), visibleRows), 1);
+    }
+
+    private void drawRecipeScrollbar() {
+        if (!isThreadScrollbarVisible()) {
+            return;
+        }
+        if (!hasCustomThreadScrollbarVisual()) {
+            recipeScrollbar.draw(this, mc);
+            return;
+        }
+
+        int x = recipeScrollbar.getLeft();
+        int y = recipeScrollbar.getTop();
+        int width = recipeScrollbar.getWidth();
+        int height = recipeScrollbar.getHeight();
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        ResourceLocation trackTexture = getThreadScrollbarTrackTexture();
+        if (trackTexture != null) {
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            this.mc.getTextureManager().bindTexture(trackTexture);
+            GuiRenderUtils.drawScaledTexturedRect(
+                x,
+                y,
+                width,
+                height,
+                0,
+                0,
+                getThreadScrollbarTextureWidth(),
+                getThreadScrollbarTextureHeight(),
+                getThreadScrollbarTextureWidth(),
+                getThreadScrollbarTextureHeight()
+            );
+        } else {
+            drawRect(x, y, x + width, y + height, getThreadScrollbarTrackColor());
+        }
+
+        int range = getThreadScrollbarRange(getTotalThreadCount(), getVisibleQueueRows());
+        int thumbHeight = getThreadScrollbarThumbHeight(height, range);
+        int thumbY = y;
+        if (range > 0 && height > thumbHeight) {
+            thumbY += MathHelper.clamp(recipeScrollbar.getCurrentScroll(), 0, range) * (height - thumbHeight) / range;
+        }
+
+        ResourceLocation thumbTexture = getThreadScrollbarThumbTexture();
+        if (thumbTexture != null) {
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            this.mc.getTextureManager().bindTexture(thumbTexture);
+            GuiRenderUtils.drawScaledTexturedRect(
+                x,
+                thumbY,
+                width,
+                thumbHeight,
+                0,
+                0,
+                getThreadScrollbarThumbTextureWidth(),
+                getThreadScrollbarThumbTextureHeight(),
+                getThreadScrollbarThumbTextureWidth(),
+                getThreadScrollbarThumbTextureHeight()
+            );
+        } else {
+            drawRect(x, thumbY, x + width, thumbY + thumbHeight, getThreadScrollbarThumbColor());
+        }
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
+    private void clickRecipeScrollbarIfVisible(int mouseX, int mouseY) {
+        if (isThreadScrollbarVisible()) {
+            recipeScrollbar.click(mouseX, mouseY);
+        }
+    }
+
+    private int getThreadScrollbarRange(int totalThreads, int visibleRows) {
+        return Math.max(0, totalThreads - Math.max(1, visibleRows));
+    }
+
+    private int getTotalThreadCount() {
+        Map<String, FactoryRecipeThread> coreThreads = factory.getCoreRecipeThreads();
+        List<FactoryRecipeThread> threadList = factory.getFactoryRecipeThreadList();
+        return coreThreads.size() + threadList.size();
+    }
+
+    private int getThreadScrollbarThumbHeight(int scrollbarHeight, int range) {
+        int minHeight = MathHelper.clamp(getThreadScrollbarThumbMinHeight(), 1, Math.max(1, scrollbarHeight));
+        if (range <= 0) {
+            return scrollbarHeight;
+        }
+        int total = Math.max(1, getTotalThreadCount());
+        int proportional = MathHelper.floor((float) scrollbarHeight * (float) getVisibleQueueRows() / (float) total);
+        return MathHelper.clamp(proportional, minHeight, scrollbarHeight);
     }
 
     private int getVisibleQueueRows() {
@@ -1643,28 +1740,183 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         if (styleOverride.threadQueueX != null) {
             return Math.max(0, styleOverride.threadQueueX.intValue());
         }
-        return RECIPE_QUEUE_OFFSET_X;
+        return Math.max(0, MMCEGuiExtConfig.factoryController.threadQueueX);
     }
 
     private int getThreadQueueY() {
         if (styleOverride.threadQueueY != null) {
             return Math.max(0, styleOverride.threadQueueY.intValue());
         }
-        return RECIPE_QUEUE_OFFSET_Y;
+        return Math.max(0, MMCEGuiExtConfig.factoryController.threadQueueY);
+    }
+
+    @Nullable
+    private MachineGuiStyleManager.ThreadScrollbarStyle getThreadScrollbarStyle() {
+        return styleOverride.threadScrollbar;
     }
 
     private int getThreadScrollbarX() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.x != null) {
+            return Math.max(0, scrollbar.x.intValue());
+        }
         if (styleOverride.threadScrollbarX != null) {
             return Math.max(0, styleOverride.threadScrollbarX.intValue());
         }
-        return SCROLLBAR_LEFT;
+        MMCEGuiExtConfig.FactoryController.ThreadScrollbar cfg = MMCEGuiExtConfig.factoryController.threadScrollbar;
+        if (cfg.x >= 0) {
+            return cfg.x;
+        }
+        return Math.max(0, MMCEGuiExtConfig.factoryController.threadScrollbarX);
     }
 
     private int getThreadScrollbarY() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.y != null) {
+            return Math.max(0, scrollbar.y.intValue());
+        }
         if (styleOverride.threadScrollbarY != null) {
             return Math.max(0, styleOverride.threadScrollbarY.intValue());
         }
-        return SCROLLBAR_TOP;
+        MMCEGuiExtConfig.FactoryController.ThreadScrollbar cfg = MMCEGuiExtConfig.factoryController.threadScrollbar;
+        if (cfg.y >= 0) {
+            return cfg.y;
+        }
+        return Math.max(0, MMCEGuiExtConfig.factoryController.threadScrollbarY);
+    }
+
+    private int getThreadScrollbarWidth() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.width != null) {
+            return Math.max(1, scrollbar.width.intValue());
+        }
+        return Math.max(1, MMCEGuiExtConfig.factoryController.threadScrollbar.width);
+    }
+
+    private int getThreadScrollbarHeight(int autoHeight) {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.height != null) {
+            return Math.max(1, scrollbar.height.intValue());
+        }
+        int configured = MMCEGuiExtConfig.factoryController.threadScrollbar.height;
+        return configured >= 0 ? Math.max(1, configured) : Math.max(1, autoHeight);
+    }
+
+    private boolean isThreadScrollbarVisible() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.visible != null) {
+            return scrollbar.visible.booleanValue();
+        }
+        return MMCEGuiExtConfig.factoryController.threadScrollbar.visible;
+    }
+
+    private boolean hasCustomThreadScrollbarVisual() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null) {
+            if (hasText(scrollbar.trackTexture) || hasText(scrollbar.thumbTexture)) {
+                return true;
+            }
+            if (scrollbar.trackColor != null || scrollbar.thumbColor != null) {
+                return true;
+            }
+            if (scrollbar.textureWidth != null || scrollbar.textureHeight != null
+                || scrollbar.thumbTextureWidth != null || scrollbar.thumbTextureHeight != null
+                || scrollbar.thumbMinHeight != null) {
+                return true;
+            }
+        }
+        MMCEGuiExtConfig.FactoryController.ThreadScrollbar cfg = MMCEGuiExtConfig.factoryController.threadScrollbar;
+        return hasText(cfg.trackTexture)
+            || hasText(cfg.thumbTexture)
+            || GuiRenderUtils.parseColorARGBOrDefault(cfg.trackColor, DEFAULT_SCROLLBAR_TRACK_COLOR) != DEFAULT_SCROLLBAR_TRACK_COLOR
+            || GuiRenderUtils.parseColorARGBOrDefault(cfg.thumbColor, DEFAULT_SCROLLBAR_THUMB_COLOR) != DEFAULT_SCROLLBAR_THUMB_COLOR
+            || cfg.textureWidth != SCROLLBAR_WIDTH
+            || cfg.textureHeight != 16
+            || cfg.thumbTextureWidth != SCROLLBAR_WIDTH
+            || cfg.thumbTextureHeight != SCROLLBAR_THUMB_HEIGHT
+            || cfg.thumbMinHeight != SCROLLBAR_THUMB_HEIGHT;
+    }
+
+    private ResourceLocation getThreadScrollbarTrackTexture() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && hasText(scrollbar.trackTexture)) {
+            return GuiRenderUtils.parseOptionalTexture(scrollbar.trackTexture);
+        }
+        return GuiRenderUtils.parseOptionalTexture(MMCEGuiExtConfig.factoryController.threadScrollbar.trackTexture);
+    }
+
+    private ResourceLocation getThreadScrollbarThumbTexture() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && hasText(scrollbar.thumbTexture)) {
+            return GuiRenderUtils.parseOptionalTexture(scrollbar.thumbTexture);
+        }
+        return GuiRenderUtils.parseOptionalTexture(MMCEGuiExtConfig.factoryController.threadScrollbar.thumbTexture);
+    }
+
+    private int getThreadScrollbarTrackColor() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.trackColor != null) {
+            return scrollbar.trackColor.intValue();
+        }
+        return GuiRenderUtils.parseColorARGBOrDefault(
+            MMCEGuiExtConfig.factoryController.threadScrollbar.trackColor,
+            DEFAULT_SCROLLBAR_TRACK_COLOR
+        );
+    }
+
+    private int getThreadScrollbarThumbColor() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.thumbColor != null) {
+            return scrollbar.thumbColor.intValue();
+        }
+        return GuiRenderUtils.parseColorARGBOrDefault(
+            MMCEGuiExtConfig.factoryController.threadScrollbar.thumbColor,
+            DEFAULT_SCROLLBAR_THUMB_COLOR
+        );
+    }
+
+    private int getThreadScrollbarTextureWidth() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.textureWidth != null) {
+            return Math.max(1, scrollbar.textureWidth.intValue());
+        }
+        return Math.max(1, MMCEGuiExtConfig.factoryController.threadScrollbar.textureWidth);
+    }
+
+    private int getThreadScrollbarTextureHeight() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.textureHeight != null) {
+            return Math.max(1, scrollbar.textureHeight.intValue());
+        }
+        return Math.max(1, MMCEGuiExtConfig.factoryController.threadScrollbar.textureHeight);
+    }
+
+    private int getThreadScrollbarThumbTextureWidth() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.thumbTextureWidth != null) {
+            return Math.max(1, scrollbar.thumbTextureWidth.intValue());
+        }
+        return Math.max(1, MMCEGuiExtConfig.factoryController.threadScrollbar.thumbTextureWidth);
+    }
+
+    private int getThreadScrollbarThumbTextureHeight() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.thumbTextureHeight != null) {
+            return Math.max(1, scrollbar.thumbTextureHeight.intValue());
+        }
+        return Math.max(1, MMCEGuiExtConfig.factoryController.threadScrollbar.thumbTextureHeight);
+    }
+
+    private int getThreadScrollbarThumbMinHeight() {
+        MachineGuiStyleManager.ThreadScrollbarStyle scrollbar = getThreadScrollbarStyle();
+        if (scrollbar != null && scrollbar.thumbMinHeight != null) {
+            return Math.max(1, scrollbar.thumbMinHeight.intValue());
+        }
+        return Math.max(1, MMCEGuiExtConfig.factoryController.threadScrollbar.thumbMinHeight);
+    }
+
+    private boolean hasText(@Nullable String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
     private int getThreadRowWidth() {
@@ -2060,7 +2312,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 saveActiveSubGuiRuntimeState();
                 return true;
             }
-            recipeScrollbar.click(mouseX, mouseY);
+            clickRecipeScrollbarIfVisible(mouseX, mouseY);
             saveActiveSubGuiRuntimeState();
             return true;
         } finally {
@@ -2088,7 +2340,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                     updatePanelScrollFromMouse(panel.id, panel.rect, localY);
                 }
             } else {
-                recipeScrollbar.click(mouseX, mouseY);
+                clickRecipeScrollbarIfVisible(mouseX, mouseY);
             }
             saveActiveSubGuiRuntimeState();
             return true;

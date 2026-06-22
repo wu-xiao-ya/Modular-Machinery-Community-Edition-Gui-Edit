@@ -241,6 +241,9 @@ public class MMCEGuiExtConfig {
         @Config.RangeInt(min = 0, max = 2048)
         public int threadScrollbarY = 8;
 
+        @Config.Comment("Custom factory thread scrollbar. New JSON styles should use factoryController.threadScrollbar.")
+        public ThreadScrollbar threadScrollbar = new ThreadScrollbar();
+
         @Config.Comment("Visible recipe queue rows on the left panel.")
         @Config.RangeInt(min = 1, max = 20)
         public int queueVisibleRows = 6;
@@ -270,6 +273,59 @@ public class MMCEGuiExtConfig {
 
         @Config.Comment("Virtual Smart Interface key when no DataPort is bound. Empty = disabled.")
         public String smartInterfaceEditorVirtualKey = "mmcege_virtual_port";
+
+        public static class ThreadScrollbar {
+            @Config.Comment("Whether to draw the factory thread scrollbar.")
+            public boolean visible = true;
+
+            @Config.Comment("Scrollbar X. -1 = use legacy threadScrollbarX.")
+            @Config.RangeInt(min = -1, max = 2048)
+            public int x = -1;
+
+            @Config.Comment("Scrollbar Y. -1 = use legacy threadScrollbarY.")
+            @Config.RangeInt(min = -1, max = 2048)
+            public int y = -1;
+
+            @Config.Comment("Scrollbar width.")
+            @Config.RangeInt(min = 1, max = 128)
+            public int width = 12;
+
+            @Config.Comment("Scrollbar height. -1 = auto by visible thread rows.")
+            @Config.RangeInt(min = -1, max = 2048)
+            public int height = -1;
+
+            @Config.Comment("Track texture. Empty = colored rectangle fallback.")
+            public String trackTexture = "";
+
+            @Config.Comment("Thumb texture. Empty = colored rectangle fallback.")
+            public String thumbTexture = "";
+
+            @Config.Comment("Track color fallback. Hex RGB/ARGB.")
+            public String trackColor = "66000000";
+
+            @Config.Comment("Thumb color fallback. Hex RGB/ARGB.")
+            public String thumbColor = "FFFFFFFF";
+
+            @Config.Comment("Track texture source width.")
+            @Config.RangeInt(min = 1, max = 4096)
+            public int textureWidth = 12;
+
+            @Config.Comment("Track texture source height.")
+            @Config.RangeInt(min = 1, max = 4096)
+            public int textureHeight = 16;
+
+            @Config.Comment("Thumb texture source width.")
+            @Config.RangeInt(min = 1, max = 4096)
+            public int thumbTextureWidth = 12;
+
+            @Config.Comment("Thumb texture source height.")
+            @Config.RangeInt(min = 1, max = 4096)
+            public int thumbTextureHeight = 15;
+
+            @Config.Comment("Minimum drawn thumb height.")
+            @Config.RangeInt(min = 1, max = 512)
+            public int thumbMinHeight = 15;
+        }
     }
 
     public static class ItemBus {

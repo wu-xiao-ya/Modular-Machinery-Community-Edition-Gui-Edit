@@ -236,6 +236,7 @@ final class MachineGuiStyleParser {
             "queueScrollbarY",
             "queue_scrollbar_y"
         );
+        style.threadScrollbar = parseThreadScrollbar(node, result, scope);
         style.threadVisibleRows = validateRangeInt(
             getInt(
                 node,
@@ -482,6 +483,35 @@ final class MachineGuiStyleParser {
         }
 
         return style.isEmpty() ? MachineGuiStyleManager.ControllerStyle.EMPTY : style;
+    }
+
+    @Nullable
+    private static MachineGuiStyleManager.ThreadScrollbarStyle parseThreadScrollbar(
+        JsonObject node,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        JsonObject obj = getObject(node, result, scope, "threadScrollbar", "thread_scrollbar");
+        if (obj == null) {
+            return null;
+        }
+        String itemScope = field(scope, "threadScrollbar");
+        MachineGuiStyleManager.ThreadScrollbarStyle style = new MachineGuiStyleManager.ThreadScrollbarStyle();
+        style.x = validateMinInt(getInt(obj, result, itemScope, "x"), 0, result, itemScope, "x");
+        style.y = validateMinInt(getInt(obj, result, itemScope, "y"), 0, result, itemScope, "y");
+        style.width = validateRangeInt(getInt(obj, result, itemScope, "width", "w"), 1, MAX_COMPONENT_SIZE, result, itemScope, "width");
+        style.height = validateRangeInt(getInt(obj, result, itemScope, "height", "h"), 1, MAX_COMPONENT_SIZE, result, itemScope, "height");
+        style.trackTexture = getTrimmedString(obj, result, itemScope, "trackTexture", "track_texture", "texture");
+        style.thumbTexture = getTrimmedString(obj, result, itemScope, "thumbTexture", "thumb_texture", "handleTexture", "handle_texture");
+        style.trackColor = getColor(obj, result, itemScope, "trackColor", "track_color", "backgroundColor", "background_color", "bgColor", "bg_color");
+        style.thumbColor = getColor(obj, result, itemScope, "thumbColor", "thumb_color", "handleColor", "handle_color");
+        style.textureWidth = validateRangeInt(getInt(obj, result, itemScope, "textureWidth", "texture_width", "trackTextureWidth", "track_texture_width", "texW"), 1, MAX_COMPONENT_SIZE, result, itemScope, "textureWidth");
+        style.textureHeight = validateRangeInt(getInt(obj, result, itemScope, "textureHeight", "texture_height", "trackTextureHeight", "track_texture_height", "texH"), 1, MAX_COMPONENT_SIZE, result, itemScope, "textureHeight");
+        style.thumbTextureWidth = validateRangeInt(getInt(obj, result, itemScope, "thumbTextureWidth", "thumb_texture_width", "handleTextureWidth", "handle_texture_width"), 1, MAX_COMPONENT_SIZE, result, itemScope, "thumbTextureWidth");
+        style.thumbTextureHeight = validateRangeInt(getInt(obj, result, itemScope, "thumbTextureHeight", "thumb_texture_height", "handleTextureHeight", "handle_texture_height"), 1, MAX_COMPONENT_SIZE, result, itemScope, "thumbTextureHeight");
+        style.thumbMinHeight = validateRangeInt(getInt(obj, result, itemScope, "thumbMinHeight", "thumb_min_height", "minThumbHeight", "min_thumb_height"), 1, MAX_COMPONENT_SIZE, result, itemScope, "thumbMinHeight");
+        style.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
+        return style;
     }
 
     @Nullable

@@ -53,9 +53,17 @@ Write it into each machine JSON:
       "guiWidth": 520, "guiHeight": 240,
       "specialThreadBackgroundColor": "B2E5FF",
       "threadQueueX": 12, "threadQueueY": 14,
-      "threadScrollbarX": 98, "threadScrollbarY": 22,
       "threadVisibleRows": 7,
-      "threadRowWidth": 90, "threadRowHeight": 34
+      "threadRowWidth": 90, "threadRowHeight": 34,
+      "threadScrollbar": {
+        "x": 98, "y": 22, "width": 8, "height": 197,
+        "trackTexture": "yourmod:textures/gui/scroll_track.png",
+        "thumbTexture": "yourmod:textures/gui/scroll_thumb.png",
+        "trackColor": "66000000", "thumbColor": "FFFFFFFF",
+        "textureWidth": 8, "textureHeight": 197,
+        "thumbTextureWidth": 8, "thumbTextureHeight": 16,
+        "thumbMinHeight": 15, "visible": true
+      }
     }
   }
 }
@@ -69,7 +77,7 @@ Aliases:
 Per-machine values override global. Since `1.0.1+`, if a machine defines any `mmce_gui_ext` node, unspecified GUI size falls back to the MMCE base size (`176x213` / `280x213`) first, reducing coupling to global cfg.
 
 Common per-machine fields (see the quick reference for the full list): `backgroundTexture`, `backgroundTextureOffsetX/Y`, `hideDefaultBackground`, `guiWidth`, `guiHeight`, `enableRightExtension`, `useNineSlice`, `backgroundTextureWidth/Height`, `backgroundCorner`, `centerFullGui`, `specialThreadBackgroundColor`, `enableSmartInterfaceEditor`, `smartInterfaceEditorX/Y`, `smartInterfaceEditorInputWidth`, `smartInterfaceEditorVirtualKey`, `smartInterfaceEditorPriority`, `foregroundContentPriority`, `hideDefaultSmartInterfaceEditor`, `defaultPanelId`, `customPanels`, `smartInterfaceEditors`, `sliders`, `textureLayers`/`backgroundLayers`/`foregroundLayers`, `buttons`.
-For the factory thread queue, the copy-paste fields are `threadQueueX`, `threadQueueY`, `threadScrollbarX`, `threadScrollbarY`, `threadVisibleRows`, `threadRowWidth`, and `threadRowHeight`; aliases like `queueX`, `queueY`, `queueScrollbarX`, `queueScrollbarY`, `queueVisibleRows`, `queueRowWidth`, and `queueRowHeight` are accepted. Customizing these fields also triggers the integrated-controller self proxy.
+For the factory thread queue, use `threadQueueX`, `threadQueueY`, `threadVisibleRows`, `threadRowWidth`, and `threadRowHeight` for the row layout. Use the preferred structured `threadScrollbar` object for scrollbar position, size, track/thumb textures, colors, texture source sizes, minimum thumb height, and visibility. Legacy `threadScrollbarX/Y` remain supported. Customizing these fields also triggers the integrated-controller self proxy.
 
 ---
 

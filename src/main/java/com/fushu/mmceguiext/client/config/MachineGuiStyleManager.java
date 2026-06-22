@@ -303,6 +303,8 @@ public final class MachineGuiStyleManager {
         @Nullable
         public Integer threadScrollbarY;
         @Nullable
+        public ThreadScrollbarStyle threadScrollbar;
+        @Nullable
         public Integer threadVisibleRows;
         @Nullable
         public Integer threadRowWidth;
@@ -381,6 +383,7 @@ public final class MachineGuiStyleManager {
                    && threadQueueY == null
                    && threadScrollbarX == null
                    && threadScrollbarY == null
+                   && threadScrollbar == null
                    && threadVisibleRows == null
                    && threadRowWidth == null
                    && threadRowHeight == null
@@ -436,6 +439,7 @@ public final class MachineGuiStyleManager {
             copy.threadQueueY = source.threadQueueY;
             copy.threadScrollbarX = source.threadScrollbarX;
             copy.threadScrollbarY = source.threadScrollbarY;
+            copy.threadScrollbar = ThreadScrollbarStyle.copyOf(source.threadScrollbar);
             copy.threadVisibleRows = source.threadVisibleRows;
             copy.threadRowWidth = source.threadRowWidth;
             copy.threadRowHeight = source.threadRowHeight;
@@ -491,6 +495,7 @@ public final class MachineGuiStyleManager {
             if (overlay.threadQueueY != null) this.threadQueueY = overlay.threadQueueY;
             if (overlay.threadScrollbarX != null) this.threadScrollbarX = overlay.threadScrollbarX;
             if (overlay.threadScrollbarY != null) this.threadScrollbarY = overlay.threadScrollbarY;
+            if (overlay.threadScrollbar != null) this.threadScrollbar = ThreadScrollbarStyle.merge(this.threadScrollbar, overlay.threadScrollbar);
             if (overlay.threadVisibleRows != null) this.threadVisibleRows = overlay.threadVisibleRows;
             if (overlay.threadRowWidth != null) this.threadRowWidth = overlay.threadRowWidth;
             if (overlay.threadRowHeight != null) this.threadRowHeight = overlay.threadRowHeight;
@@ -558,6 +563,69 @@ public final class MachineGuiStyleManager {
         }
     }
 
+
+    public static class ThreadScrollbarStyle {
+        @Nullable public Integer x;
+        @Nullable public Integer y;
+        @Nullable public Integer width;
+        @Nullable public Integer height;
+        @Nullable public String trackTexture;
+        @Nullable public String thumbTexture;
+        @Nullable public Integer trackColor;
+        @Nullable public Integer thumbColor;
+        @Nullable public Integer textureWidth;
+        @Nullable public Integer textureHeight;
+        @Nullable public Integer thumbTextureWidth;
+        @Nullable public Integer thumbTextureHeight;
+        @Nullable public Integer thumbMinHeight;
+        @Nullable public Boolean visible;
+
+        @Nullable
+        public static ThreadScrollbarStyle copyOf(@Nullable ThreadScrollbarStyle source) {
+            if (source == null) {
+                return null;
+            }
+            ThreadScrollbarStyle copy = new ThreadScrollbarStyle();
+            copy.x = source.x;
+            copy.y = source.y;
+            copy.width = source.width;
+            copy.height = source.height;
+            copy.trackTexture = source.trackTexture;
+            copy.thumbTexture = source.thumbTexture;
+            copy.trackColor = source.trackColor;
+            copy.thumbColor = source.thumbColor;
+            copy.textureWidth = source.textureWidth;
+            copy.textureHeight = source.textureHeight;
+            copy.thumbTextureWidth = source.thumbTextureWidth;
+            copy.thumbTextureHeight = source.thumbTextureHeight;
+            copy.thumbMinHeight = source.thumbMinHeight;
+            copy.visible = source.visible;
+            return copy;
+        }
+
+        @Nullable
+        public static ThreadScrollbarStyle merge(@Nullable ThreadScrollbarStyle base, @Nullable ThreadScrollbarStyle overlay) {
+            if (overlay == null) {
+                return base;
+            }
+            ThreadScrollbarStyle out = base == null ? new ThreadScrollbarStyle() : copyOf(base);
+            if (overlay.x != null) out.x = overlay.x;
+            if (overlay.y != null) out.y = overlay.y;
+            if (overlay.width != null) out.width = overlay.width;
+            if (overlay.height != null) out.height = overlay.height;
+            if (overlay.trackTexture != null) out.trackTexture = overlay.trackTexture;
+            if (overlay.thumbTexture != null) out.thumbTexture = overlay.thumbTexture;
+            if (overlay.trackColor != null) out.trackColor = overlay.trackColor;
+            if (overlay.thumbColor != null) out.thumbColor = overlay.thumbColor;
+            if (overlay.textureWidth != null) out.textureWidth = overlay.textureWidth;
+            if (overlay.textureHeight != null) out.textureHeight = overlay.textureHeight;
+            if (overlay.thumbTextureWidth != null) out.thumbTextureWidth = overlay.thumbTextureWidth;
+            if (overlay.thumbTextureHeight != null) out.thumbTextureHeight = overlay.thumbTextureHeight;
+            if (overlay.thumbMinHeight != null) out.thumbMinHeight = overlay.thumbMinHeight;
+            if (overlay.visible != null) out.visible = overlay.visible;
+            return out;
+        }
+    }
     public static class InfoSectionStyle {
         @Nullable
         public String id;

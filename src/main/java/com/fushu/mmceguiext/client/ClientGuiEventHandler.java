@@ -44,6 +44,12 @@ public class ClientGuiEventHandler {
     private static final int DEFAULT_THREAD_VISIBLE_ROWS = 6;
     private static final int DEFAULT_THREAD_ROW_WIDTH = 86;
     private static final int DEFAULT_THREAD_ROW_HEIGHT = 32;
+    private static final int DEFAULT_THREAD_SCROLLBAR_WIDTH = 12;
+    private static final int DEFAULT_THREAD_SCROLLBAR_HEIGHT = -1;
+    private static final int DEFAULT_THREAD_SCROLLBAR_TEXTURE_HEIGHT = 16;
+    private static final int DEFAULT_THREAD_SCROLLBAR_THUMB_HEIGHT = 15;
+    private static final int DEFAULT_THREAD_SCROLLBAR_TRACK_COLOR = 0x66000000;
+    private static final int DEFAULT_THREAD_SCROLLBAR_THUMB_COLOR = 0xFFFFFFFF;
 
     @SubscribeEvent
     public void onGuiOpen(GuiOpenEvent event) {
@@ -193,7 +199,36 @@ public class ClientGuiEventHandler {
             || MMCEGuiExtConfig.factoryController.threadScrollbarY != DEFAULT_THREAD_SCROLLBAR_Y
             || MMCEGuiExtConfig.factoryController.queueVisibleRows != DEFAULT_THREAD_VISIBLE_ROWS
             || MMCEGuiExtConfig.factoryController.threadRowWidth != DEFAULT_THREAD_ROW_WIDTH
-            || MMCEGuiExtConfig.factoryController.threadRowHeight != DEFAULT_THREAD_ROW_HEIGHT;
+            || MMCEGuiExtConfig.factoryController.threadRowHeight != DEFAULT_THREAD_ROW_HEIGHT
+            || hasCustomThreadScrollbar(style);
+    }
+
+    private boolean hasCustomThreadScrollbar(MachineGuiStyleManager.ControllerStyle style) {
+        if (style.threadScrollbar != null) {
+            return true;
+        }
+        MMCEGuiExtConfig.FactoryController.ThreadScrollbar scrollbar = MMCEGuiExtConfig.factoryController.threadScrollbar;
+        if (scrollbar == null) {
+            return false;
+        }
+        return !scrollbar.visible
+            || scrollbar.x >= 0
+            || scrollbar.y >= 0
+            || scrollbar.width != DEFAULT_THREAD_SCROLLBAR_WIDTH
+            || scrollbar.height != DEFAULT_THREAD_SCROLLBAR_HEIGHT
+            || hasText(scrollbar.trackTexture)
+            || hasText(scrollbar.thumbTexture)
+            || GuiRenderUtils.parseColorARGBOrDefault(scrollbar.trackColor, DEFAULT_THREAD_SCROLLBAR_TRACK_COLOR) != DEFAULT_THREAD_SCROLLBAR_TRACK_COLOR
+            || GuiRenderUtils.parseColorARGBOrDefault(scrollbar.thumbColor, DEFAULT_THREAD_SCROLLBAR_THUMB_COLOR) != DEFAULT_THREAD_SCROLLBAR_THUMB_COLOR
+            || scrollbar.textureWidth != DEFAULT_THREAD_SCROLLBAR_WIDTH
+            || scrollbar.textureHeight != DEFAULT_THREAD_SCROLLBAR_TEXTURE_HEIGHT
+            || scrollbar.thumbTextureWidth != DEFAULT_THREAD_SCROLLBAR_WIDTH
+            || scrollbar.thumbTextureHeight != DEFAULT_THREAD_SCROLLBAR_THUMB_HEIGHT
+            || scrollbar.thumbMinHeight != DEFAULT_THREAD_SCROLLBAR_THUMB_HEIGHT;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
     private boolean isCustomInt(Integer value, int defaultValue) {

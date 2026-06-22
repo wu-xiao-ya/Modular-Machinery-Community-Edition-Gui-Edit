@@ -400,8 +400,14 @@ This file is a quick reference for pack authors.
   - CN: 工厂线程队列左上角坐标。可用 `queueX` / `queueY` 作为别名。
   - EN: Top-left position of the factory thread queue. `queueX` / `queueY` aliases are accepted.
 - `threadScrollbarX` / `threadScrollbarY`
-  - CN: 工厂线程队列滚动条左上角坐标。可用 `queueScrollbarX` / `queueScrollbarY` 作为别名。
-  - EN: Top-left position of the factory thread queue scrollbar. `queueScrollbarX` / `queueScrollbarY` aliases are accepted.
+  - CN: 工厂线程队列滚动条左上角坐标。旧扁平字段仍可用；新 JSON 推荐使用下面的 `threadScrollbar` 对象。
+  - EN: Top-left position of the factory thread queue scrollbar. Legacy flat fields remain supported; new JSON styles should use the `threadScrollbar` object below.
+- `threadScrollbar`
+  - CN: 集成控制器线程队列滚动条结构化配置。只写这个对象也会触发集成控制器自代理 GUI。
+  - EN: Structured scrollbar config for the factory thread queue. This object alone can trigger the integrated-controller self proxy.
+  - Fields: `x`, `y`, `width`, `height`, `trackTexture`, `thumbTexture`, `trackColor`, `thumbColor`, `textureWidth`, `textureHeight`, `thumbTextureWidth`, `thumbTextureHeight`, `thumbMinHeight`, `visible`.
+  - CN: `trackTexture` / `thumbTexture` 为空时分别回退到 `trackColor` / `thumbColor`；`height` 不写或全局 cfg 设 `-1` 时按可见行数自动计算。
+  - EN: Empty `trackTexture` / `thumbTexture` fall back to `trackColor` / `thumbColor`; missing `height` or global cfg `-1` uses automatic height from visible rows.
 - `threadVisibleRows`
   - CN: 工厂线程队列可见行数，优先级高于全局 `queueVisibleRows`。
   - EN: Visible rows in the factory thread queue. Overrides global `queueVisibleRows`.
@@ -420,11 +426,25 @@ This file is a quick reference for pack authors.
     "factoryController": {
       "threadQueueX": 12,
       "threadQueueY": 14,
-      "threadScrollbarX": 98,
-      "threadScrollbarY": 22,
       "threadVisibleRows": 7,
       "threadRowWidth": 90,
-      "threadRowHeight": 34
+      "threadRowHeight": 34,
+      "threadScrollbar": {
+        "x": 98,
+        "y": 22,
+        "width": 8,
+        "height": 197,
+        "trackTexture": "yourmod:textures/gui/scroll_track.png",
+        "thumbTexture": "yourmod:textures/gui/scroll_thumb.png",
+        "trackColor": "66000000",
+        "thumbColor": "FFFFFFFF",
+        "textureWidth": 8,
+        "textureHeight": 197,
+        "thumbTextureWidth": 8,
+        "thumbTextureHeight": 16,
+        "thumbMinHeight": 15,
+        "visible": true
+      }
     }
   }
 }
@@ -462,8 +482,8 @@ This file is a quick reference for pack authors.
 }
 ```
 
-- CN: 这组字段可以直接拷到机器 JSON 里。`queueX` / `queueY` / `queueScrollbarX` / `queueScrollbarY` / `queueVisibleRows` / `queueRowWidth` / `queueRowHeight` 这些别名也能用。
-- EN: You can copy this block directly into a machine JSON. Aliases such as `queueX` / `queueY` / `queueScrollbarX` / `queueScrollbarY` / `queueVisibleRows` / `queueRowWidth` / `queueRowHeight` are also accepted.
+- CN: 这组字段可以直接拷到机器 JSON 里。`queueX` / `queueY` / `queueVisibleRows` / `queueRowWidth` / `queueRowHeight` 这些别名也能用；滚动条外观请使用 `threadScrollbar`。
+- EN: You can copy this block directly into a machine JSON. Aliases such as `queueX` / `queueY` / `queueVisibleRows` / `queueRowWidth` / `queueRowHeight` are also accepted; scrollbar visuals should use `threadScrollbar`.
 
 ## 10. Common patterns / 常见写法
 
