@@ -1109,9 +1109,11 @@ final class MachineGuiStyleParser {
             visual.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
             visual.transform = parseDynamicVisualTransform(obj, result, itemScope);
             visual.transformByValue = parseDynamicVisualTransformByValue(obj, result, itemScope);
+            visual.visibleByValue = parseDynamicVisualVisibilityByValue(obj, result, itemScope);
             visual.source = parseDynamicVisualSource(obj, result, itemScope);
             visual.history = parseDynamicVisualHistory(obj, result, itemScope);
             visual.renderer = parseDynamicVisualRenderer(obj, result, itemScope);
+            visual.rendererByValue = parseDynamicVisualRendererByValue(obj, result, itemScope);
             if (visual.renderer == null) {
                 result.warnForMachine(scope, itemScope + " is missing required renderer.");
                 continue;
@@ -1221,6 +1223,44 @@ final class MachineGuiStyleParser {
             return null;
         }
         return transform;
+    }
+
+    @Nullable
+    private static MachineGuiStyleManager.DynamicVisualVisibilityByValueStyle parseDynamicVisualVisibilityByValue(
+        JsonObject visualObj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        JsonObject visibleObj = getObject(
+            visualObj,
+            result,
+            scope,
+            "visibleByValue",
+            "visible_by_value",
+            "visibilityByValue",
+            "visibility_by_value"
+        );
+        if (visibleObj == null) {
+            return null;
+        }
+        String visibleScope = field(scope, "visibleByValue");
+        MachineGuiStyleManager.DynamicVisualVisibilityByValueStyle visible = new MachineGuiStyleManager.DynamicVisualVisibilityByValueStyle();
+        visible.min = getFloat(visibleObj, result, visibleScope, "min", "minimum");
+        visible.max = getFloat(visibleObj, result, visibleScope, "max", "maximum");
+        visible.equals = getFloat(visibleObj, result, visibleScope, "equals", "eq", "value");
+        visible.invert = getBoolean(visibleObj, result, visibleScope, "invert", "inverted", "reverse", "not");
+        if (isLikelyDynamicVisualSourceObject(visibleObj)) {
+            visible.source = parseDynamicVisualSource(visibleObj, result, visibleScope);
+        } else {
+            JsonObject sourceObj = getObject(visibleObj, result, visibleScope, "source", "dataSource", "data_source");
+            if (sourceObj != null) {
+                visible.source = parseDynamicVisualSource(sourceObj, result, visibleScope + ".source");
+            }
+        }
+        if (visible.min == null && visible.max == null && visible.equals == null && visible.invert == null && visible.source == null) {
+            return null;
+        }
+        return visible;
     }
 
     @Nullable
@@ -1368,6 +1408,79 @@ final class MachineGuiStyleParser {
         renderer.showGrid = getBoolean(rendererObj, result, scope, "showGrid", "show_grid", "grid");
         renderer.frames = parseDynamicVisualFrames(rendererObj, result, scope);
         return renderer;
+    }
+
+    @Nullable
+    private static MachineGuiStyleManager.DynamicVisualRendererByValueStyle parseDynamicVisualRendererByValue(
+        JsonObject visualObj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        JsonObject rendererObj = getObject(
+            visualObj,
+            result,
+            scope,
+            "rendererByValue",
+            "renderer_by_value",
+            "colorsByValue",
+            "colors_by_value",
+            "dynamicColors",
+            "dynamic_colors"
+        );
+        if (rendererObj == null) {
+            return null;
+        }
+        String rendererScope = field(scope, "rendererByValue");
+        MachineGuiStyleManager.DynamicVisualRendererByValueStyle renderer = new MachineGuiStyleManager.DynamicVisualRendererByValueStyle();
+        renderer.backgroundColor = parseDynamicDrivenColor(rendererObj, result, rendererScope, "backgroundColor", "background_color", "bgColor", "bg_color");
+        renderer.fillColor = parseDynamicDrivenColor(rendererObj, result, rendererScope, "fillColor", "fill_color");
+        renderer.borderColor = parseDynamicDrivenColor(rendererObj, result, rendererScope, "borderColor", "border_color", "frameColor", "frame_color");
+        renderer.color = parseDynamicDrivenColor(rendererObj, result, rendererScope, "color", "pieColor", "pie_color");
+        renderer.lineColor = parseDynamicDrivenColor(rendererObj, result, rendererScope, "lineColor", "line_color");
+        renderer.gridColor = parseDynamicDrivenColor(rendererObj, result, rendererScope, "gridColor", "grid_color");
+        if (renderer.backgroundColor == null
+            && renderer.fillColor == null
+            && renderer.borderColor == null
+            && renderer.color == null
+            && renderer.lineColor == null
+            && renderer.gridColor == null) {
+            return null;
+        }
+        return renderer;
+    }
+
+    @Nullable
+    private static MachineGuiStyleManager.DynamicVisualDrivenColorStyle parseDynamicDrivenColor(
+        JsonObject parentObj,
+        MachineFileParseResult result,
+        String scope,
+        String... keys
+    ) {
+        MatchedElement match = findElement(parentObj, keys);
+        if (match == null) {
+            return null;
+        }
+        String itemScope = field(scope, match.key);
+        if (!match.element.isJsonObject()) {
+            result.warnForMachine(scope, itemScope + " must be an object.");
+            return null;
+        }
+        JsonObject obj = match.element.getAsJsonObject();
+        MachineGuiStyleManager.DynamicVisualDrivenColorStyle driven = new MachineGuiStyleManager.DynamicVisualDrivenColorStyle();
+        driven.fromColor = getColor(obj, result, itemScope, "fromColor", "from_color", "startColor", "start_color", "minColor", "min_color");
+        driven.toColor = getColor(obj, result, itemScope, "toColor", "to_color", "endColor", "end_color", "maxColor", "max_color");
+        if (isLikelyDynamicVisualSourceObject(obj)) {
+            driven.source = parseDynamicVisualSource(obj, result, itemScope);
+        } else {
+            JsonObject sourceObj = getObject(obj, result, itemScope, "source", "dataSource", "data_source");
+            if (sourceObj != null) {
+                driven.source = parseDynamicVisualSource(sourceObj, result, itemScope + ".source");
+            }
+        }
+        if (driven.fromColor == null && driven.toColor == null && driven.source == null) {
+            return null;
+        }
+        return driven;
     }
 
     @Nullable

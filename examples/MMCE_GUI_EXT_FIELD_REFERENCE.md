@@ -607,7 +607,9 @@ EN: Common tweaks:
 - `history`: optional sampling config for charts.
 - `transform`: optional static transform object.
 - `transformByValue`: optional variable-driven transform object. Supported channels: `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`.
+- `visibleByValue`: optional variable-driven visibility object. Supports `min`, `max`, `equals`, `invert`, optional independent `source`.
 - `renderer`: renderer object.
+- `rendererByValue`: optional variable-driven color object. Supported channels: `backgroundColor`, `fillColor`, `borderColor`, `color`, `lineColor`, `gridColor`.
 
 ### `source` fields / 数据源字段
 
@@ -685,6 +687,59 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
 - `pivotX` / `pivotY`
   - CN: 变量驱动支点坐标。单位仍由静态 `transform.pivotUnit` 决定；未写时默认 `ratio`。
   - EN: Variable-driven pivot coordinates. Their units are still controlled by static `transform.pivotUnit`; if omitted, it defaults to `ratio`.
+
+### `visibleByValue` / 变量驱动显隐
+
+```json
+"visibleByValue": {
+  "min": 0.15,
+  "max": 0.95,
+  "invert": false,
+  "source": { "type": "customData", "key": "alarm", "default": 0, "min": 0, "max": 1 }
+}
+```
+
+- `min`, `max`, `equals`
+  - CN: 对归一化后的输入值做范围/等值判断。
+  - EN: Range / equality checks against the normalized input value.
+- `invert`
+  - CN: 取反最终显隐结果。
+  - EN: Inverts the final visible / hidden decision.
+- `source`
+  - CN: 可选独立数据源；未写时默认复用该 visual 的主 `source`。
+  - EN: Optional independent source; otherwise the visual's main `source` is reused.
+- 规则 / rule
+  - CN: 未配置 `visibleByValue` 时按普通 `visible` 处理；配置后只有条件命中才会渲染。
+  - EN: Without `visibleByValue`, the normal `visible` flag is used; with it, the component renders only when the condition passes.
+
+### `rendererByValue` / 变量驱动颜色
+
+```json
+"rendererByValue": {
+  "fillColor": {
+    "fromColor": "FF33CC66",
+    "toColor": "FFFF5544"
+  },
+  "borderColor": {
+    "fromColor": "FF66FF99",
+    "toColor": "FFFFAA66",
+    "source": { "type": "customData", "key": "danger", "default": 0, "min": 0, "max": 1 }
+  }
+}
+```
+
+- supported channels / 支持通道
+  - `backgroundColor`, `fillColor`, `borderColor`, `color`, `lineColor`, `gridColor`
+- per-channel fields / 每个通道字段
+  - `fromColor`, `toColor`
+    - CN: 按归一化后的 `0-1` 值做线性插值。
+    - EN: Linear interpolation endpoints for normalized `0-1` input.
+  - `source`
+    - CN: 可选独立数据源；未写时默认复用该 visual 的主 `source`。
+    - EN: Optional independent source; otherwise the visual's main `source` is reused.
+- 回退规则 / fallback rule
+  - CN: 若只写了 `fromColor` 或 `toColor`，另一端会优先回退到静态 `renderer` 对应颜色；若静态颜色也没写，则退回已填写的那一端。
+  - EN: If only one endpoint is provided, the other side first falls back to the matching static renderer color; if that is also missing, the provided endpoint is reused.
 
 ### renderer: `textureSwitch`
 
@@ -774,3 +829,30 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
 ```
 
 In this example, the static `pivotUnit` is `ratio`, so the dynamic `pivotX` / `pivotY` values are also treated as relative coordinates.
+
+### Combined example with visibility + colors / 带显隐与颜色联动的综合示例
+
+```json
+{
+  "id": "warning_ring",
+  "x": 160,
+  "y": 28,
+  "width": 28,
+  "height": 28,
+  "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+  "visibleByValue": { "min": 0.05 },
+  "renderer": {
+    "type": "pie",
+    "mode": "ring",
+    "innerRadius": 8,
+    "backgroundColor": "22000000",
+    "color": "FF44FF44"
+  },
+  "rendererByValue": {
+    "color": {
+      "fromColor": "FF44FF44",
+      "toColor": "FFFF4444"
+    }
+  }
+}
+```

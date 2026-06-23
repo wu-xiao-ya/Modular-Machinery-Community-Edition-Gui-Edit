@@ -8,6 +8,7 @@ Use them as a starting point:
 - `smart-interface-only.json`: only enables Smart Interface editor slots
 - `factory-queue-only.json`: only customizes the factory queue and right expansion
 - `sliders.json`: adds horizontal and vertical controller sliders that write Smart Interface / virtual DataPort values
+- `dynamic-visuals.json`: demonstrates `dynamicVisuals[]`, including transform-by-value, visibility-by-value, and color interpolation
 - `error-cases.json`: intentionally broken or edge-case examples for log validation
 - `subgui-page-reference.json`: main machine JSON, intended for `config/modularmachinery/machinery`
 - `subgui-page-reference-settings.json`: sub GUI overlay JSON, intended for `config/mmceguiext/subgui`
@@ -29,3 +30,4 @@ Page / sub GUI naming rule used by the sample:
 - `close_subgui` closes the currently open sub GUI and keeps the main controller visible
 - the sample keeps the same `registryname` in both files so the sub GUI overlays can merge into the same machine definition
 - `sliders[]` entries write numeric values through their `key`; use the same key from CraftTweaker via `ctrl.getSmartInterfaceData(key)` or `ctrl.customData`
+- `dynamic-visuals.json` uses those slider-written keys (`heat`, `warning`) to drive fill, ring, visibility, color, rotation, and scale in one place

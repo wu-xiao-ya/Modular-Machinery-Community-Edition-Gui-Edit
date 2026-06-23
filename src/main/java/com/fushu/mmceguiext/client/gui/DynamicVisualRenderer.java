@@ -54,8 +54,12 @@ public class DynamicVisualRenderer {
             }
             float raw = resolveRawValue(visual.source, controller, metricProvider);
             float normalized = normalizeValue(raw, visual.source);
+            if (!resolveVisibilityByValue(visual.visibleByValue, normalized, controller, metricProvider)) {
+                continue;
+            }
             updateHistoryIfNeeded(visual, normalized, controller);
-            renderVisual(visual, raw, normalized, controller, metricProvider, originX, originY);
+            MachineGuiStyleManager.DynamicVisualRendererStyle renderer = resolveRendererStyle(visual, normalized, controller, metricProvider);
+            renderVisual(visual, renderer, raw, normalized, controller, metricProvider, originX, originY);
         }
     }
 
@@ -144,6 +148,7 @@ public class DynamicVisualRenderer {
 
     private void renderVisual(
         MachineGuiStyleManager.DynamicVisualStyle visual,
+        MachineGuiStyleManager.DynamicVisualRendererStyle renderer,
         float rawValue,
         float normalized,
         @Nullable TileMultiblockMachineController controller,
@@ -151,7 +156,6 @@ public class DynamicVisualRenderer {
         int originX,
         int originY
     ) {
-        MachineGuiStyleManager.DynamicVisualRendererStyle renderer = visual.renderer;
         String type = renderer.type == null ? "fill" : renderer.type;
         ResolvedTransform transform = resolveTransform(visual, normalized, controller, metricProvider);
         if (transform.alpha <= EPSILON) {
@@ -189,6 +193,55 @@ public class DynamicVisualRenderer {
         } finally {
             endVisualRender(transform.alpha);
         }
+    }
+
+    private boolean resolveVisibilityByValue(
+        @Nullable MachineGuiStyleManager.DynamicVisualVisibilityByValueStyle visibility,
+        float fallbackNormalized,
+        @Nullable TileMultiblockMachineController controller,
+        MetricProvider metricProvider
+    ) {
+        if (visibility == null) {
+            return true;
+        }
+        float value = resolveNormalizedInput(visibility.source, fallbackNormalized, controller, metricProvider);
+        boolean visible = true;
+        if (visibility.equals != null) {
+            visible = Math.abs(value - visibility.equals.floatValue()) <= EPSILON;
+        }
+        if (visibility.min != null && value < visibility.min.floatValue()) {
+            visible = false;
+        }
+        if (visibility.max != null && value > visibility.max.floatValue()) {
+            visible = false;
+        }
+        if (Boolean.TRUE.equals(visibility.invert)) {
+            visible = !visible;
+        }
+        return visible;
+    }
+
+    private MachineGuiStyleManager.DynamicVisualRendererStyle resolveRendererStyle(
+        MachineGuiStyleManager.DynamicVisualStyle visual,
+        float fallbackNormalized,
+        @Nullable TileMultiblockMachineController controller,
+        MetricProvider metricProvider
+    ) {
+        MachineGuiStyleManager.DynamicVisualRendererStyle renderer = MachineGuiStyleManager.DynamicVisualRendererStyle.copyOf(visual.renderer);
+        if (renderer == null) {
+            renderer = new MachineGuiStyleManager.DynamicVisualRendererStyle();
+        }
+        MachineGuiStyleManager.DynamicVisualRendererByValueStyle dynamic = visual.rendererByValue;
+        if (dynamic == null) {
+            return renderer;
+        }
+        renderer.backgroundColor = resolveDrivenColor(dynamic.backgroundColor, renderer.backgroundColor, fallbackNormalized, controller, metricProvider);
+        renderer.fillColor = resolveDrivenColor(dynamic.fillColor, renderer.fillColor, fallbackNormalized, controller, metricProvider);
+        renderer.borderColor = resolveDrivenColor(dynamic.borderColor, renderer.borderColor, fallbackNormalized, controller, metricProvider);
+        renderer.color = resolveDrivenColor(dynamic.color, renderer.color, fallbackNormalized, controller, metricProvider);
+        renderer.lineColor = resolveDrivenColor(dynamic.lineColor, renderer.lineColor, fallbackNormalized, controller, metricProvider);
+        renderer.gridColor = resolveDrivenColor(dynamic.gridColor, renderer.gridColor, fallbackNormalized, controller, metricProvider);
+        return renderer;
     }
 
     private void drawResolvedVisual(
@@ -305,11 +358,7 @@ public class DynamicVisualRenderer {
         @Nullable TileMultiblockMachineController controller,
         MetricProvider metricProvider
     ) {
-        float input = fallbackNormalized;
-        if (driven.source != null) {
-            float raw = resolveRawValue(driven.source, controller, metricProvider);
-            input = normalizeValue(raw, driven.source);
-        }
+        float input = resolveNormalizedInput(driven.source, fallbackNormalized, controller, metricProvider);
         float min = driven.min == null ? 0.0F : driven.min.floatValue();
         float max = driven.max == null ? 1.0F : driven.max.floatValue();
         if (!Float.isFinite(input)) {
@@ -319,6 +368,63 @@ public class DynamicVisualRenderer {
             return min;
         }
         return min + (max - min) * input;
+    }
+
+    private float resolveNormalizedInput(
+        @Nullable MachineGuiStyleManager.DynamicVisualSourceStyle source,
+        float fallbackNormalized,
+        @Nullable TileMultiblockMachineController controller,
+        MetricProvider metricProvider
+    ) {
+        float input = fallbackNormalized;
+        if (source != null) {
+            float raw = resolveRawValue(source, controller, metricProvider);
+            input = normalizeValue(raw, source);
+        }
+        return Float.isFinite(input) ? input : 0.0F;
+    }
+
+    @Nullable
+    private Integer resolveDrivenColor(
+        @Nullable MachineGuiStyleManager.DynamicVisualDrivenColorStyle driven,
+        @Nullable Integer baseColor,
+        float fallbackNormalized,
+        @Nullable TileMultiblockMachineController controller,
+        MetricProvider metricProvider
+    ) {
+        if (driven == null) {
+            return baseColor;
+        }
+        float input = ProgressBarStyleSupport.clamp01(resolveNormalizedInput(driven.source, fallbackNormalized, controller, metricProvider));
+        Integer fromColor = driven.fromColor != null ? driven.fromColor : (baseColor != null ? baseColor : driven.toColor);
+        Integer toColor = driven.toColor != null ? driven.toColor : (baseColor != null ? baseColor : driven.fromColor);
+        if (fromColor == null && toColor == null) {
+            return baseColor;
+        }
+        if (fromColor == null) {
+            fromColor = toColor;
+        }
+        if (toColor == null) {
+            toColor = fromColor;
+        }
+        return Integer.valueOf(interpolateColor(fromColor.intValue(), toColor.intValue(), input));
+    }
+
+    private int interpolateColor(int fromColor, int toColor, float progress) {
+        float clamped = ProgressBarStyleSupport.clamp01(progress);
+        int fromA = (fromColor >>> 24) & 0xFF;
+        int fromR = (fromColor >>> 16) & 0xFF;
+        int fromG = (fromColor >>> 8) & 0xFF;
+        int fromB = fromColor & 0xFF;
+        int toA = (toColor >>> 24) & 0xFF;
+        int toR = (toColor >>> 16) & 0xFF;
+        int toG = (toColor >>> 8) & 0xFF;
+        int toB = toColor & 0xFF;
+        int outA = MathHelper.clamp(Math.round(fromA + (toA - fromA) * clamped), 0, 255);
+        int outR = MathHelper.clamp(Math.round(fromR + (toR - fromR) * clamped), 0, 255);
+        int outG = MathHelper.clamp(Math.round(fromG + (toG - fromG) * clamped), 0, 255);
+        int outB = MathHelper.clamp(Math.round(fromB + (toB - fromB) * clamped), 0, 255);
+        return (outA << 24) | (outR << 16) | (outG << 8) | outB;
     }
 
     private void applyTransformMatrix(ResolvedTransform transform) {

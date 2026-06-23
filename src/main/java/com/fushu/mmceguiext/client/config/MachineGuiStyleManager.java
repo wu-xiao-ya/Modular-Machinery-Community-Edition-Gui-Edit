@@ -1006,11 +1006,15 @@ public final class MachineGuiStyleManager {
         @Nullable
         public DynamicVisualTransformByValueStyle transformByValue;
         @Nullable
+        public DynamicVisualVisibilityByValueStyle visibleByValue;
+        @Nullable
         public DynamicVisualSourceStyle source;
         @Nullable
         public DynamicVisualHistoryStyle history;
         @Nullable
         public DynamicVisualRendererStyle renderer;
+        @Nullable
+        public DynamicVisualRendererByValueStyle rendererByValue;
 
         public static DynamicVisualStyle copyOf(@Nullable DynamicVisualStyle source) {
             DynamicVisualStyle copy = new DynamicVisualStyle();
@@ -1028,9 +1032,11 @@ public final class MachineGuiStyleManager {
             copy.page = source.page;
             copy.transform = DynamicVisualTransformStyle.copyOf(source.transform);
             copy.transformByValue = DynamicVisualTransformByValueStyle.copyOf(source.transformByValue);
+            copy.visibleByValue = DynamicVisualVisibilityByValueStyle.copyOf(source.visibleByValue);
             copy.source = DynamicVisualSourceStyle.copyOf(source.source);
             copy.history = DynamicVisualHistoryStyle.copyOf(source.history);
             copy.renderer = DynamicVisualRendererStyle.copyOf(source.renderer);
+            copy.rendererByValue = DynamicVisualRendererByValueStyle.copyOf(source.rendererByValue);
             return copy;
         }
     }
@@ -1135,6 +1141,33 @@ public final class MachineGuiStyleManager {
             DynamicVisualDrivenValueStyle copy = new DynamicVisualDrivenValueStyle();
             copy.min = source.min;
             copy.max = source.max;
+            copy.source = DynamicVisualSourceStyle.copyOf(source.source);
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualVisibilityByValueStyle {
+        @Nullable
+        public Float min;
+        @Nullable
+        public Float max;
+        @Nullable
+        public Float equals;
+        @Nullable
+        public Boolean invert;
+        @Nullable
+        public DynamicVisualSourceStyle source;
+
+        @Nullable
+        public static DynamicVisualVisibilityByValueStyle copyOf(@Nullable DynamicVisualVisibilityByValueStyle source) {
+            if (source == null) {
+                return null;
+            }
+            DynamicVisualVisibilityByValueStyle copy = new DynamicVisualVisibilityByValueStyle();
+            copy.min = source.min;
+            copy.max = source.max;
+            copy.equals = source.equals;
+            copy.invert = source.invert;
             copy.source = DynamicVisualSourceStyle.copyOf(source.source);
             return copy;
         }
@@ -1270,6 +1303,57 @@ public final class MachineGuiStyleManager {
                     copy.frames.add(DynamicVisualFrameStyle.copyOf(frame));
                 }
             }
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualRendererByValueStyle {
+        @Nullable
+        public DynamicVisualDrivenColorStyle backgroundColor;
+        @Nullable
+        public DynamicVisualDrivenColorStyle fillColor;
+        @Nullable
+        public DynamicVisualDrivenColorStyle borderColor;
+        @Nullable
+        public DynamicVisualDrivenColorStyle color;
+        @Nullable
+        public DynamicVisualDrivenColorStyle lineColor;
+        @Nullable
+        public DynamicVisualDrivenColorStyle gridColor;
+
+        @Nullable
+        public static DynamicVisualRendererByValueStyle copyOf(@Nullable DynamicVisualRendererByValueStyle source) {
+            if (source == null) {
+                return null;
+            }
+            DynamicVisualRendererByValueStyle copy = new DynamicVisualRendererByValueStyle();
+            copy.backgroundColor = DynamicVisualDrivenColorStyle.copyOf(source.backgroundColor);
+            copy.fillColor = DynamicVisualDrivenColorStyle.copyOf(source.fillColor);
+            copy.borderColor = DynamicVisualDrivenColorStyle.copyOf(source.borderColor);
+            copy.color = DynamicVisualDrivenColorStyle.copyOf(source.color);
+            copy.lineColor = DynamicVisualDrivenColorStyle.copyOf(source.lineColor);
+            copy.gridColor = DynamicVisualDrivenColorStyle.copyOf(source.gridColor);
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualDrivenColorStyle {
+        @Nullable
+        public Integer fromColor;
+        @Nullable
+        public Integer toColor;
+        @Nullable
+        public DynamicVisualSourceStyle source;
+
+        @Nullable
+        public static DynamicVisualDrivenColorStyle copyOf(@Nullable DynamicVisualDrivenColorStyle source) {
+            if (source == null) {
+                return null;
+            }
+            DynamicVisualDrivenColorStyle copy = new DynamicVisualDrivenColorStyle();
+            copy.fromColor = source.fromColor;
+            copy.toColor = source.toColor;
+            copy.source = DynamicVisualSourceStyle.copyOf(source.source);
             return copy;
         }
     }

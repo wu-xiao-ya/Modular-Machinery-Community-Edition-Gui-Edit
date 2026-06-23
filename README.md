@@ -418,9 +418,9 @@ See the MMCE source license. / 见 MMCE 源码许可。
 
 ## Dynamic visuals / 动态可视化组件
 
-`dynamicVisuals[]` can be used under both `machineController` and `factoryController`. It uses one unified pipeline: `source` -> normalized value -> optional `history` -> `renderer`.
+`dynamicVisuals[]` can be used under both `machineController` and `factoryController`. It uses one unified pipeline: `source` -> normalized value -> optional visibility / transform / color overrides -> optional `history` -> `renderer`.
 
-Common fields: `id`, `x`, `y`, `width`, `height`, `priority`, `foreground`, `page`, `visible`, `source`, `history`, `renderer`, `transform`, `transformByValue`.
+Common fields: `id`, `x`, `y`, `width`, `height`, `priority`, `foreground`, `page`, `visible`, `visibleByValue`, `source`, `history`, `renderer`, `rendererByValue`, `transform`, `transformByValue`.
 
 Supported sources:
 - `customData`: reads a numeric value from controller custom data / Smart Interface virtual key: `key`, `default`, `min`, `max`, `clamp`, `invert`.
@@ -437,6 +437,12 @@ Optional transforms:
 - `transformByValue`: drive `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, and `pivotY` from the normalized source value.
 - Dynamic `pivotX` / `pivotY` use the static `transform.pivotUnit` for their units. If `pivotUnit` is omitted, it defaults to `ratio`; use `ratio` for 0..1 relative coordinates, or `px` for absolute pixel coordinates.
 - each `transformByValue` channel accepts `{ "min": ..., "max": ... }` and may define its own independent `source`.
+
+Optional visibility / color overrides:
+- `visibleByValue`: conditional visibility driven by the normalized value. Supports `min`, `max`, `equals`, `invert`, and optional independent `source`.
+- `rendererByValue`: variable-driven color interpolation for color-capable renderers. Supported channels: `backgroundColor`, `fillColor`, `borderColor`, `color`, `lineColor`, `gridColor`.
+- each `rendererByValue` channel accepts `{ "fromColor": ..., "toColor": ... }` and may define its own independent `source`.
+- when `rendererByValue` is used, static renderer colors remain the fallback endpoints if `fromColor` or `toColor` is omitted.
 
 Example:
 
@@ -500,8 +506,31 @@ Example:
         { "texture": "pack:textures/gui/fan.png" }
       ]
     }
+  },
+  {
+    "id": "warning_ring",
+    "x": 160,
+    "y": 28,
+    "width": 28,
+    "height": 28,
+    "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+    "visibleByValue": { "min": 0.05 },
+    "renderer": {
+      "type": "pie",
+      "mode": "ring",
+      "innerRadius": 8,
+      "backgroundColor": "22000000",
+      "color": "FF44FF44"
+    },
+    "rendererByValue": {
+      "color": {
+        "fromColor": "FF44FF44",
+        "toColor": "FFFF4444"
+      }
+    }
   }
 ]
 ```
 
 In the example above, the static `transform.pivotUnit` is `ratio`, so the dynamic `pivotX` / `pivotY` values are also interpreted as relative `0..1` coordinates.
+`warning_ring` stays hidden near zero, then fades from green to red as `warning` rises.
