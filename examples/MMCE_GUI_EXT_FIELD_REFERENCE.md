@@ -606,7 +606,7 @@ EN: Common tweaks:
 - `source`: value source object.
 - `history`: optional sampling config for charts.
 - `transform`: optional static transform object.
-- `transformByValue`: optional variable-driven transform object.
+- `transformByValue`: optional variable-driven transform object. Supported channels: `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`.
 - `renderer`: renderer object.
 
 ### `source` fields / 数据源字段
@@ -674,7 +674,7 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
 ```
 
 - supported channels / 支持通道:
-  - `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`
+  - `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`
 - per-channel fields / 每个通道字段:
   - `min`, `max`
     - CN: 把归一化后的 `0-1` 数值映射到该区间。
@@ -682,6 +682,9 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
   - `source`
     - CN: 可选独立数据源；未写时默认使用该 visual 的主 `source`。
     - EN: Optional independent source; otherwise the visual's main `source` is reused.
+- `pivotX` / `pivotY`
+  - CN: 变量驱动支点坐标。单位仍由静态 `transform.pivotUnit` 决定；未写时默认 `ratio`。
+  - EN: Variable-driven pivot coordinates. Their units are still controlled by static `transform.pivotUnit`; if omitted, it defaults to `ratio`.
 
 ### renderer: `textureSwitch`
 
@@ -751,6 +754,8 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
   "transform": { "pivotX": 0.5, "pivotY": 0.5, "pivotUnit": "ratio", "alpha": 0.6 },
   "transformByValue": {
     "rotation": { "min": 0, "max": 360 },
+    "pivotX": { "min": 0.35, "max": 0.65 },
+    "pivotY": { "min": 0.35, "max": 0.65 },
     "scale": { "min": 0.85, "max": 1.15 },
     "alpha": {
       "min": 0.4,
@@ -767,3 +772,5 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
   }
 }
 ```
+
+In this example, the static `pivotUnit` is `ratio`, so the dynamic `pivotX` / `pivotY` values are also treated as relative coordinates.

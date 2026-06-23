@@ -192,9 +192,8 @@ Renderers supported now: `textureSwitch`, `fill`, `pie`/`ring`, and `lineChart`.
 
 Optional transforms are also supported:
 - `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`, `pivotUnit`, and legacy `origin` (`topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`).
-- `transformByValue`: variable-driven `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`.
-- `pivotX` / `pivotY` only work in static `transform`; when present they override `origin` for that visual.
-- `pivotUnit` defaults to `ratio`. Use `ratio` for 0..1 relative coordinates, or `px` for absolute pixel coordinates.
+- `transformByValue`: variable-driven `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`.
+- Dynamic `pivotX` / `pivotY` use the static `transform.pivotUnit` for their units. If `pivotUnit` is omitted, it defaults to `ratio`; use `ratio` for 0..1 relative coordinates, or `px` for absolute pixel coordinates.
 - each `transformByValue` channel may define its own independent `source`; otherwise it reuses the visual's main `source`.
 
 ```json
@@ -233,6 +232,8 @@ Variable-driven rotation example:
   "transform": { "pivotX": 0.5, "pivotY": 0.5, "pivotUnit": "ratio", "alpha": 0.6 },
   "transformByValue": {
     "rotation": { "min": 0, "max": 360 },
+    "pivotX": { "min": 0.35, "max": 0.65 },
+    "pivotY": { "min": 0.35, "max": 0.65 },
     "scale": { "min": 0.85, "max": 1.15 },
     "alpha": {
       "min": 0.4,
@@ -249,3 +250,5 @@ Variable-driven rotation example:
   }
 }
 ```
+
+In this example, the static `pivotUnit` is `ratio`, so the dynamic `pivotX` / `pivotY` values are also interpreted as relative coordinates.

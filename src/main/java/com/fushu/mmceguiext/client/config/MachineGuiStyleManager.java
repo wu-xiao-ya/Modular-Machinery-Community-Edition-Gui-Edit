@@ -1095,6 +1095,10 @@ public final class MachineGuiStyleManager {
         public DynamicVisualDrivenValueStyle rotation;
         @Nullable
         public DynamicVisualDrivenValueStyle alpha;
+        @Nullable
+        public DynamicVisualDrivenValueStyle pivotX;
+        @Nullable
+        public DynamicVisualDrivenValueStyle pivotY;
 
         @Nullable
         public static DynamicVisualTransformByValueStyle copyOf(@Nullable DynamicVisualTransformByValueStyle source) {
@@ -1109,6 +1113,8 @@ public final class MachineGuiStyleManager {
             copy.scaleY = DynamicVisualDrivenValueStyle.copyOf(source.scaleY);
             copy.rotation = DynamicVisualDrivenValueStyle.copyOf(source.rotation);
             copy.alpha = DynamicVisualDrivenValueStyle.copyOf(source.alpha);
+            copy.pivotX = DynamicVisualDrivenValueStyle.copyOf(source.pivotX);
+            copy.pivotY = DynamicVisualDrivenValueStyle.copyOf(source.pivotY);
             return copy;
         }
     }

@@ -434,9 +434,8 @@ Supported renderers:
 
 Optional transforms:
 - `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`, `pivotUnit`, and legacy `origin` (`topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`).
-- `transformByValue`: drive `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha` from the normalized source value.
-- `pivotX` / `pivotY` only work inside static `transform`. When present, they override `origin` for that visual.
-- `pivotUnit` defaults to `ratio`. Use `ratio` for 0..1 relative coordinates, or `px` for absolute pixel coordinates.
+- `transformByValue`: drive `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, and `pivotY` from the normalized source value.
+- Dynamic `pivotX` / `pivotY` use the static `transform.pivotUnit` for their units. If `pivotUnit` is omitted, it defaults to `ratio`; use `ratio` for 0..1 relative coordinates, or `px` for absolute pixel coordinates.
 - each `transformByValue` channel accepts `{ "min": ..., "max": ... }` and may define its own independent `source`.
 
 Example:
@@ -485,6 +484,8 @@ Example:
     "transform": { "pivotX": 0.5, "pivotY": 0.5, "pivotUnit": "ratio", "alpha": 0.6 },
     "transformByValue": {
       "rotation": { "min": 0, "max": 360 },
+      "pivotX": { "min": 0.35, "max": 0.65 },
+      "pivotY": { "min": 0.35, "max": 0.65 },
       "scale": { "min": 0.85, "max": 1.15 },
       "alpha": {
         "min": 0.4,
@@ -502,3 +503,5 @@ Example:
   }
 ]
 ```
+
+In the example above, the static `transform.pivotUnit` is `ratio`, so the dynamic `pivotX` / `pivotY` values are also interpreted as relative `0..1` coordinates.

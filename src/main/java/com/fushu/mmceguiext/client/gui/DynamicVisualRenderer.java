@@ -285,6 +285,12 @@ public class DynamicVisualRenderer {
             if (dynamic.alpha != null) {
                 transform.alpha *= normalizeRuntimeAlpha(resolveDrivenValue(dynamic.alpha, normalized, controller, metricProvider));
             }
+            if (dynamic.pivotX != null) {
+                transform.pivotX = Float.valueOf(resolveDrivenValue(dynamic.pivotX, normalized, controller, metricProvider));
+            }
+            if (dynamic.pivotY != null) {
+                transform.pivotY = Float.valueOf(resolveDrivenValue(dynamic.pivotY, normalized, controller, metricProvider));
+            }
         }
 
         transform.scaleX = normalizeRuntimeScale(transform.scaleX);

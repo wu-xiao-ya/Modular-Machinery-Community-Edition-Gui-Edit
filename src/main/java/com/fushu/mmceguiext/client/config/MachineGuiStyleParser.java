@@ -1207,13 +1207,17 @@ final class MachineGuiStyleParser {
         transform.scaleY = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "scaleY", "scale_y");
         transform.rotation = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "rotation", "rotate", "angle");
         transform.alpha = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "alpha", "opacity", "transparency");
+        transform.pivotX = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "pivotX", "pivot_x");
+        transform.pivotY = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "pivotY", "pivot_y");
         if (transform.offsetX == null
             && transform.offsetY == null
             && transform.scale == null
             && transform.scaleX == null
             && transform.scaleY == null
             && transform.rotation == null
-            && transform.alpha == null) {
+            && transform.alpha == null
+            && transform.pivotX == null
+            && transform.pivotY == null) {
             return null;
         }
         return transform;

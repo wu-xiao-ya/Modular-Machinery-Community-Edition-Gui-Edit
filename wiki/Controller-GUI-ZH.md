@@ -192,9 +192,8 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 
 还支持可选变换：
 - `transform`：静态 `offsetX`、`offsetY`、`scale`、`scaleX`、`scaleY`、`rotation`、`alpha`、`pivotX`、`pivotY`、`pivotUnit`，以及兼容旧写法的 `origin`（`topLeft`、`topCenter`、`topRight`、`centerLeft`、`center`、`centerRight`、`bottomLeft`、`bottomCenter`、`bottomRight`）。
-- `transformByValue`：按变量驱动 `offsetX`、`offsetY`、`scale`、`scaleX`、`scaleY`、`rotation`、`alpha`。
-- `pivotX` / `pivotY` 只在静态 `transform` 中生效；一旦填写，会覆盖该 visual 的 `origin`。
-- `pivotUnit` 默认是 `ratio`。`ratio` 表示基于宽高的 `0..1` 相对坐标，`px` 表示绝对像素坐标。
+- `transformByValue`：按变量驱动 `offsetX`、`offsetY`、`scale`、`scaleX`、`scaleY`、`rotation`、`alpha`、`pivotX`、`pivotY`。
+- 动态 `pivotX` / `pivotY` 的单位仍由静态 `transform.pivotUnit` 决定；如果没写，默认就是 `ratio`。`ratio` 表示基于宽高的 `0..1` 相对坐标，`px` 表示绝对像素坐标。
 - 每个 `transformByValue` 通道都可写独立 `source`，不写时默认复用当前 visual 的主 `source`。
 
 ```json
@@ -233,6 +232,8 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
   "transform": { "pivotX": 0.5, "pivotY": 0.5, "pivotUnit": "ratio", "alpha": 0.6 },
   "transformByValue": {
     "rotation": { "min": 0, "max": 360 },
+    "pivotX": { "min": 0.35, "max": 0.65 },
+    "pivotY": { "min": 0.35, "max": 0.65 },
     "scale": { "min": 0.85, "max": 1.15 },
     "alpha": {
       "min": 0.4,
@@ -249,3 +250,5 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
   }
 }
 ```
+
+这个示例里静态 `pivotUnit` 是 `ratio`，所以动态 `pivotX` / `pivotY` 也按相对坐标解释。
