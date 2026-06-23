@@ -1137,6 +1137,13 @@ final class MachineGuiStyleParser {
         transform.rotation = getFloat(visualObj, result, scope, "rotation", "rotate", "angle");
         transform.alpha = normalizeAlpha(getFloat(visualObj, result, scope, "alpha", "opacity", "transparency"));
         transform.origin = normalizeDynamicTransformOrigin(getTrimmedString(visualObj, result, scope, "origin", "pivot", "anchor"), result, scope);
+        transform.pivotX = getFloat(visualObj, result, scope, "pivotX", "pivot_x");
+        transform.pivotY = getFloat(visualObj, result, scope, "pivotY", "pivot_y");
+        transform.pivotUnit = normalizeDynamicTransformPivotUnit(
+            getTrimmedString(visualObj, result, scope, "pivotUnit", "pivot_unit", "pivotMode", "pivot_mode"),
+            result,
+            scope
+        );
         if (transformObj != null) {
             String transformScope = field(scope, "transform");
             Float offsetX = getFloat(transformObj, result, transformScope, "offsetX", "offset_x", "dx");
@@ -1147,6 +1154,13 @@ final class MachineGuiStyleParser {
             Float rotation = getFloat(transformObj, result, transformScope, "rotation", "rotate", "angle");
             Float alpha = normalizeAlpha(getFloat(transformObj, result, transformScope, "alpha", "opacity", "transparency"));
             String origin = normalizeDynamicTransformOrigin(getTrimmedString(transformObj, result, transformScope, "origin", "pivot", "anchor"), result, transformScope);
+            Float pivotX = getFloat(transformObj, result, transformScope, "pivotX", "pivot_x");
+            Float pivotY = getFloat(transformObj, result, transformScope, "pivotY", "pivot_y");
+            String pivotUnit = normalizeDynamicTransformPivotUnit(
+                getTrimmedString(transformObj, result, transformScope, "pivotUnit", "pivot_unit", "pivotMode", "pivot_mode"),
+                result,
+                transformScope
+            );
             if (offsetX != null) transform.offsetX = offsetX;
             if (offsetY != null) transform.offsetY = offsetY;
             if (scale != null) transform.scale = scale;
@@ -1155,6 +1169,9 @@ final class MachineGuiStyleParser {
             if (rotation != null) transform.rotation = rotation;
             if (alpha != null) transform.alpha = alpha;
             if (origin != null) transform.origin = origin;
+            if (pivotX != null) transform.pivotX = pivotX;
+            if (pivotY != null) transform.pivotY = pivotY;
+            if (pivotUnit != null) transform.pivotUnit = pivotUnit;
         }
         if (transform.offsetX == null
             && transform.offsetY == null
@@ -1163,7 +1180,10 @@ final class MachineGuiStyleParser {
             && transform.scaleY == null
             && transform.rotation == null
             && transform.alpha == null
-            && transform.origin == null) {
+            && transform.origin == null
+            && transform.pivotX == null
+            && transform.pivotY == null
+            && transform.pivotUnit == null) {
             return null;
         }
         return transform;
@@ -2246,6 +2266,26 @@ final class MachineGuiStyleParser {
             return "bottomRight";
         }
         result.warnForMachine(scope, field(scope, "origin") + " must be one of topLeft, topCenter, topRight, centerLeft, center, centerRight, bottomLeft, bottomCenter or bottomRight.");
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeDynamicTransformPivotUnit(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("ratio".equals(text) || "relative".equals(text) || "normalized".equals(text) || "fraction".equals(text)) {
+            return "ratio";
+        }
+        if ("px".equals(text) || "pixel".equals(text) || "pixels".equals(text)) {
+            return "px";
+        }
+        result.warnForMachine(scope, field(scope, "pivotUnit") + " must be ratio or px.");
         return null;
     }
 

@@ -433,8 +433,10 @@ Supported renderers:
 - `lineChart`: uses `history.enabled`, `samples`, `intervalTicks`; renderer fields include `lineColor`, `fillColor`, `gridColor`, `lineWidth`, `showGrid`.
 
 Optional transforms:
-- `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `origin` (`topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`).
+- `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`, `pivotUnit`, and legacy `origin` (`topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`).
 - `transformByValue`: drive `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha` from the normalized source value.
+- `pivotX` / `pivotY` only work inside static `transform`. When present, they override `origin` for that visual.
+- `pivotUnit` defaults to `ratio`. Use `ratio` for 0..1 relative coordinates, or `px` for absolute pixel coordinates.
 - each `transformByValue` channel accepts `{ "min": ..., "max": ... }` and may define its own independent `source`.
 
 Example:
@@ -480,7 +482,7 @@ Example:
     "width": 32,
     "height": 32,
     "source": { "type": "customData", "key": "speed", "default": 0, "min": 0, "max": 100 },
-    "transform": { "origin": "center", "alpha": 0.6 },
+    "transform": { "pivotX": 0.5, "pivotY": 0.5, "pivotUnit": "ratio", "alpha": 0.6 },
     "transformByValue": {
       "rotation": { "min": 0, "max": 360 },
       "scale": { "min": 0.85, "max": 1.15 },

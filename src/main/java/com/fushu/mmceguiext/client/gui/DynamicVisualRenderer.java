@@ -249,6 +249,15 @@ public class DynamicVisualRenderer {
             if (base.origin != null && !base.origin.trim().isEmpty()) {
                 transform.origin = base.origin;
             }
+            if (base.pivotX != null) {
+                transform.pivotX = base.pivotX.floatValue();
+            }
+            if (base.pivotY != null) {
+                transform.pivotY = base.pivotY.floatValue();
+            }
+            if (base.pivotUnit != null && !base.pivotUnit.trim().isEmpty()) {
+                transform.pivotUnit = base.pivotUnit;
+            }
         }
 
         MachineGuiStyleManager.DynamicVisualTransformByValueStyle dynamic = visual.transformByValue;
@@ -665,8 +674,16 @@ public class DynamicVisualRenderer {
         private float rotation = 0.0F;
         private float alpha = 1.0F;
         private String origin = "topLeft";
+        @Nullable
+        private Float pivotX;
+        @Nullable
+        private Float pivotY;
+        private String pivotUnit = "ratio";
 
         private float resolvePivotX(int width) {
+            if (this.pivotX != null) {
+                return resolveExplicitPivot(this.pivotX.floatValue(), width);
+            }
             if ("center".equals(this.origin)
                 || "topCenter".equals(this.origin)
                 || "bottomCenter".equals(this.origin)) {
@@ -681,6 +698,9 @@ public class DynamicVisualRenderer {
         }
 
         private float resolvePivotY(int height) {
+            if (this.pivotY != null) {
+                return resolveExplicitPivot(this.pivotY.floatValue(), height);
+            }
             if ("center".equals(this.origin)
                 || "centerLeft".equals(this.origin)
                 || "centerRight".equals(this.origin)) {
@@ -692,6 +712,13 @@ public class DynamicVisualRenderer {
                 return (float) height;
             }
             return 0.0F;
+        }
+
+        private float resolveExplicitPivot(float value, int size) {
+            if ("px".equals(this.pivotUnit)) {
+                return value;
+            }
+            return value * size;
         }
 
         private boolean requiresMatrix() {

@@ -630,7 +630,10 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
   "scale": 1.1,
   "rotation": 45,
   "alpha": 0.8,
-  "origin": "center"
+  "origin": "center",
+  "pivotX": 0.5,
+  "pivotY": 0.5,
+  "pivotUnit": "ratio"
 }
 ```
 
@@ -649,6 +652,12 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
 - `origin`
   - CN: 变换原点，支持 `topLeft`、`topCenter`、`topRight`、`centerLeft`、`center`、`centerRight`、`bottomLeft`、`bottomCenter`、`bottomRight`。
   - EN: Transform origin. Supports `topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`.
+- `pivotX`, `pivotY`
+  - CN: 显式自定义旋转/缩放支点。仅在 `transform` 中生效；写了之后会优先于 `origin`。
+  - EN: Explicit custom rotation/scale pivot. Only works inside `transform`; when present it overrides `origin`.
+- `pivotUnit`
+  - CN: 支点单位。`ratio` 表示相对宽高的 `0..1` 比例坐标，`px` 表示绝对像素坐标；默认 `ratio`。
+  - EN: Pivot unit. `ratio` means `0..1` relative coordinates based on width/height; `px` means absolute pixel coordinates; defaults to `ratio`.
 
 ### `transformByValue` / 变量驱动变换
 
@@ -739,7 +748,7 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
   "width": 32,
   "height": 32,
   "source": { "type": "customData", "key": "speed", "default": 0, "min": 0, "max": 100 },
-  "transform": { "origin": "center", "alpha": 0.6 },
+  "transform": { "pivotX": 0.5, "pivotY": 0.5, "pivotUnit": "ratio", "alpha": 0.6 },
   "transformByValue": {
     "rotation": { "min": 0, "max": 360 },
     "scale": { "min": 0.85, "max": 1.15 },

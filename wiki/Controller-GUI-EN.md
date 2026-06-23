@@ -191,8 +191,10 @@ Read from text lines pushed into MMCE's `ControllerGUIRenderEvent.extraInfo[]` (
 Renderers supported now: `textureSwitch`, `fill`, `pie`/`ring`, and `lineChart`. Sources can read controller `customData` / Smart Interface numeric values, or built-in machine metrics such as `recipeProgress`, `energyRatio`, `parallelism`, `threadCount`, plus factory thread-count metrics.
 
 Optional transforms are also supported:
-- `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `origin` (`topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`).
+- `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`, `pivotUnit`, and legacy `origin` (`topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`).
 - `transformByValue`: variable-driven `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`.
+- `pivotX` / `pivotY` only work in static `transform`; when present they override `origin` for that visual.
+- `pivotUnit` defaults to `ratio`. Use `ratio` for 0..1 relative coordinates, or `px` for absolute pixel coordinates.
 - each `transformByValue` channel may define its own independent `source`; otherwise it reuses the visual's main `source`.
 
 ```json
@@ -228,7 +230,7 @@ Variable-driven rotation example:
   "width": 32,
   "height": 32,
   "source": { "type": "customData", "key": "speed", "default": 0, "min": 0, "max": 100 },
-  "transform": { "origin": "center", "alpha": 0.6 },
+  "transform": { "pivotX": 0.5, "pivotY": 0.5, "pivotUnit": "ratio", "alpha": 0.6 },
   "transformByValue": {
     "rotation": { "min": 0, "max": 360 },
     "scale": { "min": 0.85, "max": 1.15 },

@@ -1052,6 +1052,12 @@ public final class MachineGuiStyleManager {
         public Float alpha;
         @Nullable
         public String origin;
+        @Nullable
+        public Float pivotX;
+        @Nullable
+        public Float pivotY;
+        @Nullable
+        public String pivotUnit;
 
         @Nullable
         public static DynamicVisualTransformStyle copyOf(@Nullable DynamicVisualTransformStyle source) {
@@ -1067,6 +1073,9 @@ public final class MachineGuiStyleManager {
             copy.rotation = source.rotation;
             copy.alpha = source.alpha;
             copy.origin = source.origin;
+            copy.pivotX = source.pivotX;
+            copy.pivotY = source.pivotY;
+            copy.pivotUnit = source.pivotUnit;
             return copy;
         }
     }
