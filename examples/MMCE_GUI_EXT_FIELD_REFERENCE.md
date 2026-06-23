@@ -588,3 +588,88 @@ EN: Common tweaks:
 - `width` controls the bar length
 - `height` controls the bar thickness
 - `priority` controls what it draws over
+
+## 10. Dynamic visuals / 动态可视化组件
+
+- `dynamicVisuals`
+  - CN: 控制器动态可视化数组，普通控制器和集成控制器都支持。统一支持贴图切换、动态填充、圆饼/环形图、曲线图。
+  - EN: Dynamic visual component array for both Machine and Factory controllers. Supports texture switching, fills, pie/ring charts and line charts.
+- aliases / 别名: `dynamic_visuals`, `visuals`, `dynamicWidgets`, `dynamic_widgets`.
+
+### `dynamicVisuals` fields / 条目字段
+
+- `id`: optional stable id, also used by chart history.
+- `x`, `y`, `width`, `height`: required rectangle.
+- `priority`: foreground render priority. Defaults to normal controller content priority.
+- `foreground`: `true`/omitted = foreground; `false` = background.
+- `page`, `visible`: same page/visibility rules as other controller widgets.
+- `source`: value source object.
+- `history`: optional sampling config for charts.
+- `renderer`: renderer object.
+
+### `source` fields / 数据源字段
+
+```json
+"source": { "type": "customData", "key": "heat", "default": 0, "min": 0, "max": 100, "clamp": true, "invert": false }
+```
+
+```json
+"source": { "type": "machine", "metric": "recipeProgress", "default": 0, "min": 0, "max": 1 }
+```
+
+Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`, `energyRatio`, `parallelism`, `threadCount`, `activeThreadCount`, `idleThreadCount`; factory additionally accepts `factoryThreadCount`, `factoryActiveThreadCount`, `factoryIdleThreadCount`.
+
+### renderer: `textureSwitch`
+
+```json
+"renderer": {
+  "type": "textureSwitch",
+  "fallbackTexture": "pack:textures/gui/unknown.png",
+  "frames": [
+    { "max": 30, "texture": "pack:textures/gui/low.png" },
+    { "max": 70, "texture": "pack:textures/gui/mid.png" },
+    { "texture": "pack:textures/gui/high.png" }
+  ]
+}
+```
+
+### renderer: `fill`
+
+```json
+"renderer": {
+  "type": "fill",
+  "backgroundTexture": "pack:textures/gui/tank_empty.png",
+  "fillTexture": "pack:textures/gui/tank_full.png",
+  "direction": "up"
+}
+```
+
+`direction`: `right`, `left`, `up`, `down`.
+
+### renderer: `pie`
+
+```json
+"renderer": {
+  "type": "pie",
+  "mode": "ring",
+  "startAngle": -90,
+  "innerRadius": 10,
+  "color": "FFFFAA00",
+  "backgroundColor": "33000000",
+  "segments": 64
+}
+```
+
+### renderer: `lineChart`
+
+```json
+"history": { "enabled": true, "samples": 60, "intervalTicks": 5 },
+"renderer": {
+  "type": "lineChart",
+  "lineColor": "FF55CCFF",
+  "fillColor": "3355CCFF",
+  "gridColor": "22000000",
+  "lineWidth": 1,
+  "showGrid": true
+}
+```

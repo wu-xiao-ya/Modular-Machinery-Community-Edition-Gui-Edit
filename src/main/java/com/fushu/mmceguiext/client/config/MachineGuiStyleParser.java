@@ -470,6 +470,7 @@ final class MachineGuiStyleParser {
         style.textureLayers = parseTextureLayers(node, result, scope);
         style.progressBars = parseProgressBars(node, result, scope);
         style.sliders = parseSliders(node, result, scope);
+        style.dynamicVisuals = parseDynamicVisuals(node, result, scope);
         style.subGuis = parseSubGuis(node, result, scope);
 
         Boolean useDefaultBackground = getBoolean(node, result, scope, "useDefaultBackground");
@@ -1058,6 +1059,198 @@ final class MachineGuiStyleParser {
             sliders.add(slider);
         }
         return sliders.isEmpty() ? null : sliders;
+    }
+
+    @Nullable
+    private static List<MachineGuiStyleManager.DynamicVisualStyle> parseDynamicVisuals(
+        JsonObject node,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        MatchedElement match = findElement(node, "dynamicVisuals", "dynamic_visuals", "visuals", "dynamicWidgets", "dynamic_widgets");
+        if (match == null) {
+            return null;
+        }
+        if (!match.element.isJsonArray()) {
+            result.warnForMachine(scope, field(scope, match.key) + " must be an array.");
+            return null;
+        }
+
+        List<MachineGuiStyleManager.DynamicVisualStyle> visuals = new ArrayList<MachineGuiStyleManager.DynamicVisualStyle>();
+        JsonArray array = match.element.getAsJsonArray();
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
+            JsonElement child = array.get(i);
+            String itemScope = field(scope, match.key + "[" + i + "]");
+            if (child == null || !child.isJsonObject()) {
+                result.warnForMachine(scope, itemScope + " must be an object.");
+                continue;
+            }
+
+            JsonObject obj = child.getAsJsonObject();
+            Integer x = getInt(obj, result, itemScope, "x");
+            Integer y = getInt(obj, result, itemScope, "y");
+            Integer width = validateRangeInt(getInt(obj, result, itemScope, "width", "w"), 1, MAX_COMPONENT_SIZE, result, itemScope, "width");
+            Integer height = validateRangeInt(getInt(obj, result, itemScope, "height", "h"), 1, MAX_COMPONENT_SIZE, result, itemScope, "height");
+            if (x == null || y == null || width == null || height == null) {
+                result.warnForMachine(scope, itemScope + " is missing required fields x, y, width or height.");
+                continue;
+            }
+
+            MachineGuiStyleManager.DynamicVisualStyle visual = new MachineGuiStyleManager.DynamicVisualStyle();
+            visual.id = getTrimmedString(obj, result, itemScope, "id", "name");
+            visual.x = x.intValue();
+            visual.y = y.intValue();
+            visual.width = width.intValue();
+            visual.height = height.intValue();
+            visual.priority = getInt(obj, result, itemScope, "priority", "zIndex", "z_index", "z", "layer");
+            visual.foreground = getBoolean(obj, result, itemScope, "foreground", "front", "drawForeground");
+            visual.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
+            visual.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
+            visual.source = parseDynamicVisualSource(obj, result, itemScope);
+            visual.history = parseDynamicVisualHistory(obj, result, itemScope);
+            visual.renderer = parseDynamicVisualRenderer(obj, result, itemScope);
+            if (visual.renderer == null) {
+                result.warnForMachine(scope, itemScope + " is missing required renderer.");
+                continue;
+            }
+            visuals.add(visual);
+        }
+        return visuals.isEmpty() ? null : visuals;
+    }
+
+    private static MachineGuiStyleManager.DynamicVisualSourceStyle parseDynamicVisualSource(
+        JsonObject visualObj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        JsonObject sourceObj = getObject(visualObj, result, scope, "source", "dataSource", "data_source");
+        if (sourceObj == null) {
+            sourceObj = visualObj;
+        }
+        MachineGuiStyleManager.DynamicVisualSourceStyle source = new MachineGuiStyleManager.DynamicVisualSourceStyle();
+        source.type = normalizeDynamicSourceType(getTrimmedString(sourceObj, result, scope, "type", "sourceType", "source_type"), result, scope);
+        source.key = getTrimmedString(
+            sourceObj,
+            result,
+            scope,
+            "key",
+            "customKey",
+            "custom_key",
+            "virtualKey",
+            "virtual_key",
+            "dataPortKey",
+            "data_port_key"
+        );
+        source.metric = normalizeDynamicMetric(getTrimmedString(sourceObj, result, scope, "metric", "machineMetric", "machine_metric"), result, scope);
+        source.defaultValue = getFloat(sourceObj, result, scope, "default", "defaultValue", "default_value", "fallback", "fallbackValue", "fallback_value");
+        source.min = getFloat(sourceObj, result, scope, "min", "minimum");
+        source.max = getFloat(sourceObj, result, scope, "max", "maximum");
+        source.clamp = getBoolean(sourceObj, result, scope, "clamp", "bounded");
+        source.invert = getBoolean(sourceObj, result, scope, "invert", "inverted", "reverse");
+        if (source.type == null) {
+            source.type = source.key == null || source.key.isEmpty() ? "machine" : "customData";
+        }
+        if ("customData".equals(source.type) && (source.key == null || source.key.isEmpty())) {
+            result.warnForMachine(scope, field(scope, "source.key") + " is required for customData dynamic visuals.");
+        }
+        if ("machine".equals(source.type) && (source.metric == null || source.metric.isEmpty())) {
+            source.metric = "recipeProgress";
+        }
+        return source;
+    }
+
+    @Nullable
+    private static MachineGuiStyleManager.DynamicVisualHistoryStyle parseDynamicVisualHistory(
+        JsonObject visualObj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        JsonObject historyObj = getObject(visualObj, result, scope, "history", "sampleHistory", "sample_history");
+        if (historyObj == null) {
+            return null;
+        }
+        MachineGuiStyleManager.DynamicVisualHistoryStyle history = new MachineGuiStyleManager.DynamicVisualHistoryStyle();
+        history.enabled = getBoolean(historyObj, result, scope, "enabled", "enable", "visible");
+        history.samples = validateRangeInt(getInt(historyObj, result, scope, "samples", "sampleCount", "sample_count"), 2, MAX_ARRAY_ENTRIES, result, scope, "samples");
+        history.intervalTicks = validateRangeInt(getInt(historyObj, result, scope, "intervalTicks", "interval_ticks", "interval", "tickInterval", "tick_interval"), 1, 1200, result, scope, "intervalTicks");
+        return history;
+    }
+
+    @Nullable
+    private static MachineGuiStyleManager.DynamicVisualRendererStyle parseDynamicVisualRenderer(
+        JsonObject visualObj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        JsonObject rendererObj = getObject(visualObj, result, scope, "renderer", "render", "visual");
+        if (rendererObj == null) {
+            rendererObj = visualObj;
+        }
+        MachineGuiStyleManager.DynamicVisualRendererStyle renderer = new MachineGuiStyleManager.DynamicVisualRendererStyle();
+        renderer.type = normalizeDynamicRendererType(getTrimmedString(rendererObj, result, scope, "type", "rendererType", "renderer_type"), result, scope);
+        if (renderer.type == null) {
+            renderer.type = "fill";
+        }
+        renderer.direction = normalizeDynamicFillDirection(getTrimmedString(rendererObj, result, scope, "direction", "fillDirection", "fill_direction"), result, scope);
+        renderer.backgroundTexture = getTrimmedString(rendererObj, result, scope, "backgroundTexture", "background_texture", "emptyTexture", "empty_texture");
+        renderer.fillTexture = getTrimmedString(rendererObj, result, scope, "fillTexture", "fill_texture", "texture", "fullTexture", "full_texture");
+        renderer.fallbackTexture = getTrimmedString(rendererObj, result, scope, "fallbackTexture", "fallback_texture", "defaultTexture", "default_texture");
+        renderer.backgroundColor = getColor(rendererObj, result, scope, "backgroundColor", "background_color", "bgColor", "bg_color");
+        renderer.fillColor = getColor(rendererObj, result, scope, "fillColor", "fill_color");
+        renderer.borderColor = getColor(rendererObj, result, scope, "borderColor", "border_color", "frameColor", "frame_color");
+        renderer.color = getColor(rendererObj, result, scope, "color", "pieColor", "pie_color");
+        renderer.lineColor = getColor(rendererObj, result, scope, "lineColor", "line_color");
+        renderer.gridColor = getColor(rendererObj, result, scope, "gridColor", "grid_color");
+        renderer.textureWidth = validateRangeInt(getInt(rendererObj, result, scope, "textureWidth", "texture_width", "texW"), 1, MAX_COMPONENT_SIZE, result, scope, "textureWidth");
+        renderer.textureHeight = validateRangeInt(getInt(rendererObj, result, scope, "textureHeight", "texture_height", "texH"), 1, MAX_COMPONENT_SIZE, result, scope, "textureHeight");
+        renderer.mode = normalizeDynamicPieMode(getTrimmedString(rendererObj, result, scope, "mode", "pieMode", "pie_mode"), result, scope);
+        renderer.startAngle = getFloat(rendererObj, result, scope, "startAngle", "start_angle", "angle");
+        renderer.innerRadius = validateRangeInt(getInt(rendererObj, result, scope, "innerRadius", "inner_radius"), 0, MAX_COMPONENT_SIZE, result, scope, "innerRadius");
+        renderer.segments = validateRangeInt(getInt(rendererObj, result, scope, "segments", "segmentCount", "segment_count"), 3, 360, result, scope, "segments");
+        renderer.lineWidth = validateRangeInt(getInt(rendererObj, result, scope, "lineWidth", "line_width"), 1, 16, result, scope, "lineWidth");
+        renderer.showGrid = getBoolean(rendererObj, result, scope, "showGrid", "show_grid", "grid");
+        renderer.frames = parseDynamicVisualFrames(rendererObj, result, scope);
+        return renderer;
+    }
+
+    @Nullable
+    private static List<MachineGuiStyleManager.DynamicVisualFrameStyle> parseDynamicVisualFrames(
+        JsonObject rendererObj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        MatchedElement match = findElement(rendererObj, "frames", "states", "textures");
+        if (match == null) {
+            return null;
+        }
+        if (!match.element.isJsonArray()) {
+            result.warnForMachine(scope, field(scope, match.key) + " must be an array.");
+            return null;
+        }
+        List<MachineGuiStyleManager.DynamicVisualFrameStyle> frames = new ArrayList<MachineGuiStyleManager.DynamicVisualFrameStyle>();
+        JsonArray array = match.element.getAsJsonArray();
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
+            JsonElement child = array.get(i);
+            String itemScope = field(scope, match.key + "[" + i + "]");
+            if (child == null || !child.isJsonObject()) {
+                result.warnForMachine(scope, itemScope + " must be an object.");
+                continue;
+            }
+            JsonObject obj = child.getAsJsonObject();
+            MachineGuiStyleManager.DynamicVisualFrameStyle frame = new MachineGuiStyleManager.DynamicVisualFrameStyle();
+            frame.min = getFloat(obj, result, itemScope, "min", "minimum");
+            frame.max = getFloat(obj, result, itemScope, "max", "maximum");
+            frame.equals = getFloat(obj, result, itemScope, "equals", "eq", "value");
+            frame.texture = getTrimmedString(obj, result, itemScope, "texture", "path", "resource");
+            if (frame.texture == null || frame.texture.isEmpty()) {
+                result.warnForMachine(scope, itemScope + " is missing required field texture.");
+                continue;
+            }
+            frames.add(frame);
+        }
+        return frames.isEmpty() ? null : frames;
     }
 
     @Nullable
@@ -1750,6 +1943,119 @@ final class MachineGuiStyleParser {
             return "vertical";
         }
         result.warnForMachine(scope, field(scope, "direction") + " must be horizontal or vertical.");
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeDynamicSourceType(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("customdata".equals(text) || "custom_data".equals(text) || "custom".equals(text)
+            || "smartinterface".equals(text) || "smart_interface".equals(text) || "smart".equals(text)
+            || "data_port".equals(text) || "dataport".equals(text)) {
+            return "customData";
+        }
+        if ("machine".equals(text) || "metric".equals(text) || "builtin".equals(text) || "built_in".equals(text)) {
+            return "machine";
+        }
+        result.warnForMachine(scope, field(scope, "source.type") + " must be customData or machine.");
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeDynamicMetric(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw);
+        if (text.isEmpty()) {
+            return null;
+        }
+        String normalized = text.replace("_", "").replace("-", "").toLowerCase(Locale.ROOT);
+        if ("recipeprogress".equals(normalized)) return "recipeProgress";
+        if ("recipemaxprogress".equals(normalized) || "recipetotaltick".equals(normalized) || "recipetotalticks".equals(normalized)) return "recipeMaxProgress";
+        if ("energystored".equals(normalized) || "energy".equals(normalized)) return "energyStored";
+        if ("energycapacity".equals(normalized) || "maxenergy".equals(normalized) || "maxenergystored".equals(normalized)) return "energyCapacity";
+        if ("energyratio".equals(normalized) || "energyprogress".equals(normalized)) return "energyRatio";
+        if ("parallelism".equals(normalized) || "currentparallelism".equals(normalized)) return "parallelism";
+        if ("threadcount".equals(normalized)) return "threadCount";
+        if ("activethreadcount".equals(normalized)) return "activeThreadCount";
+        if ("idlethreadcount".equals(normalized)) return "idleThreadCount";
+        if ("factorythreadcount".equals(normalized)) return "factoryThreadCount";
+        if ("factoryactivethreadcount".equals(normalized)) return "factoryActiveThreadCount";
+        if ("factoryidlethreadcount".equals(normalized)) return "factoryIdleThreadCount";
+        result.warnForMachine(scope, field(scope, "source.metric") + " has unknown dynamic visual metric: " + text + ".");
+        return text;
+    }
+
+    @Nullable
+    private static String normalizeDynamicRendererType(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("textureswitch".equals(text) || "texture_switch".equals(text) || "switch".equals(text) || "state_texture".equals(text)) {
+            return "textureSwitch";
+        }
+        if ("fill".equals(text) || "bar".equals(text) || "progress".equals(text) || "progressbar".equals(text) || "progress_bar".equals(text)) {
+            return "fill";
+        }
+        if ("pie".equals(text) || "ring".equals(text) || "donut".equals(text) || "doughnut".equals(text)) {
+            return "pie";
+        }
+        if ("linechart".equals(text) || "line_chart".equals(text) || "chart".equals(text) || "line".equals(text) || "area".equals(text)) {
+            return "lineChart";
+        }
+        result.warnForMachine(scope, field(scope, "renderer.type") + " must be textureSwitch, fill, pie or lineChart.");
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeDynamicFillDirection(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("right".equals(text) || "left_to_right".equals(text) || "ltr".equals(text)) return "right";
+        if ("left".equals(text) || "right_to_left".equals(text) || "rtl".equals(text)) return "left";
+        if ("down".equals(text) || "top_to_bottom".equals(text) || "ttb".equals(text)) return "down";
+        if ("up".equals(text) || "bottom_to_top".equals(text) || "btt".equals(text)) return "up";
+        result.warnForMachine(scope, field(scope, "renderer.direction") + " must be right, left, up or down.");
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeDynamicPieMode(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("pie".equals(text) || "solid".equals(text)) {
+            return "pie";
+        }
+        if ("ring".equals(text) || "donut".equals(text) || "doughnut".equals(text)) {
+            return "ring";
+        }
+        result.warnForMachine(scope, field(scope, "renderer.mode") + " must be pie or ring.");
         return null;
     }
 

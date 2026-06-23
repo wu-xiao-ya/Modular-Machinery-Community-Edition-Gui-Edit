@@ -183,3 +183,32 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 - 建议所有可运行时控制的图层都写 `id`。
 - 多个 `virtualKey` 用英文逗号分隔；`showControls=false` 时该输入框不显示左右切换和 OK。
 - JSON 修改后建议重启验证；ZS 可先 `/ct reload`。
+
+## 9. 动态可视化组件
+
+`dynamicVisuals[]` 在普通控制器和集成控制器样式里都支持。它是变量驱动视觉的统一系统：`source` -> 归一化 -> 可选 `history` -> `renderer`。
+
+当前 renderer 支持：`textureSwitch`、`fill`、`pie`/`ring`、`lineChart`。source 可以读取控制器 `customData` / Smart Interface 数值，也可以读取内置机器指标，例如 `recipeProgress`、`energyRatio`、`parallelism`、`threadCount`，以及工厂线程数量指标。
+
+```json
+"dynamicVisuals": [
+  {
+    "id": "energy_ring",
+    "x": 120,
+    "y": 24,
+    "width": 32,
+    "height": 32,
+    "source": { "type": "machine", "metric": "energyRatio", "min": 0, "max": 1 },
+    "renderer": {
+      "type": "pie",
+      "mode": "ring",
+      "startAngle": -90,
+      "innerRadius": 10,
+      "color": "FFFFAA00",
+      "backgroundColor": "33000000"
+    }
+  }
+]
+```
+
+`foreground`、`priority`、`page`、`visible` 与其他控制器组件规则一致。

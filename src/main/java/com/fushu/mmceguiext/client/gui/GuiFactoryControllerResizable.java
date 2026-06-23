@@ -160,6 +160,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
     private List<CustomSlider> customSliders = new ArrayList<CustomSlider>();
     private List<TextureLayerDef> backgroundTextureLayers = new ArrayList<TextureLayerDef>();
     private List<TextureLayerDef> foregroundTextureLayers = new ArrayList<TextureLayerDef>();
+    private final DynamicVisualRenderer dynamicVisualRenderer = new DynamicVisualRenderer();
     private Map<String, LayerRuntimeState> layerRuntimeStates = new HashMap<String, LayerRuntimeState>();
     private Set<String> textureLayerIds = new HashSet<String>();
     private String activePageId = "main";
@@ -205,6 +206,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         rebuildSubGuiIndex();
         this.baseRuntimeState = captureCurrentRuntimeState();
         this.activeSubGui = null;
+        this.dynamicVisualRenderer.reset();
     }
 
     @Override
@@ -395,6 +397,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 }
             }
             drawProgressBars(Integer.valueOf(priority));
+            drawDynamicVisuals(true, Integer.valueOf(priority));
             drawCustomSliders(Integer.valueOf(priority));
             drawConfiguredTexts(Integer.valueOf(priority));
             if (priority >= 0) {
@@ -426,6 +429,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 continue;
             }
             drawProgressBars(priority);
+            drawDynamicVisuals(true, priority);
             drawCustomSliders(priority);
             drawConfiguredTextureLayers(true, cfg, priority);
         }
@@ -443,6 +447,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             }
             drawConfiguredTextureLayers(false, cfg);
             drawBackgroundProgressBars();
+            drawDynamicVisuals(false, null);
             drawBackgroundSliders();
             drawNegativeForegroundTextureLayers(cfg);
             updateRecipeScrollbar(this.guiLeft, this.guiTop);
@@ -501,6 +506,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         // Users should draw panel areas directly in their custom GUI textures.
         drawConfiguredTextureLayers(false, cfg);
         drawBackgroundProgressBars();
+        drawDynamicVisuals(false, null);
         drawBackgroundSliders();
         drawNegativeForegroundTextureLayers(cfg);
 
@@ -2900,6 +2906,74 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         }
     }
 
+    private void drawDynamicVisuals(boolean foreground, @Nullable Integer priorityFilter) {
+        this.dynamicVisualRenderer.render(
+            this.styleOverride.dynamicVisuals,
+            this.factory,
+            this::resolveDynamicVisualMetric,
+            foreground ? 0 : this.guiLeft,
+            foreground ? 0 : this.guiTop,
+            foreground,
+            priorityFilter,
+            this::isPageVisible,
+            resolveForegroundContentPriority()
+        );
+    }
+
+    private float resolveDynamicVisualMetric(String metric, float fallback) {
+        String key = metric == null ? "recipeProgress" : metric;
+        ActiveMachineRecipe first = getFirstFactoryRecipe();
+        if ("recipeProgress".equals(key)) {
+            return ProgressBarStyleSupport.recipeProgress(first);
+        }
+        if ("recipeMaxProgress".equals(key)) {
+            return first == null ? fallback : (float) first.getTotalTick();
+        }
+        if ("parallelism".equals(key)) {
+            return (float) getCurrentParallelism();
+        }
+        if ("threadCount".equals(key) || "factoryThreadCount".equals(key)) {
+            return (float) getFactoryThreadCount();
+        }
+        if ("activeThreadCount".equals(key) || "factoryActiveThreadCount".equals(key)) {
+            return (float) getFactoryActiveThreadCount();
+        }
+        if ("idleThreadCount".equals(key) || "factoryIdleThreadCount".equals(key)) {
+            return Math.max(0.0F, (float) (getFactoryThreadCount() - getFactoryActiveThreadCount()));
+        }
+        if ("energyStored".equals(key)) {
+            return DynamicVisualRenderer.reflectMetric(this.factory, fallback, "getEnergyStored", "getEnergy", "getCurrentEnergy");
+        }
+        if ("energyCapacity".equals(key)) {
+            return DynamicVisualRenderer.reflectMetric(this.factory, fallback, "getMaxEnergyStored", "getEnergyCapacity", "getMaxEnergy");
+        }
+        if ("energyRatio".equals(key)) {
+            float stored = DynamicVisualRenderer.reflectMetric(this.factory, fallback, "getEnergyStored", "getEnergy", "getCurrentEnergy");
+            float capacity = DynamicVisualRenderer.reflectMetric(this.factory, 0.0F, "getMaxEnergyStored", "getEnergyCapacity", "getMaxEnergy");
+            return capacity <= 0.0F ? fallback : stored / capacity;
+        }
+        return fallback;
+    }
+
+    private int getFactoryThreadCount() {
+        return this.factory.getCoreRecipeThreads().size() + this.factory.getFactoryRecipeThreadList().size();
+    }
+
+    private int getFactoryActiveThreadCount() {
+        int count = 0;
+        for (FactoryRecipeThread thread : this.factory.getCoreRecipeThreads().values()) {
+            if (thread.getActiveRecipe() != null) {
+                count++;
+            }
+        }
+        for (FactoryRecipeThread thread : this.factory.getFactoryRecipeThreadList()) {
+            if (thread.getActiveRecipe() != null) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     private void drawProgressBars(@Nullable Integer priorityFilter) {
         if (styleOverride.progressBars == null || styleOverride.progressBars.isEmpty()) {
             return;
@@ -4493,6 +4567,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 }
             }
         }
+        this.dynamicVisualRenderer.collectForegroundPriorities(styleOverride.dynamicVisuals, priorities, resolveForegroundContentPriority());
         for (CustomSlider slider : this.customSliders) {
             if (slider.foreground) {
                 priorities.add(Integer.valueOf(slider.priority));

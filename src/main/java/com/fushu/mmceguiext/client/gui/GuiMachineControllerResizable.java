@@ -125,6 +125,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
     private final List<CustomSlider> customSliders = new ArrayList<CustomSlider>();
     private final List<TextureLayerDef> backgroundTextureLayers = new ArrayList<TextureLayerDef>();
     private final List<TextureLayerDef> foregroundTextureLayers = new ArrayList<TextureLayerDef>();
+    private final DynamicVisualRenderer dynamicVisualRenderer = new DynamicVisualRenderer();
     private final Map<String, LayerRuntimeState> layerRuntimeStates = new HashMap<String, LayerRuntimeState>();
     private final Set<String> textureLayerIds = new HashSet<String>();
     private String activePageId = "main";
@@ -163,6 +164,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         resolveGuiScaleConfig();
         super.initGui();
         initializeCurrentContext(null, false, null, this.activePageId);
+        this.dynamicVisualRenderer.reset();
         this.currentRuntimeState = captureRuntimeState(null, false);
         this.modalSubGuiDragging = false;
         this.modalSubGuiDragOffsetX = 0;
@@ -339,6 +341,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             }
             drawConfiguredTextureLayers(false, cfg);
             drawBackgroundProgressBars();
+            drawDynamicVisuals(false, null);
             drawBackgroundSliders();
             drawNegativeForegroundTextureLayers(cfg);
             return;
@@ -395,6 +398,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
         // Users should draw panel areas directly in their custom GUI textures.
         drawConfiguredTextureLayers(false, cfg);
         drawBackgroundProgressBars();
+        drawDynamicVisuals(false, null);
         drawBackgroundSliders();
         drawNegativeForegroundTextureLayers(cfg);
     }
@@ -456,6 +460,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 }
             }
             drawProgressBars(Integer.valueOf(priority));
+            drawDynamicVisuals(true, Integer.valueOf(priority));
             drawCustomSliders(Integer.valueOf(priority));
             drawConfiguredTexts(Integer.valueOf(priority));
             if (priority >= 0) {
@@ -487,6 +492,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 continue;
             }
             drawProgressBars(priority);
+            drawDynamicVisuals(true, priority);
             drawCustomSliders(priority);
             drawConfiguredTextureLayers(true, cfg, priority);
         }
@@ -858,6 +864,55 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
             }
             GlStateManager.popMatrix();
         }
+    }
+
+    private void drawDynamicVisuals(boolean foreground, @Nullable Integer priorityFilter) {
+        this.dynamicVisualRenderer.render(
+            this.styleOverride.dynamicVisuals,
+            this.controller,
+            this::resolveDynamicVisualMetric,
+            foreground ? 0 : this.guiLeft,
+            foreground ? 0 : this.guiTop,
+            foreground,
+            priorityFilter,
+            this::isPageVisible,
+            resolveForegroundContentPriority()
+        );
+    }
+
+    private float resolveDynamicVisualMetric(String metric, float fallback) {
+        ActiveMachineRecipe recipe = this.controller.getActiveRecipe();
+        String key = metric == null ? "recipeProgress" : metric;
+        if ("recipeProgress".equals(key)) {
+            return ProgressBarStyleSupport.recipeProgress(recipe);
+        }
+        if ("recipeMaxProgress".equals(key)) {
+            return recipe == null ? fallback : (float) recipe.getTotalTick();
+        }
+        if ("parallelism".equals(key)) {
+            return recipe == null ? 0.0F : (float) recipe.getParallelism();
+        }
+        if ("threadCount".equals(key)) {
+            return 1.0F;
+        }
+        if ("activeThreadCount".equals(key)) {
+            return recipe == null ? 0.0F : 1.0F;
+        }
+        if ("idleThreadCount".equals(key)) {
+            return recipe == null ? 1.0F : 0.0F;
+        }
+        if ("energyStored".equals(key)) {
+            return DynamicVisualRenderer.reflectMetric(this.controller, fallback, "getEnergyStored", "getEnergy", "getCurrentEnergy");
+        }
+        if ("energyCapacity".equals(key)) {
+            return DynamicVisualRenderer.reflectMetric(this.controller, fallback, "getMaxEnergyStored", "getEnergyCapacity", "getMaxEnergy");
+        }
+        if ("energyRatio".equals(key)) {
+            float stored = DynamicVisualRenderer.reflectMetric(this.controller, fallback, "getEnergyStored", "getEnergy", "getCurrentEnergy");
+            float capacity = DynamicVisualRenderer.reflectMetric(this.controller, 0.0F, "getMaxEnergyStored", "getEnergyCapacity", "getMaxEnergy");
+            return capacity <= 0.0F ? fallback : stored / capacity;
+        }
+        return fallback;
     }
 
     private void drawProgressBars(@Nullable Integer priorityFilter) {
@@ -3753,6 +3808,7 @@ public class GuiMachineControllerResizable extends GuiContainerBase<ContainerCon
                 }
             }
         }
+        this.dynamicVisualRenderer.collectForegroundPriorities(styleOverride.dynamicVisuals, priorities, resolveForegroundContentPriority());
         for (CustomSlider slider : this.customSliders) {
             if (slider.foreground) {
                 priorities.add(Integer.valueOf(slider.priority));

@@ -183,3 +183,32 @@ Read from text lines pushed into MMCE's `ControllerGUIRenderEvent.extraInfo[]` (
 - Give every runtime-controllable layer an `id`.
 - Separate multiple `virtualKey`s with commas; `showControls=false` hides the left/right and OK buttons for that input.
 - Restart to verify JSON changes; ZS can be `/ct reload`ed.
+
+## 9. Dynamic visuals
+
+`dynamicVisuals[]` works in both Machine and Factory controller styles. It is the unified system for variable-driven visuals: `source` -> normalization -> optional `history` -> `renderer`.
+
+Renderers supported now: `textureSwitch`, `fill`, `pie`/`ring`, and `lineChart`. Sources can read controller `customData` / Smart Interface numeric values, or built-in machine metrics such as `recipeProgress`, `energyRatio`, `parallelism`, `threadCount`, plus factory thread-count metrics.
+
+```json
+"dynamicVisuals": [
+  {
+    "id": "energy_ring",
+    "x": 120,
+    "y": 24,
+    "width": 32,
+    "height": 32,
+    "source": { "type": "machine", "metric": "energyRatio", "min": 0, "max": 1 },
+    "renderer": {
+      "type": "pie",
+      "mode": "ring",
+      "startAngle": -90,
+      "innerRadius": 10,
+      "color": "FFFFAA00",
+      "backgroundColor": "33000000"
+    }
+  }
+]
+```
+
+Use `foreground`, `priority`, `page`, and `visible` exactly like other controller widgets.

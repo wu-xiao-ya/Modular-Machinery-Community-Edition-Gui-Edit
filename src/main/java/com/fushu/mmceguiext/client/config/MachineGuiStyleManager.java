@@ -361,6 +361,8 @@ public final class MachineGuiStyleManager {
         @Nullable
         public List<SliderStyle> sliders;
         @Nullable
+        public List<DynamicVisualStyle> dynamicVisuals;
+        @Nullable
         public List<SubGuiStyle> subGuis;
 
         public boolean isEmpty() {
@@ -412,6 +414,7 @@ public final class MachineGuiStyleManager {
                    && (textureLayers == null || textureLayers.isEmpty())
                    && (progressBars == null || progressBars.isEmpty())
                    && (sliders == null || sliders.isEmpty())
+                   && (dynamicVisuals == null || dynamicVisuals.isEmpty())
                    && (subGuis == null || subGuis.isEmpty());
         }
 
@@ -468,6 +471,7 @@ public final class MachineGuiStyleManager {
             copy.textureLayers = source.textureLayers == null ? null : new ArrayList<TextureLayerStyle>(source.textureLayers);
             copy.progressBars = source.progressBars == null ? null : new ArrayList<ProgressBarStyle>(source.progressBars);
             copy.sliders = source.sliders == null ? null : new ArrayList<SliderStyle>(source.sliders);
+            copy.dynamicVisuals = source.dynamicVisuals == null ? null : copyDynamicVisualList(source.dynamicVisuals);
             copy.subGuis = source.subGuis == null ? null : copySubGuiList(source.subGuis);
             return copy;
         }
@@ -524,6 +528,7 @@ public final class MachineGuiStyleManager {
             this.textureLayers = appendList(this.textureLayers, overlay.textureLayers);
             this.progressBars = appendList(this.progressBars, overlay.progressBars);
             this.sliders = appendList(this.sliders, overlay.sliders);
+            this.dynamicVisuals = appendDynamicVisualList(this.dynamicVisuals, overlay.dynamicVisuals);
             this.subGuis = appendSubGuiList(this.subGuis, overlay.subGuis);
             return this;
         }
@@ -548,6 +553,33 @@ public final class MachineGuiStyleManager {
                 copy.add(SubGuiStyle.copyOf(subGui));
             }
             return copy;
+        }
+
+        @Nullable
+        private static List<DynamicVisualStyle> copyDynamicVisualList(@Nullable List<DynamicVisualStyle> source) {
+            if (source == null || source.isEmpty()) {
+                return source;
+            }
+            List<DynamicVisualStyle> copy = new ArrayList<DynamicVisualStyle>(source.size());
+            for (DynamicVisualStyle visual : source) {
+                copy.add(DynamicVisualStyle.copyOf(visual));
+            }
+            return copy;
+        }
+
+        @Nullable
+        private static List<DynamicVisualStyle> appendDynamicVisualList(
+            @Nullable List<DynamicVisualStyle> base,
+            @Nullable List<DynamicVisualStyle> overlay
+        ) {
+            if (overlay == null || overlay.isEmpty()) {
+                return base;
+            }
+            List<DynamicVisualStyle> out = base == null ? new ArrayList<DynamicVisualStyle>() : copyDynamicVisualList(base);
+            for (DynamicVisualStyle visual : overlay) {
+                out.add(DynamicVisualStyle.copyOf(visual));
+            }
+            return out;
         }
 
         @Nullable
@@ -952,6 +984,206 @@ public final class MachineGuiStyleManager {
         public Boolean showText;
         @Nullable
         public Integer textColor;
+    }
+
+    public static class DynamicVisualStyle {
+        @Nullable
+        public String id;
+        public int x;
+        public int y;
+        public int width;
+        public int height;
+        @Nullable
+        public Integer priority;
+        @Nullable
+        public Boolean foreground;
+        @Nullable
+        public Boolean visible;
+        @Nullable
+        public String page;
+        @Nullable
+        public DynamicVisualSourceStyle source;
+        @Nullable
+        public DynamicVisualHistoryStyle history;
+        @Nullable
+        public DynamicVisualRendererStyle renderer;
+
+        public static DynamicVisualStyle copyOf(@Nullable DynamicVisualStyle source) {
+            DynamicVisualStyle copy = new DynamicVisualStyle();
+            if (source == null) {
+                return copy;
+            }
+            copy.id = source.id;
+            copy.x = source.x;
+            copy.y = source.y;
+            copy.width = source.width;
+            copy.height = source.height;
+            copy.priority = source.priority;
+            copy.foreground = source.foreground;
+            copy.visible = source.visible;
+            copy.page = source.page;
+            copy.source = DynamicVisualSourceStyle.copyOf(source.source);
+            copy.history = DynamicVisualHistoryStyle.copyOf(source.history);
+            copy.renderer = DynamicVisualRendererStyle.copyOf(source.renderer);
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualSourceStyle {
+        @Nullable
+        public String type;
+        @Nullable
+        public String key;
+        @Nullable
+        public String metric;
+        @Nullable
+        public Float defaultValue;
+        @Nullable
+        public Float min;
+        @Nullable
+        public Float max;
+        @Nullable
+        public Boolean clamp;
+        @Nullable
+        public Boolean invert;
+
+        @Nullable
+        public static DynamicVisualSourceStyle copyOf(@Nullable DynamicVisualSourceStyle source) {
+            if (source == null) {
+                return null;
+            }
+            DynamicVisualSourceStyle copy = new DynamicVisualSourceStyle();
+            copy.type = source.type;
+            copy.key = source.key;
+            copy.metric = source.metric;
+            copy.defaultValue = source.defaultValue;
+            copy.min = source.min;
+            copy.max = source.max;
+            copy.clamp = source.clamp;
+            copy.invert = source.invert;
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualHistoryStyle {
+        @Nullable
+        public Boolean enabled;
+        @Nullable
+        public Integer samples;
+        @Nullable
+        public Integer intervalTicks;
+
+        @Nullable
+        public static DynamicVisualHistoryStyle copyOf(@Nullable DynamicVisualHistoryStyle source) {
+            if (source == null) {
+                return null;
+            }
+            DynamicVisualHistoryStyle copy = new DynamicVisualHistoryStyle();
+            copy.enabled = source.enabled;
+            copy.samples = source.samples;
+            copy.intervalTicks = source.intervalTicks;
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualRendererStyle {
+        @Nullable
+        public String type;
+        @Nullable
+        public String direction;
+        @Nullable
+        public String backgroundTexture;
+        @Nullable
+        public String fillTexture;
+        @Nullable
+        public String fallbackTexture;
+        @Nullable
+        public Integer backgroundColor;
+        @Nullable
+        public Integer fillColor;
+        @Nullable
+        public Integer borderColor;
+        @Nullable
+        public Integer color;
+        @Nullable
+        public Integer lineColor;
+        @Nullable
+        public Integer gridColor;
+        @Nullable
+        public Integer textureWidth;
+        @Nullable
+        public Integer textureHeight;
+        @Nullable
+        public String mode;
+        @Nullable
+        public Float startAngle;
+        @Nullable
+        public Integer innerRadius;
+        @Nullable
+        public Integer segments;
+        @Nullable
+        public Integer lineWidth;
+        @Nullable
+        public Boolean showGrid;
+        @Nullable
+        public List<DynamicVisualFrameStyle> frames;
+
+        @Nullable
+        public static DynamicVisualRendererStyle copyOf(@Nullable DynamicVisualRendererStyle source) {
+            if (source == null) {
+                return null;
+            }
+            DynamicVisualRendererStyle copy = new DynamicVisualRendererStyle();
+            copy.type = source.type;
+            copy.direction = source.direction;
+            copy.backgroundTexture = source.backgroundTexture;
+            copy.fillTexture = source.fillTexture;
+            copy.fallbackTexture = source.fallbackTexture;
+            copy.backgroundColor = source.backgroundColor;
+            copy.fillColor = source.fillColor;
+            copy.borderColor = source.borderColor;
+            copy.color = source.color;
+            copy.lineColor = source.lineColor;
+            copy.gridColor = source.gridColor;
+            copy.textureWidth = source.textureWidth;
+            copy.textureHeight = source.textureHeight;
+            copy.mode = source.mode;
+            copy.startAngle = source.startAngle;
+            copy.innerRadius = source.innerRadius;
+            copy.segments = source.segments;
+            copy.lineWidth = source.lineWidth;
+            copy.showGrid = source.showGrid;
+            if (source.frames != null) {
+                copy.frames = new ArrayList<DynamicVisualFrameStyle>(source.frames.size());
+                for (DynamicVisualFrameStyle frame : source.frames) {
+                    copy.frames.add(DynamicVisualFrameStyle.copyOf(frame));
+                }
+            }
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualFrameStyle {
+        @Nullable
+        public Float min;
+        @Nullable
+        public Float max;
+        @Nullable
+        public Float equals;
+        @Nullable
+        public String texture;
+
+        public static DynamicVisualFrameStyle copyOf(@Nullable DynamicVisualFrameStyle source) {
+            DynamicVisualFrameStyle copy = new DynamicVisualFrameStyle();
+            if (source == null) {
+                return copy;
+            }
+            copy.min = source.min;
+            copy.max = source.max;
+            copy.equals = source.equals;
+            copy.texture = source.texture;
+            return copy;
+        }
     }
 
 }

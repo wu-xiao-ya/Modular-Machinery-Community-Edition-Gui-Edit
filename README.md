@@ -415,3 +415,58 @@ This is what makes the long-capacity custom hatches / AE buses above actually us
 ## License | 许可
 
 See the MMCE source license. / 见 MMCE 源码许可。
+
+## Dynamic visuals / 动态可视化组件
+
+`dynamicVisuals[]` can be used under both `machineController` and `factoryController`. It uses one unified pipeline: `source` -> normalized value -> optional `history` -> `renderer`.
+
+Common fields: `id`, `x`, `y`, `width`, `height`, `priority`, `foreground`, `page`, `visible`, `source`, `history`, `renderer`.
+
+Supported sources:
+- `customData`: reads a numeric value from controller custom data / Smart Interface virtual key: `key`, `default`, `min`, `max`, `clamp`, `invert`.
+- `machine`: built-in metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`, `energyRatio`, `parallelism`, `threadCount`, `activeThreadCount`, `idleThreadCount`; factory also supports `factoryThreadCount`, `factoryActiveThreadCount`, `factoryIdleThreadCount`.
+
+Supported renderers:
+- `textureSwitch`: ordered `frames[]` using `min`, `max`, `equals`, `texture`, plus optional `fallbackTexture`.
+- `fill`: progress-style fill with `backgroundTexture`, `fillTexture`, `direction` (`right`, `left`, `up`, `down`).
+- `pie`: color pie/ring chart with `mode` (`pie`/`ring`), `startAngle`, `innerRadius`, `segments`, `color`, `backgroundColor`.
+- `lineChart`: uses `history.enabled`, `samples`, `intervalTicks`; renderer fields include `lineColor`, `fillColor`, `gridColor`, `lineWidth`, `showGrid`.
+
+Example:
+
+```json
+"dynamicVisuals": [
+  {
+    "id": "heat_icon",
+    "x": 120,
+    "y": 30,
+    "width": 16,
+    "height": 16,
+    "priority": 20,
+    "page": "main",
+    "source": { "type": "customData", "key": "heat", "default": 0, "min": 0, "max": 100 },
+    "renderer": {
+      "type": "textureSwitch",
+      "frames": [
+        { "max": 30, "texture": "pack:textures/gui/heat_low.png" },
+        { "max": 70, "texture": "pack:textures/gui/heat_mid.png" },
+        { "texture": "pack:textures/gui/heat_high.png" }
+      ]
+    }
+  },
+  {
+    "id": "recipe_fill",
+    "x": 20,
+    "y": 90,
+    "width": 64,
+    "height": 8,
+    "source": { "type": "machine", "metric": "recipeProgress", "min": 0, "max": 1 },
+    "renderer": {
+      "type": "fill",
+      "backgroundTexture": "pack:textures/gui/bar_empty.png",
+      "fillTexture": "pack:textures/gui/bar_full.png",
+      "direction": "right"
+    }
+  }
+]
+```
