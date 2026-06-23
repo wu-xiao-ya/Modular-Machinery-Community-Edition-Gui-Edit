@@ -186,7 +186,7 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 
 ## 9. 动态可视化组件
 
-`dynamicVisuals[]` 在普通控制器和集成控制器样式里都支持。它是变量驱动视觉的统一系统：`source` -> 归一化 -> 可选 `history` -> `renderer`。
+`dynamicVisuals[]` 在普通控制器和集成控制器样式里都支持。它是变量驱动视觉的统一系统：`source` -> 归一化 -> 可选显隐 / 变换 / 颜色覆盖 -> 可选 `history` -> `renderer`。
 
 当前 renderer 支持：`textureSwitch`、`fill`、`pie`/`ring`、`lineChart`。source 可以读取控制器 `customData` / Smart Interface 数值，也可以读取内置机器指标，例如 `recipeProgress`、`energyRatio`、`parallelism`、`threadCount`，以及工厂线程数量指标。
 
@@ -195,6 +195,12 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 - `transformByValue`：按变量驱动 `offsetX`、`offsetY`、`scale`、`scaleX`、`scaleY`、`rotation`、`alpha`、`pivotX`、`pivotY`。
 - 动态 `pivotX` / `pivotY` 的单位仍由静态 `transform.pivotUnit` 决定；如果没写，默认就是 `ratio`。`ratio` 表示基于宽高的 `0..1` 相对坐标，`px` 表示绝对像素坐标。
 - 每个 `transformByValue` 通道都可写独立 `source`，不写时默认复用当前 visual 的主 `source`。
+
+还支持可选显隐 / 颜色覆盖：
+- `visibleByValue`：按归一化后的变量值决定是否显示。支持 `min`、`max`、`equals`、`invert`，也支持独立 `source`。
+- `rendererByValue`：对支持颜色的 renderer 做变量驱动颜色插值。支持通道：`backgroundColor`、`fillColor`、`borderColor`、`color`、`lineColor`、`gridColor`。
+- 每个 `rendererByValue` 通道可写 `{ "fromColor": ..., "toColor": ... }`，也可单独指定 `source`。
+- 如果少写了一端颜色，会优先回退到静态 `renderer` 对应颜色；静态颜色也没有时，就复用已填写的那一端。
 
 ```json
 "dynamicVisuals": [
@@ -217,7 +223,7 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 ]
 ```
 
-`foreground`、`priority`、`page`、`visible` 与其他控制器组件规则一致。
+`foreground`、`priority`、`page`、`visible`、`visibleByValue`、`rendererByValue` 与其他控制器组件规则一致。
 
 变量驱动旋转示例：
 
@@ -252,3 +258,32 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 ```
 
 这个示例里静态 `pivotUnit` 是 `ratio`，所以动态 `pivotX` / `pivotY` 也按相对坐标解释。
+
+显隐 + 颜色联动示例：
+
+```json
+{
+  "id": "warning_ring",
+  "x": 160,
+  "y": 28,
+  "width": 28,
+  "height": 28,
+  "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+  "visibleByValue": { "min": 0.05 },
+  "renderer": {
+    "type": "pie",
+    "mode": "ring",
+    "innerRadius": 8,
+    "backgroundColor": "22000000",
+    "color": "FF44FF44"
+  },
+  "rendererByValue": {
+    "color": {
+      "fromColor": "FF44FF44",
+      "toColor": "FFFF4444"
+    }
+  }
+}
+```
+
+这个示例在接近 0 时保持隐藏，随后会随着 `warning` 上升从绿色渐变到红色。

@@ -186,7 +186,7 @@ Read from text lines pushed into MMCE's `ControllerGUIRenderEvent.extraInfo[]` (
 
 ## 9. Dynamic visuals
 
-`dynamicVisuals[]` works in both Machine and Factory controller styles. It is the unified system for variable-driven visuals: `source` -> normalization -> optional `history` -> `renderer`.
+`dynamicVisuals[]` works in both Machine and Factory controller styles. It is the unified system for variable-driven visuals: `source` -> normalization -> optional visibility / transform / color overrides -> optional `history` -> `renderer`.
 
 Renderers supported now: `textureSwitch`, `fill`, `pie`/`ring`, and `lineChart`. Sources can read controller `customData` / Smart Interface numeric values, or built-in machine metrics such as `recipeProgress`, `energyRatio`, `parallelism`, `threadCount`, plus factory thread-count metrics.
 
@@ -195,6 +195,12 @@ Optional transforms are also supported:
 - `transformByValue`: variable-driven `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`.
 - Dynamic `pivotX` / `pivotY` use the static `transform.pivotUnit` for their units. If `pivotUnit` is omitted, it defaults to `ratio`; use `ratio` for 0..1 relative coordinates, or `px` for absolute pixel coordinates.
 - each `transformByValue` channel may define its own independent `source`; otherwise it reuses the visual's main `source`.
+
+Optional visibility / color overrides are also supported:
+- `visibleByValue`: conditional visibility driven by the normalized value. Supports `min`, `max`, `equals`, `invert`, and an optional independent `source`.
+- `rendererByValue`: variable-driven color interpolation for color-capable renderers. Supported channels: `backgroundColor`, `fillColor`, `borderColor`, `color`, `lineColor`, `gridColor`.
+- each `rendererByValue` channel accepts `{ "fromColor": ..., "toColor": ... }` and may define its own independent `source`.
+- if one color endpoint is omitted, the static renderer color is used as the fallback endpoint first; if that is also absent, the provided endpoint is reused.
 
 ```json
 "dynamicVisuals": [
@@ -217,7 +223,7 @@ Optional transforms are also supported:
 ]
 ```
 
-Use `foreground`, `priority`, `page`, and `visible` exactly like other controller widgets.
+Use `foreground`, `priority`, `page`, `visible`, `visibleByValue`, and `rendererByValue` exactly like other controller widgets.
 
 Variable-driven rotation example:
 
@@ -252,3 +258,32 @@ Variable-driven rotation example:
 ```
 
 In this example, the static `pivotUnit` is `ratio`, so the dynamic `pivotX` / `pivotY` values are also interpreted as relative coordinates.
+
+Visibility + color example:
+
+```json
+{
+  "id": "warning_ring",
+  "x": 160,
+  "y": 28,
+  "width": 28,
+  "height": 28,
+  "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+  "visibleByValue": { "min": 0.05 },
+  "renderer": {
+    "type": "pie",
+    "mode": "ring",
+    "innerRadius": 8,
+    "backgroundColor": "22000000",
+    "color": "FF44FF44"
+  },
+  "rendererByValue": {
+    "color": {
+      "fromColor": "FF44FF44",
+      "toColor": "FFFF4444"
+    }
+  }
+}
+```
+
+This example stays hidden near zero, then fades from green to red as `warning` rises.
