@@ -433,7 +433,7 @@ Supported renderers:
 - `lineChart`: uses `history.enabled`, `samples`, `intervalTicks`; renderer fields include `lineColor`, `fillColor`, `gridColor`, `lineWidth`, `showGrid`.
 
 Optional transforms:
-- `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `origin` (`topLeft` or `center`).
+- `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `origin` (`topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`).
 - `transformByValue`: drive `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha` from the normalized source value.
 - each `transformByValue` channel accepts `{ "min": ..., "max": ... }` and may define its own independent `source`.
 

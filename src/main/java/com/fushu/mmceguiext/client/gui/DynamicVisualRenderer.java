@@ -162,17 +162,24 @@ public class DynamicVisualRenderer {
         beginVisualRender(transform.alpha);
         try {
             if (transform.requiresMatrix()) {
+                float pivotX = transform.resolvePivotX(visual.width);
+                float pivotY = transform.resolvePivotY(visual.height);
                 GlStateManager.pushMatrix();
                 try {
-                    if (transform.isCenterOrigin()) {
-                        GlStateManager.translate(x + visual.width * 0.5F, y + visual.height * 0.5F, 0.0F);
-                        applyTransformMatrix(transform);
-                        drawResolvedVisual(type, visual, renderer, rawValue, normalized, -visual.width / 2, -visual.height / 2, visual.width, visual.height, transform.alpha);
-                    } else {
-                        GlStateManager.translate(x, y, 0.0F);
-                        applyTransformMatrix(transform);
-                        drawResolvedVisual(type, visual, renderer, rawValue, normalized, 0, 0, visual.width, visual.height, transform.alpha);
-                    }
+                    GlStateManager.translate(x + pivotX, y + pivotY, 0.0F);
+                    applyTransformMatrix(transform);
+                    drawResolvedVisual(
+                        type,
+                        visual,
+                        renderer,
+                        rawValue,
+                        normalized,
+                        -Math.round(pivotX),
+                        -Math.round(pivotY),
+                        visual.width,
+                        visual.height,
+                        transform.alpha
+                    );
                 } finally {
                     GlStateManager.popMatrix();
                 }
@@ -659,8 +666,32 @@ public class DynamicVisualRenderer {
         private float alpha = 1.0F;
         private String origin = "topLeft";
 
-        private boolean isCenterOrigin() {
-            return "center".equals(this.origin);
+        private float resolvePivotX(int width) {
+            if ("center".equals(this.origin)
+                || "topCenter".equals(this.origin)
+                || "bottomCenter".equals(this.origin)) {
+                return width * 0.5F;
+            }
+            if ("topRight".equals(this.origin)
+                || "centerRight".equals(this.origin)
+                || "bottomRight".equals(this.origin)) {
+                return (float) width;
+            }
+            return 0.0F;
+        }
+
+        private float resolvePivotY(int height) {
+            if ("center".equals(this.origin)
+                || "centerLeft".equals(this.origin)
+                || "centerRight".equals(this.origin)) {
+                return height * 0.5F;
+            }
+            if ("bottomLeft".equals(this.origin)
+                || "bottomCenter".equals(this.origin)
+                || "bottomRight".equals(this.origin)) {
+                return (float) height;
+            }
+            return 0.0F;
         }
 
         private boolean requiresMatrix() {

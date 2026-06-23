@@ -2216,11 +2216,36 @@ final class MachineGuiStyleParser {
         if ("center".equals(text) || "centre".equals(text) || "middle".equals(text)) {
             return "center";
         }
+        if ("topcenter".equals(text) || "top_center".equals(text) || "top-center".equals(text)
+            || "topmiddle".equals(text) || "top_middle".equals(text) || "top-middle".equals(text)) {
+            return "topCenter";
+        }
+        if ("centerleft".equals(text) || "center_left".equals(text) || "center-left".equals(text)
+            || "middleleft".equals(text) || "middle_left".equals(text) || "middle-left".equals(text)) {
+            return "centerLeft";
+        }
+        if ("centerright".equals(text) || "center_right".equals(text) || "center-right".equals(text)
+            || "middleright".equals(text) || "middle_right".equals(text) || "middle-right".equals(text)) {
+            return "centerRight";
+        }
+        if ("bottomcenter".equals(text) || "bottom_center".equals(text) || "bottom-center".equals(text)
+            || "bottommiddle".equals(text) || "bottom_middle".equals(text) || "bottom-middle".equals(text)) {
+            return "bottomCenter";
+        }
         if ("topleft".equals(text) || "top_left".equals(text) || "top-left".equals(text)
             || "origin".equals(text) || "default".equals(text)) {
             return "topLeft";
         }
-        result.warnForMachine(scope, field(scope, "origin") + " must be center or topLeft.");
+        if ("topright".equals(text) || "top_right".equals(text) || "top-right".equals(text)) {
+            return "topRight";
+        }
+        if ("bottomleft".equals(text) || "bottom_left".equals(text) || "bottom-left".equals(text)) {
+            return "bottomLeft";
+        }
+        if ("bottomright".equals(text) || "bottom_right".equals(text) || "bottom-right".equals(text)) {
+            return "bottomRight";
+        }
+        result.warnForMachine(scope, field(scope, "origin") + " must be one of topLeft, topCenter, topRight, centerLeft, center, centerRight, bottomLeft, bottomCenter or bottomRight.");
         return null;
     }
 

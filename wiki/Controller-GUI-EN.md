@@ -191,7 +191,7 @@ Read from text lines pushed into MMCE's `ControllerGUIRenderEvent.extraInfo[]` (
 Renderers supported now: `textureSwitch`, `fill`, `pie`/`ring`, and `lineChart`. Sources can read controller `customData` / Smart Interface numeric values, or built-in machine metrics such as `recipeProgress`, `energyRatio`, `parallelism`, `threadCount`, plus factory thread-count metrics.
 
 Optional transforms are also supported:
-- `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `origin` (`topLeft` / `center`).
+- `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `origin` (`topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`).
 - `transformByValue`: variable-driven `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`.
 - each `transformByValue` channel may define its own independent `source`; otherwise it reuses the visual's main `source`.
 

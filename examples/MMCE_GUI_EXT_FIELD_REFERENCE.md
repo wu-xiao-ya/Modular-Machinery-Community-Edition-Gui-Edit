@@ -647,8 +647,8 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
   - CN: 静态透明度，支持 `0.0-1.0`，也兼容 `0-255`。
   - EN: Static alpha. Supports `0.0-1.0` and also accepts `0-255`.
 - `origin`
-  - CN: 变换原点，支持 `topLeft`、`center`。
-  - EN: Transform origin. Supports `topLeft` and `center`.
+  - CN: 变换原点，支持 `topLeft`、`topCenter`、`topRight`、`centerLeft`、`center`、`centerRight`、`bottomLeft`、`bottomCenter`、`bottomRight`。
+  - EN: Transform origin. Supports `topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`.
 
 ### `transformByValue` / 变量驱动变换
 
