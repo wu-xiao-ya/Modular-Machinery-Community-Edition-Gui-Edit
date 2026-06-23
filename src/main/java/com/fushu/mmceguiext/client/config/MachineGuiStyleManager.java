@@ -1002,6 +1002,10 @@ public final class MachineGuiStyleManager {
         @Nullable
         public String page;
         @Nullable
+        public DynamicVisualTransformStyle transform;
+        @Nullable
+        public DynamicVisualTransformByValueStyle transformByValue;
+        @Nullable
         public DynamicVisualSourceStyle source;
         @Nullable
         public DynamicVisualHistoryStyle history;
@@ -1022,9 +1026,101 @@ public final class MachineGuiStyleManager {
             copy.foreground = source.foreground;
             copy.visible = source.visible;
             copy.page = source.page;
+            copy.transform = DynamicVisualTransformStyle.copyOf(source.transform);
+            copy.transformByValue = DynamicVisualTransformByValueStyle.copyOf(source.transformByValue);
             copy.source = DynamicVisualSourceStyle.copyOf(source.source);
             copy.history = DynamicVisualHistoryStyle.copyOf(source.history);
             copy.renderer = DynamicVisualRendererStyle.copyOf(source.renderer);
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualTransformStyle {
+        @Nullable
+        public Float offsetX;
+        @Nullable
+        public Float offsetY;
+        @Nullable
+        public Float scale;
+        @Nullable
+        public Float scaleX;
+        @Nullable
+        public Float scaleY;
+        @Nullable
+        public Float rotation;
+        @Nullable
+        public Float alpha;
+        @Nullable
+        public String origin;
+
+        @Nullable
+        public static DynamicVisualTransformStyle copyOf(@Nullable DynamicVisualTransformStyle source) {
+            if (source == null) {
+                return null;
+            }
+            DynamicVisualTransformStyle copy = new DynamicVisualTransformStyle();
+            copy.offsetX = source.offsetX;
+            copy.offsetY = source.offsetY;
+            copy.scale = source.scale;
+            copy.scaleX = source.scaleX;
+            copy.scaleY = source.scaleY;
+            copy.rotation = source.rotation;
+            copy.alpha = source.alpha;
+            copy.origin = source.origin;
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualTransformByValueStyle {
+        @Nullable
+        public DynamicVisualDrivenValueStyle offsetX;
+        @Nullable
+        public DynamicVisualDrivenValueStyle offsetY;
+        @Nullable
+        public DynamicVisualDrivenValueStyle scale;
+        @Nullable
+        public DynamicVisualDrivenValueStyle scaleX;
+        @Nullable
+        public DynamicVisualDrivenValueStyle scaleY;
+        @Nullable
+        public DynamicVisualDrivenValueStyle rotation;
+        @Nullable
+        public DynamicVisualDrivenValueStyle alpha;
+
+        @Nullable
+        public static DynamicVisualTransformByValueStyle copyOf(@Nullable DynamicVisualTransformByValueStyle source) {
+            if (source == null) {
+                return null;
+            }
+            DynamicVisualTransformByValueStyle copy = new DynamicVisualTransformByValueStyle();
+            copy.offsetX = DynamicVisualDrivenValueStyle.copyOf(source.offsetX);
+            copy.offsetY = DynamicVisualDrivenValueStyle.copyOf(source.offsetY);
+            copy.scale = DynamicVisualDrivenValueStyle.copyOf(source.scale);
+            copy.scaleX = DynamicVisualDrivenValueStyle.copyOf(source.scaleX);
+            copy.scaleY = DynamicVisualDrivenValueStyle.copyOf(source.scaleY);
+            copy.rotation = DynamicVisualDrivenValueStyle.copyOf(source.rotation);
+            copy.alpha = DynamicVisualDrivenValueStyle.copyOf(source.alpha);
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualDrivenValueStyle {
+        @Nullable
+        public Float min;
+        @Nullable
+        public Float max;
+        @Nullable
+        public DynamicVisualSourceStyle source;
+
+        @Nullable
+        public static DynamicVisualDrivenValueStyle copyOf(@Nullable DynamicVisualDrivenValueStyle source) {
+            if (source == null) {
+                return null;
+            }
+            DynamicVisualDrivenValueStyle copy = new DynamicVisualDrivenValueStyle();
+            copy.min = source.min;
+            copy.max = source.max;
+            copy.source = DynamicVisualSourceStyle.copyOf(source.source);
             return copy;
         }
     }

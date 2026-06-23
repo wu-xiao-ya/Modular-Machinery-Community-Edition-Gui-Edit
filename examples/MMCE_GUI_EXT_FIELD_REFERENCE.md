@@ -605,6 +605,8 @@ EN: Common tweaks:
 - `page`, `visible`: same page/visibility rules as other controller widgets.
 - `source`: value source object.
 - `history`: optional sampling config for charts.
+- `transform`: optional static transform object.
+- `transformByValue`: optional variable-driven transform object.
 - `renderer`: renderer object.
 
 ### `source` fields / 数据源字段
@@ -618,6 +620,59 @@ EN: Common tweaks:
 ```
 
 Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`, `energyRatio`, `parallelism`, `threadCount`, `activeThreadCount`, `idleThreadCount`; factory additionally accepts `factoryThreadCount`, `factoryActiveThreadCount`, `factoryIdleThreadCount`.
+
+### `transform` / 静态变换
+
+```json
+"transform": {
+  "offsetX": 4,
+  "offsetY": -2,
+  "scale": 1.1,
+  "rotation": 45,
+  "alpha": 0.8,
+  "origin": "center"
+}
+```
+
+- `offsetX`, `offsetY`
+  - CN: 静态坐标偏移，支持负数。
+  - EN: Static coordinate offset; negative values are allowed.
+- `scale`, `scaleX`, `scaleY`
+  - CN: 静态缩放。`scale` 为统一缩放，`scaleX/Y` 可分别覆盖。
+  - EN: Static scaling. `scale` is uniform; `scaleX/Y` override each axis.
+- `rotation`
+  - CN: 静态旋转角度，单位为度。
+  - EN: Static rotation in degrees.
+- `alpha`
+  - CN: 静态透明度，支持 `0.0-1.0`，也兼容 `0-255`。
+  - EN: Static alpha. Supports `0.0-1.0` and also accepts `0-255`.
+- `origin`
+  - CN: 变换原点，支持 `topLeft`、`center`。
+  - EN: Transform origin. Supports `topLeft` and `center`.
+
+### `transformByValue` / 变量驱动变换
+
+```json
+"transformByValue": {
+  "rotation": { "min": 0, "max": 360 },
+  "scale": { "min": 0.8, "max": 1.2 },
+  "alpha": {
+    "min": 0.3,
+    "max": 1.0,
+    "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 }
+  }
+}
+```
+
+- supported channels / 支持通道:
+  - `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`
+- per-channel fields / 每个通道字段:
+  - `min`, `max`
+    - CN: 把归一化后的 `0-1` 数值映射到该区间。
+    - EN: Maps the normalized `0-1` input into this output range.
+  - `source`
+    - CN: 可选独立数据源；未写时默认使用该 visual 的主 `source`。
+    - EN: Optional independent source; otherwise the visual's main `source` is reused.
 
 ### renderer: `textureSwitch`
 
@@ -671,5 +726,35 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
   "gridColor": "22000000",
   "lineWidth": 1,
   "showGrid": true
+}
+```
+
+### Combined example / 综合示例
+
+```json
+{
+  "id": "fan",
+  "x": 120,
+  "y": 30,
+  "width": 32,
+  "height": 32,
+  "source": { "type": "customData", "key": "speed", "default": 0, "min": 0, "max": 100 },
+  "transform": { "origin": "center", "alpha": 0.6 },
+  "transformByValue": {
+    "rotation": { "min": 0, "max": 360 },
+    "scale": { "min": 0.85, "max": 1.15 },
+    "alpha": {
+      "min": 0.4,
+      "max": 1.0,
+      "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 }
+    }
+  },
+  "renderer": {
+    "type": "textureSwitch",
+    "fallbackTexture": "pack:textures/gui/fan.png",
+    "frames": [
+      { "texture": "pack:textures/gui/fan.png" }
+    ]
+  }
 }
 ```

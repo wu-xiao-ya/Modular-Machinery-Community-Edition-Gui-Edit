@@ -420,7 +420,7 @@ See the MMCE source license. / 见 MMCE 源码许可。
 
 `dynamicVisuals[]` can be used under both `machineController` and `factoryController`. It uses one unified pipeline: `source` -> normalized value -> optional `history` -> `renderer`.
 
-Common fields: `id`, `x`, `y`, `width`, `height`, `priority`, `foreground`, `page`, `visible`, `source`, `history`, `renderer`.
+Common fields: `id`, `x`, `y`, `width`, `height`, `priority`, `foreground`, `page`, `visible`, `source`, `history`, `renderer`, `transform`, `transformByValue`.
 
 Supported sources:
 - `customData`: reads a numeric value from controller custom data / Smart Interface virtual key: `key`, `default`, `min`, `max`, `clamp`, `invert`.
@@ -431,6 +431,11 @@ Supported renderers:
 - `fill`: progress-style fill with `backgroundTexture`, `fillTexture`, `direction` (`right`, `left`, `up`, `down`).
 - `pie`: color pie/ring chart with `mode` (`pie`/`ring`), `startAngle`, `innerRadius`, `segments`, `color`, `backgroundColor`.
 - `lineChart`: uses `history.enabled`, `samples`, `intervalTicks`; renderer fields include `lineColor`, `fillColor`, `gridColor`, `lineWidth`, `showGrid`.
+
+Optional transforms:
+- `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `origin` (`topLeft` or `center`).
+- `transformByValue`: drive `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha` from the normalized source value.
+- each `transformByValue` channel accepts `{ "min": ..., "max": ... }` and may define its own independent `source`.
 
 Example:
 
@@ -466,6 +471,31 @@ Example:
       "backgroundTexture": "pack:textures/gui/bar_empty.png",
       "fillTexture": "pack:textures/gui/bar_full.png",
       "direction": "right"
+    }
+  },
+  {
+    "id": "fan",
+    "x": 120,
+    "y": 30,
+    "width": 32,
+    "height": 32,
+    "source": { "type": "customData", "key": "speed", "default": 0, "min": 0, "max": 100 },
+    "transform": { "origin": "center", "alpha": 0.6 },
+    "transformByValue": {
+      "rotation": { "min": 0, "max": 360 },
+      "scale": { "min": 0.85, "max": 1.15 },
+      "alpha": {
+        "min": 0.4,
+        "max": 1.0,
+        "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 }
+      }
+    },
+    "renderer": {
+      "type": "textureSwitch",
+      "fallbackTexture": "pack:textures/gui/fan.png",
+      "frames": [
+        { "texture": "pack:textures/gui/fan.png" }
+      ]
     }
   }
 ]

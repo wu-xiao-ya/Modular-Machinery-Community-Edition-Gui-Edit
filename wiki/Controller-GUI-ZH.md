@@ -190,6 +190,11 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 
 当前 renderer 支持：`textureSwitch`、`fill`、`pie`/`ring`、`lineChart`。source 可以读取控制器 `customData` / Smart Interface 数值，也可以读取内置机器指标，例如 `recipeProgress`、`energyRatio`、`parallelism`、`threadCount`，以及工厂线程数量指标。
 
+还支持可选变换：
+- `transform`：静态 `offsetX`、`offsetY`、`scale`、`scaleX`、`scaleY`、`rotation`、`alpha`、`origin`（`topLeft` / `center`）。
+- `transformByValue`：按变量驱动 `offsetX`、`offsetY`、`scale`、`scaleX`、`scaleY`、`rotation`、`alpha`。
+- 每个 `transformByValue` 通道都可写独立 `source`，不写时默认复用当前 visual 的主 `source`。
+
 ```json
 "dynamicVisuals": [
   {
@@ -212,3 +217,33 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 ```
 
 `foreground`、`priority`、`page`、`visible` 与其他控制器组件规则一致。
+
+变量驱动旋转示例：
+
+```json
+{
+  "id": "fan",
+  "x": 120,
+  "y": 30,
+  "width": 32,
+  "height": 32,
+  "source": { "type": "customData", "key": "speed", "default": 0, "min": 0, "max": 100 },
+  "transform": { "origin": "center", "alpha": 0.6 },
+  "transformByValue": {
+    "rotation": { "min": 0, "max": 360 },
+    "scale": { "min": 0.85, "max": 1.15 },
+    "alpha": {
+      "min": 0.4,
+      "max": 1.0,
+      "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 }
+    }
+  },
+  "renderer": {
+    "type": "textureSwitch",
+    "fallbackTexture": "pack:textures/gui/fan.png",
+    "frames": [
+      { "texture": "pack:textures/gui/fan.png" }
+    ]
+  }
+}
+```

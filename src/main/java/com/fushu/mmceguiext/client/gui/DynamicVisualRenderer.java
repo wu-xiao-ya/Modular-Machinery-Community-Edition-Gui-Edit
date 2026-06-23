@@ -55,7 +55,7 @@ public class DynamicVisualRenderer {
             float raw = resolveRawValue(visual.source, controller, metricProvider);
             float normalized = normalizeValue(raw, visual.source);
             updateHistoryIfNeeded(visual, normalized, controller);
-            renderVisual(visual, raw, normalized, originX, originY);
+            renderVisual(visual, raw, normalized, controller, metricProvider, originX, originY);
         }
     }
 
@@ -142,25 +142,194 @@ public class DynamicVisualRenderer {
         return value;
     }
 
-    private void renderVisual(MachineGuiStyleManager.DynamicVisualStyle visual, float rawValue, float normalized, int originX, int originY) {
+    private void renderVisual(
+        MachineGuiStyleManager.DynamicVisualStyle visual,
+        float rawValue,
+        float normalized,
+        @Nullable TileMultiblockMachineController controller,
+        MetricProvider metricProvider,
+        int originX,
+        int originY
+    ) {
         MachineGuiStyleManager.DynamicVisualRendererStyle renderer = visual.renderer;
         String type = renderer.type == null ? "fill" : renderer.type;
-        int x = originX + visual.x;
-        int y = originY + visual.y;
-        if ("textureSwitch".equals(type)) {
-            drawTextureSwitch(visual, rawValue, x, y);
-        } else if ("pie".equals(type)) {
-            drawPie(renderer, normalized, x, y, visual.width, visual.height);
-        } else if ("lineChart".equals(type)) {
-            drawLineChart(visual, renderer, normalized, x, y, visual.width, visual.height);
-        } else {
-            drawFill(renderer, normalized, x, y, visual.width, visual.height);
+        ResolvedTransform transform = resolveTransform(visual, normalized, controller, metricProvider);
+        if (transform.alpha <= EPSILON) {
+            return;
         }
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        GlStateManager.enableTexture2D();
+        int x = originX + visual.x + Math.round(transform.offsetX);
+        int y = originY + visual.y + Math.round(transform.offsetY);
+        beginVisualRender(transform.alpha);
+        try {
+            if (transform.requiresMatrix()) {
+                GlStateManager.pushMatrix();
+                try {
+                    if (transform.isCenterOrigin()) {
+                        GlStateManager.translate(x + visual.width * 0.5F, y + visual.height * 0.5F, 0.0F);
+                        applyTransformMatrix(transform);
+                        drawResolvedVisual(type, visual, renderer, rawValue, normalized, -visual.width / 2, -visual.height / 2, visual.width, visual.height, transform.alpha);
+                    } else {
+                        GlStateManager.translate(x, y, 0.0F);
+                        applyTransformMatrix(transform);
+                        drawResolvedVisual(type, visual, renderer, rawValue, normalized, 0, 0, visual.width, visual.height, transform.alpha);
+                    }
+                } finally {
+                    GlStateManager.popMatrix();
+                }
+            } else {
+                drawResolvedVisual(type, visual, renderer, rawValue, normalized, x, y, visual.width, visual.height, transform.alpha);
+            }
+        } finally {
+            endVisualRender(transform.alpha);
+        }
     }
 
-    private void drawTextureSwitch(MachineGuiStyleManager.DynamicVisualStyle visual, float value, int x, int y) {
+    private void drawResolvedVisual(
+        String type,
+        MachineGuiStyleManager.DynamicVisualStyle visual,
+        MachineGuiStyleManager.DynamicVisualRendererStyle renderer,
+        float rawValue,
+        float normalized,
+        int x,
+        int y,
+        int width,
+        int height,
+        float alpha
+    ) {
+        if ("textureSwitch".equals(type)) {
+            drawTextureSwitch(visual, rawValue, x, y, width, height);
+        } else if ("pie".equals(type)) {
+            drawPie(renderer, normalized, x, y, width, height, alpha);
+        } else if ("lineChart".equals(type)) {
+            drawLineChart(visual, renderer, normalized, x, y, width, height, alpha);
+        } else {
+            drawFill(renderer, normalized, x, y, width, height, alpha);
+        }
+    }
+
+    private ResolvedTransform resolveTransform(
+        MachineGuiStyleManager.DynamicVisualStyle visual,
+        float normalized,
+        @Nullable TileMultiblockMachineController controller,
+        MetricProvider metricProvider
+    ) {
+        ResolvedTransform transform = new ResolvedTransform();
+        MachineGuiStyleManager.DynamicVisualTransformStyle base = visual.transform;
+        if (base != null) {
+            if (base.offsetX != null) {
+                transform.offsetX = base.offsetX.floatValue();
+            }
+            if (base.offsetY != null) {
+                transform.offsetY = base.offsetY.floatValue();
+            }
+            if (base.scale != null) {
+                float scale = normalizeRuntimeScale(base.scale.floatValue());
+                transform.scaleX = scale;
+                transform.scaleY = scale;
+            }
+            if (base.scaleX != null) {
+                transform.scaleX = normalizeRuntimeScale(base.scaleX.floatValue());
+            }
+            if (base.scaleY != null) {
+                transform.scaleY = normalizeRuntimeScale(base.scaleY.floatValue());
+            }
+            if (base.rotation != null) {
+                transform.rotation = base.rotation.floatValue();
+            }
+            if (base.alpha != null) {
+                transform.alpha = normalizeRuntimeAlpha(base.alpha.floatValue());
+            }
+            if (base.origin != null && !base.origin.trim().isEmpty()) {
+                transform.origin = base.origin;
+            }
+        }
+
+        MachineGuiStyleManager.DynamicVisualTransformByValueStyle dynamic = visual.transformByValue;
+        if (dynamic != null) {
+            if (dynamic.offsetX != null) {
+                transform.offsetX += resolveDrivenValue(dynamic.offsetX, normalized, controller, metricProvider);
+            }
+            if (dynamic.offsetY != null) {
+                transform.offsetY += resolveDrivenValue(dynamic.offsetY, normalized, controller, metricProvider);
+            }
+            if (dynamic.scale != null) {
+                float scale = normalizeRuntimeScale(resolveDrivenValue(dynamic.scale, normalized, controller, metricProvider));
+                transform.scaleX *= scale;
+                transform.scaleY *= scale;
+            }
+            if (dynamic.scaleX != null) {
+                transform.scaleX *= normalizeRuntimeScale(resolveDrivenValue(dynamic.scaleX, normalized, controller, metricProvider));
+            }
+            if (dynamic.scaleY != null) {
+                transform.scaleY *= normalizeRuntimeScale(resolveDrivenValue(dynamic.scaleY, normalized, controller, metricProvider));
+            }
+            if (dynamic.rotation != null) {
+                transform.rotation += resolveDrivenValue(dynamic.rotation, normalized, controller, metricProvider);
+            }
+            if (dynamic.alpha != null) {
+                transform.alpha *= normalizeRuntimeAlpha(resolveDrivenValue(dynamic.alpha, normalized, controller, metricProvider));
+            }
+        }
+
+        transform.scaleX = normalizeRuntimeScale(transform.scaleX);
+        transform.scaleY = normalizeRuntimeScale(transform.scaleY);
+        transform.alpha = normalizeRuntimeAlpha(transform.alpha);
+        return transform;
+    }
+
+    private float resolveDrivenValue(
+        MachineGuiStyleManager.DynamicVisualDrivenValueStyle driven,
+        float fallbackNormalized,
+        @Nullable TileMultiblockMachineController controller,
+        MetricProvider metricProvider
+    ) {
+        float input = fallbackNormalized;
+        if (driven.source != null) {
+            float raw = resolveRawValue(driven.source, controller, metricProvider);
+            input = normalizeValue(raw, driven.source);
+        }
+        float min = driven.min == null ? 0.0F : driven.min.floatValue();
+        float max = driven.max == null ? 1.0F : driven.max.floatValue();
+        if (!Float.isFinite(input)) {
+            input = 0.0F;
+        }
+        if (Math.abs(max - min) <= EPSILON) {
+            return min;
+        }
+        return min + (max - min) * input;
+    }
+
+    private void applyTransformMatrix(ResolvedTransform transform) {
+        if (Math.abs(transform.rotation) > EPSILON) {
+            GlStateManager.rotate(transform.rotation, 0.0F, 0.0F, 1.0F);
+        }
+        if (Math.abs(transform.scaleX - 1.0F) > EPSILON || Math.abs(transform.scaleY - 1.0F) > EPSILON) {
+            GlStateManager.scale(transform.scaleX, transform.scaleY, 1.0F);
+        }
+    }
+
+    private void beginVisualRender(float alpha) {
+        if (alpha < 1.0F - EPSILON) {
+            GlStateManager.enableBlend();
+            GlStateManager.tryBlendFuncSeparate(
+                GlStateManager.SourceFactor.SRC_ALPHA,
+                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+                GlStateManager.SourceFactor.ONE,
+                GlStateManager.DestFactor.ZERO
+            );
+        }
+        GlStateManager.color(1.0F, 1.0F, 1.0F, normalizeRuntimeAlpha(alpha));
+    }
+
+    private void endVisualRender(float alpha) {
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.enableTexture2D();
+        if (alpha < 1.0F - EPSILON) {
+            GlStateManager.disableBlend();
+        }
+    }
+
+    private void drawTextureSwitch(MachineGuiStyleManager.DynamicVisualStyle visual, float value, int x, int y, int width, int height) {
         MachineGuiStyleManager.DynamicVisualRendererStyle renderer = visual.renderer;
         String texture = null;
         if (renderer.frames != null) {
@@ -184,7 +353,7 @@ public class DynamicVisualRenderer {
         int texW = renderer.textureWidth == null ? visual.width : Math.max(1, renderer.textureWidth.intValue());
         int texH = renderer.textureHeight == null ? visual.height : Math.max(1, renderer.textureHeight.intValue());
         Minecraft.getMinecraft().getTextureManager().bindTexture(resource);
-        GuiRenderUtils.drawTexturedRect(x, y, 0, 0, visual.width, visual.height, texW, texH);
+        GuiRenderUtils.drawTexturedRect(x, y, 0, 0, width, height, texW, texH);
     }
 
     private boolean matchesFrame(MachineGuiStyleManager.DynamicVisualFrameStyle frame, float value) {
@@ -200,7 +369,7 @@ public class DynamicVisualRenderer {
         return true;
     }
 
-    private void drawFill(MachineGuiStyleManager.DynamicVisualRendererStyle renderer, float progress, int x, int y, int width, int height) {
+    private void drawFill(MachineGuiStyleManager.DynamicVisualRendererStyle renderer, float progress, int x, int y, int width, int height, float alpha) {
         int textureWidth = renderer.textureWidth == null ? width : Math.max(1, renderer.textureWidth.intValue());
         int textureHeight = renderer.textureHeight == null ? height : Math.max(1, renderer.textureHeight.intValue());
         ResourceLocation background = GuiRenderUtils.parseOptionalTexture(renderer.backgroundTexture);
@@ -208,10 +377,10 @@ public class DynamicVisualRenderer {
             Minecraft.getMinecraft().getTextureManager().bindTexture(background);
             GuiRenderUtils.drawTexturedRect(x, y, 0, 0, width, height, textureWidth, textureHeight);
         } else if (renderer.backgroundColor != null) {
-            Gui.drawRect(x, y, x + width, y + height, renderer.backgroundColor.intValue());
+            Gui.drawRect(x, y, x + width, y + height, multiplyColorAlpha(renderer.backgroundColor.intValue(), alpha));
         }
         if (renderer.borderColor != null) {
-            drawBorder(x, y, width, height, renderer.borderColor.intValue());
+            drawBorder(x, y, width, height, multiplyColorAlpha(renderer.borderColor.intValue(), alpha));
         }
         int[] bounds = computeFillBounds(x, y, width, height, renderer.direction, progress);
         if (bounds[2] <= 0 || bounds[3] <= 0) {
@@ -223,7 +392,8 @@ public class DynamicVisualRenderer {
             Minecraft.getMinecraft().getTextureManager().bindTexture(fill);
             GuiRenderUtils.drawScaledTexturedRect(bounds[0], bounds[1], bounds[2], bounds[3], uv[0], uv[1], uv[2], uv[3], textureWidth, textureHeight);
         } else {
-            Gui.drawRect(bounds[0], bounds[1], bounds[0] + bounds[2], bounds[1] + bounds[3], renderer.fillColor == null ? 0xFF55CC66 : renderer.fillColor.intValue());
+            int fillColor = renderer.fillColor == null ? 0xFF55CC66 : renderer.fillColor.intValue();
+            Gui.drawRect(bounds[0], bounds[1], bounds[0] + bounds[2], bounds[1] + bounds[3], multiplyColorAlpha(fillColor, alpha));
         }
     }
 
@@ -261,9 +431,9 @@ public class DynamicVisualRenderer {
         return new int[] {0, 0, fillW, safeH};
     }
 
-    private void drawPie(MachineGuiStyleManager.DynamicVisualRendererStyle renderer, float progress, int x, int y, int width, int height) {
-        int bg = renderer.backgroundColor == null ? 0x33000000 : renderer.backgroundColor.intValue();
-        int color = renderer.color == null ? 0xFFFFAA00 : renderer.color.intValue();
+    private void drawPie(MachineGuiStyleManager.DynamicVisualRendererStyle renderer, float progress, int x, int y, int width, int height, float alpha) {
+        int bg = renderer.backgroundColor == null ? 0x33000000 : multiplyColorAlpha(renderer.backgroundColor.intValue(), alpha);
+        int color = renderer.color == null ? multiplyColorAlpha(0xFFFFAA00, alpha) : multiplyColorAlpha(renderer.color.intValue(), alpha);
         int segments = renderer.segments == null ? 64 : MathHelper.clamp(renderer.segments.intValue(), 3, 360);
         float startAngle = renderer.startAngle == null ? -90.0F : renderer.startAngle.floatValue();
         boolean ring = "ring".equals(renderer.mode);
@@ -309,13 +479,13 @@ public class DynamicVisualRenderer {
         GlStateManager.enableTexture2D();
     }
 
-    private void drawLineChart(MachineGuiStyleManager.DynamicVisualStyle visual, MachineGuiStyleManager.DynamicVisualRendererStyle renderer, float current, int x, int y, int width, int height) {
+    private void drawLineChart(MachineGuiStyleManager.DynamicVisualStyle visual, MachineGuiStyleManager.DynamicVisualRendererStyle renderer, float current, int x, int y, int width, int height, float alpha) {
         List<Float> values = getHistoryValues(visual, current);
         if (renderer.backgroundColor != null) {
-            Gui.drawRect(x, y, x + width, y + height, renderer.backgroundColor.intValue());
+            Gui.drawRect(x, y, x + width, y + height, multiplyColorAlpha(renderer.backgroundColor.intValue(), alpha));
         }
         if (renderer.showGrid == null || renderer.showGrid.booleanValue()) {
-            int grid = renderer.gridColor == null ? 0x22000000 : renderer.gridColor.intValue();
+            int grid = renderer.gridColor == null ? multiplyColorAlpha(0x22000000, alpha) : multiplyColorAlpha(renderer.gridColor.intValue(), alpha);
             for (int i = 1; i < 4; i++) {
                 int gx = x + width * i / 4;
                 int gy = y + height * i / 4;
@@ -326,8 +496,8 @@ public class DynamicVisualRenderer {
         if (values.isEmpty()) {
             return;
         }
-        int fillColor = renderer.fillColor == null ? 0 : renderer.fillColor.intValue();
-        int lineColor = renderer.lineColor == null ? 0xFF55CCFF : renderer.lineColor.intValue();
+        int fillColor = renderer.fillColor == null ? 0 : multiplyColorAlpha(renderer.fillColor.intValue(), alpha);
+        int lineColor = renderer.lineColor == null ? multiplyColorAlpha(0xFF55CCFF, alpha) : multiplyColorAlpha(renderer.lineColor.intValue(), alpha);
         int lineWidth = renderer.lineWidth == null ? 1 : Math.max(1, renderer.lineWidth.intValue());
         int lastX = x;
         int lastY = valueToY(values.get(0).floatValue(), y, height);
@@ -349,7 +519,7 @@ public class DynamicVisualRenderer {
             Gui.drawRect(x, lastY, x + width, lastY + lineWidth, lineColor);
         }
         if (renderer.borderColor != null) {
-            drawBorder(x, y, width, height, renderer.borderColor.intValue());
+            drawBorder(x, y, width, height, multiplyColorAlpha(renderer.borderColor.intValue(), alpha));
         }
     }
 
@@ -378,6 +548,34 @@ public class DynamicVisualRenderer {
         Gui.drawRect(x, y + height - 1, x + width, y + height, color);
         Gui.drawRect(x, y, x + 1, y + height, color);
         Gui.drawRect(x + width - 1, y, x + width, y + height, color);
+    }
+
+    private int multiplyColorAlpha(int color, float alpha) {
+        float normalized = normalizeRuntimeAlpha(alpha);
+        if (normalized >= 1.0F - EPSILON) {
+            return color;
+        }
+        int baseAlpha = (color >>> 24) & 0xFF;
+        int outAlpha = MathHelper.clamp(Math.round(baseAlpha * normalized), 0, 255);
+        return (color & 0x00FFFFFF) | (outAlpha << 24);
+    }
+
+    private float normalizeRuntimeScale(float value) {
+        if (!Float.isFinite(value)) {
+            return 1.0F;
+        }
+        return Math.max(0.01F, value);
+    }
+
+    private float normalizeRuntimeAlpha(float value) {
+        if (!Float.isFinite(value)) {
+            return 1.0F;
+        }
+        float alpha = value;
+        if (alpha > 1.0F) {
+            alpha = alpha / 255.0F;
+        }
+        return ProgressBarStyleSupport.clamp01(alpha);
     }
 
     private void updateHistoryIfNeeded(MachineGuiStyleManager.DynamicVisualStyle visual, float normalized, @Nullable TileMultiblockMachineController controller) {
@@ -450,6 +648,26 @@ public class DynamicVisualRenderer {
 
     public interface PagePredicate {
         boolean isVisible(@Nullable String page);
+    }
+
+    private static final class ResolvedTransform {
+        private float offsetX = 0.0F;
+        private float offsetY = 0.0F;
+        private float scaleX = 1.0F;
+        private float scaleY = 1.0F;
+        private float rotation = 0.0F;
+        private float alpha = 1.0F;
+        private String origin = "topLeft";
+
+        private boolean isCenterOrigin() {
+            return "center".equals(this.origin);
+        }
+
+        private boolean requiresMatrix() {
+            return Math.abs(this.scaleX - 1.0F) > EPSILON
+                || Math.abs(this.scaleY - 1.0F) > EPSILON
+                || Math.abs(this.rotation) > EPSILON;
+        }
     }
 
     private static final class HistoryState {

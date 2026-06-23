@@ -1107,6 +1107,8 @@ final class MachineGuiStyleParser {
             visual.foreground = getBoolean(obj, result, itemScope, "foreground", "front", "drawForeground");
             visual.visible = getBoolean(obj, result, itemScope, "visible", "show", "enabled");
             visual.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
+            visual.transform = parseDynamicVisualTransform(obj, result, itemScope);
+            visual.transformByValue = parseDynamicVisualTransformByValue(obj, result, itemScope);
             visual.source = parseDynamicVisualSource(obj, result, itemScope);
             visual.history = parseDynamicVisualHistory(obj, result, itemScope);
             visual.renderer = parseDynamicVisualRenderer(obj, result, itemScope);
@@ -1117,6 +1119,136 @@ final class MachineGuiStyleParser {
             visuals.add(visual);
         }
         return visuals.isEmpty() ? null : visuals;
+    }
+
+    @Nullable
+    private static MachineGuiStyleManager.DynamicVisualTransformStyle parseDynamicVisualTransform(
+        JsonObject visualObj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        JsonObject transformObj = getObject(visualObj, result, scope, "transform", "visualTransform", "visual_transform");
+        MachineGuiStyleManager.DynamicVisualTransformStyle transform = new MachineGuiStyleManager.DynamicVisualTransformStyle();
+        transform.offsetX = getFloat(visualObj, result, scope, "offsetX", "offset_x", "dx");
+        transform.offsetY = getFloat(visualObj, result, scope, "offsetY", "offset_y", "dy");
+        transform.scale = normalizePositiveScale(getFloat(visualObj, result, scope, "scale"));
+        transform.scaleX = normalizePositiveScale(getFloat(visualObj, result, scope, "scaleX", "scale_x"));
+        transform.scaleY = normalizePositiveScale(getFloat(visualObj, result, scope, "scaleY", "scale_y"));
+        transform.rotation = getFloat(visualObj, result, scope, "rotation", "rotate", "angle");
+        transform.alpha = normalizeAlpha(getFloat(visualObj, result, scope, "alpha", "opacity", "transparency"));
+        transform.origin = normalizeDynamicTransformOrigin(getTrimmedString(visualObj, result, scope, "origin", "pivot", "anchor"), result, scope);
+        if (transformObj != null) {
+            String transformScope = field(scope, "transform");
+            Float offsetX = getFloat(transformObj, result, transformScope, "offsetX", "offset_x", "dx");
+            Float offsetY = getFloat(transformObj, result, transformScope, "offsetY", "offset_y", "dy");
+            Float scale = normalizePositiveScale(getFloat(transformObj, result, transformScope, "scale"));
+            Float scaleX = normalizePositiveScale(getFloat(transformObj, result, transformScope, "scaleX", "scale_x"));
+            Float scaleY = normalizePositiveScale(getFloat(transformObj, result, transformScope, "scaleY", "scale_y"));
+            Float rotation = getFloat(transformObj, result, transformScope, "rotation", "rotate", "angle");
+            Float alpha = normalizeAlpha(getFloat(transformObj, result, transformScope, "alpha", "opacity", "transparency"));
+            String origin = normalizeDynamicTransformOrigin(getTrimmedString(transformObj, result, transformScope, "origin", "pivot", "anchor"), result, transformScope);
+            if (offsetX != null) transform.offsetX = offsetX;
+            if (offsetY != null) transform.offsetY = offsetY;
+            if (scale != null) transform.scale = scale;
+            if (scaleX != null) transform.scaleX = scaleX;
+            if (scaleY != null) transform.scaleY = scaleY;
+            if (rotation != null) transform.rotation = rotation;
+            if (alpha != null) transform.alpha = alpha;
+            if (origin != null) transform.origin = origin;
+        }
+        if (transform.offsetX == null
+            && transform.offsetY == null
+            && transform.scale == null
+            && transform.scaleX == null
+            && transform.scaleY == null
+            && transform.rotation == null
+            && transform.alpha == null
+            && transform.origin == null) {
+            return null;
+        }
+        return transform;
+    }
+
+    @Nullable
+    private static MachineGuiStyleManager.DynamicVisualTransformByValueStyle parseDynamicVisualTransformByValue(
+        JsonObject visualObj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        JsonObject transformObj = getObject(visualObj, result, scope, "transformByValue", "transform_by_value", "dynamicTransform", "dynamic_transform");
+        if (transformObj == null) {
+            return null;
+        }
+        MachineGuiStyleManager.DynamicVisualTransformByValueStyle transform = new MachineGuiStyleManager.DynamicVisualTransformByValueStyle();
+        transform.offsetX = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "offsetX", "offset_x", "dx");
+        transform.offsetY = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "offsetY", "offset_y", "dy");
+        transform.scale = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "scale");
+        transform.scaleX = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "scaleX", "scale_x");
+        transform.scaleY = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "scaleY", "scale_y");
+        transform.rotation = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "rotation", "rotate", "angle");
+        transform.alpha = parseDynamicDrivenValue(transformObj, result, field(scope, "transformByValue"), "alpha", "opacity", "transparency");
+        if (transform.offsetX == null
+            && transform.offsetY == null
+            && transform.scale == null
+            && transform.scaleX == null
+            && transform.scaleY == null
+            && transform.rotation == null
+            && transform.alpha == null) {
+            return null;
+        }
+        return transform;
+    }
+
+    @Nullable
+    private static MachineGuiStyleManager.DynamicVisualDrivenValueStyle parseDynamicDrivenValue(
+        JsonObject parentObj,
+        MachineFileParseResult result,
+        String scope,
+        String... keys
+    ) {
+        MatchedElement match = findElement(parentObj, keys);
+        if (match == null) {
+            return null;
+        }
+        String itemScope = field(scope, match.key);
+        if (!match.element.isJsonObject()) {
+            result.warnForMachine(scope, itemScope + " must be an object.");
+            return null;
+        }
+        JsonObject obj = match.element.getAsJsonObject();
+        MachineGuiStyleManager.DynamicVisualDrivenValueStyle driven = new MachineGuiStyleManager.DynamicVisualDrivenValueStyle();
+        driven.min = getFloat(obj, result, itemScope, "min", "minimum", "from");
+        driven.max = getFloat(obj, result, itemScope, "max", "maximum", "to");
+        if (isLikelyDynamicVisualSourceObject(obj)) {
+            driven.source = parseDynamicVisualSource(obj, result, itemScope);
+        } else {
+            JsonObject sourceObj = getObject(obj, result, itemScope, "source", "dataSource", "data_source");
+            if (sourceObj != null) {
+                driven.source = parseDynamicVisualSource(sourceObj, result, itemScope + ".source");
+            }
+        }
+        if (driven.min == null && driven.max == null && driven.source == null) {
+            return null;
+        }
+        return driven;
+    }
+
+    private static boolean isLikelyDynamicVisualSourceObject(JsonObject obj) {
+        return obj.has("type")
+            || obj.has("sourceType")
+            || obj.has("source_type")
+            || obj.has("key")
+            || obj.has("customKey")
+            || obj.has("custom_key")
+            || obj.has("metric")
+            || obj.has("machineMetric")
+            || obj.has("machine_metric")
+            || obj.has("default")
+            || obj.has("defaultValue")
+            || obj.has("default_value")
+            || obj.has("fallback")
+            || obj.has("fallbackValue")
+            || obj.has("fallback_value");
     }
 
     private static MachineGuiStyleManager.DynamicVisualSourceStyle parseDynamicVisualSource(
@@ -2056,6 +2188,39 @@ final class MachineGuiStyleParser {
             return "ring";
         }
         result.warnForMachine(scope, field(scope, "renderer.mode") + " must be pie or ring.");
+        return null;
+    }
+
+    @Nullable
+    private static Float normalizePositiveScale(@Nullable Float value) {
+        if (value == null) {
+            return null;
+        }
+        float scale = value.floatValue();
+        if (!Float.isFinite(scale)) {
+            return null;
+        }
+        return Float.valueOf(Math.max(0.01F, scale));
+    }
+
+    @Nullable
+    private static String normalizeDynamicTransformOrigin(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("center".equals(text) || "centre".equals(text) || "middle".equals(text)) {
+            return "center";
+        }
+        if ("topleft".equals(text) || "top_left".equals(text) || "top-left".equals(text)
+            || "origin".equals(text) || "default".equals(text)) {
+            return "topLeft";
+        }
+        result.warnForMachine(scope, field(scope, "origin") + " must be center or topLeft.");
         return null;
     }
 
