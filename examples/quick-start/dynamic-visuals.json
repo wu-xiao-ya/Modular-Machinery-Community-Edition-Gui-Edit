@@ -158,6 +158,63 @@
             ]
           },
           "page": "main"
+        },
+        {
+          "id": "mode_preview",
+          "x": 226,
+          "y": 52,
+          "width": 28,
+          "height": 28,
+          "source": {
+            "type": "customData",
+            "key": "warning",
+            "default": 0,
+            "min": 0,
+            "max": 1
+          },
+          "renderer": {
+            "type": "fill",
+            "backgroundColor": "22000000",
+            "fillColor": "FF44AAFF",
+            "borderColor": "FFFFFFFF",
+            "direction": "up"
+          },
+          "rendererSwitchByValue": [
+            {
+              "max": 0.34,
+              "renderer": {
+                "type": "fill",
+                "backgroundColor": "22000000",
+                "fillColor": "FF44AAFF",
+                "borderColor": "FFFFFFFF",
+                "direction": "up"
+              }
+            },
+            {
+              "min": 0.34,
+              "max": 0.67,
+              "renderer": {
+                "type": "pie",
+                "mode": "ring",
+                "innerRadius": 8,
+                "backgroundColor": "22000000",
+                "color": "FFFFCC44"
+              }
+            },
+            {
+              "min": 0.67,
+              "renderer": {
+                "type": "textureSwitch",
+                "fallbackTexture": "demo:textures/gui/fan.png",
+                "frames": [
+                  {
+                    "texture": "demo:textures/gui/fan.png"
+                  }
+                ]
+              }
+            }
+          ],
+          "page": "main"
         }
       ]
     }

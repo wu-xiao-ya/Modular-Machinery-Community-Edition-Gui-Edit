@@ -1113,9 +1113,10 @@ final class MachineGuiStyleParser {
             visual.source = parseDynamicVisualSource(obj, result, itemScope);
             visual.history = parseDynamicVisualHistory(obj, result, itemScope);
             visual.renderer = parseDynamicVisualRenderer(obj, result, itemScope);
+            visual.rendererSwitch = parseDynamicVisualRendererSwitchByValue(obj, result, itemScope);
             visual.rendererByValue = parseDynamicVisualRendererByValue(obj, result, itemScope);
-            if (visual.renderer == null) {
-                result.warnForMachine(scope, itemScope + " is missing required renderer.");
+            if (visual.renderer == null && (visual.rendererSwitch == null || visual.rendererSwitch.isEmpty())) {
+                result.warnForMachine(scope, itemScope + " is missing required renderer or rendererSwitchByValue.");
                 continue;
             }
             visuals.add(visual);
@@ -1408,6 +1409,118 @@ final class MachineGuiStyleParser {
         renderer.showGrid = getBoolean(rendererObj, result, scope, "showGrid", "show_grid", "grid");
         renderer.frames = parseDynamicVisualFrames(rendererObj, result, scope);
         return renderer;
+    }
+
+    @Nullable
+    private static List<MachineGuiStyleManager.DynamicVisualRendererRuleStyle> parseDynamicVisualRendererSwitchByValue(
+        JsonObject visualObj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        MatchedElement match = findElement(
+            visualObj,
+            "rendererSwitchByValue",
+            "renderer_switch_by_value",
+            "rendererVariants",
+            "renderer_variants",
+            "rendererCases",
+            "renderer_cases"
+        );
+        if (match == null) {
+            return null;
+        }
+        if (!match.element.isJsonArray()) {
+            result.warnForMachine(scope, field(scope, match.key) + " must be an array.");
+            return null;
+        }
+        List<MachineGuiStyleManager.DynamicVisualRendererRuleStyle> rules = new ArrayList<MachineGuiStyleManager.DynamicVisualRendererRuleStyle>();
+        JsonArray array = match.element.getAsJsonArray();
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
+            JsonElement child = array.get(i);
+            String itemScope = field(scope, match.key + "[" + i + "]");
+            if (child == null || !child.isJsonObject()) {
+                result.warnForMachine(scope, itemScope + " must be an object.");
+                continue;
+            }
+            JsonObject obj = child.getAsJsonObject();
+            MachineGuiStyleManager.DynamicVisualRendererRuleStyle rule = new MachineGuiStyleManager.DynamicVisualRendererRuleStyle();
+            rule.min = getFloat(obj, result, itemScope, "min", "minimum");
+            rule.max = getFloat(obj, result, itemScope, "max", "maximum");
+            rule.equals = getFloat(obj, result, itemScope, "equals", "eq", "value");
+            if (isLikelyDynamicVisualSourceObject(obj)) {
+                rule.source = parseDynamicVisualSource(obj, result, itemScope);
+            } else {
+                JsonObject sourceObj = getObject(obj, result, itemScope, "source", "dataSource", "data_source");
+                if (sourceObj != null) {
+                    rule.source = parseDynamicVisualSource(sourceObj, result, itemScope + ".source");
+                }
+            }
+            JsonObject rendererObj = getObject(obj, result, itemScope, "renderer", "render", "visual", "variant");
+            if (rendererObj != null) {
+                rule.renderer = parseDynamicVisualRenderer(rendererObj, result, itemScope + ".renderer");
+            } else if (isLikelyDynamicVisualRendererObject(obj)) {
+                rule.renderer = parseDynamicVisualRenderer(obj, result, itemScope);
+            }
+            if (rule.renderer == null) {
+                result.warnForMachine(scope, itemScope + " is missing required renderer.");
+                continue;
+            }
+            rules.add(rule);
+        }
+        return rules.isEmpty() ? null : rules;
+    }
+
+    private static boolean isLikelyDynamicVisualRendererObject(JsonObject obj) {
+        return obj.has("type")
+            || obj.has("rendererType")
+            || obj.has("renderer_type")
+            || obj.has("direction")
+            || obj.has("fillDirection")
+            || obj.has("fill_direction")
+            || obj.has("backgroundTexture")
+            || obj.has("background_texture")
+            || obj.has("emptyTexture")
+            || obj.has("empty_texture")
+            || obj.has("fillTexture")
+            || obj.has("fill_texture")
+            || obj.has("fullTexture")
+            || obj.has("full_texture")
+            || obj.has("fallbackTexture")
+            || obj.has("fallback_texture")
+            || obj.has("backgroundColor")
+            || obj.has("background_color")
+            || obj.has("fillColor")
+            || obj.has("fill_color")
+            || obj.has("borderColor")
+            || obj.has("border_color")
+            || obj.has("color")
+            || obj.has("lineColor")
+            || obj.has("line_color")
+            || obj.has("gridColor")
+            || obj.has("grid_color")
+            || obj.has("textureWidth")
+            || obj.has("texture_width")
+            || obj.has("textureHeight")
+            || obj.has("texture_height")
+            || obj.has("mode")
+            || obj.has("pieMode")
+            || obj.has("pie_mode")
+            || obj.has("startAngle")
+            || obj.has("start_angle")
+            || obj.has("innerRadius")
+            || obj.has("inner_radius")
+            || obj.has("segments")
+            || obj.has("segmentCount")
+            || obj.has("segment_count")
+            || obj.has("lineWidth")
+            || obj.has("line_width")
+            || obj.has("showGrid")
+            || obj.has("show_grid")
+            || obj.has("grid")
+            || obj.has("frames")
+            || obj.has("states")
+            || obj.has("textures");
     }
 
     @Nullable

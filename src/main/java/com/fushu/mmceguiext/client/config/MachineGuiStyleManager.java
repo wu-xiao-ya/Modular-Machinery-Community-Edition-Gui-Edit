@@ -1014,6 +1014,8 @@ public final class MachineGuiStyleManager {
         @Nullable
         public DynamicVisualRendererStyle renderer;
         @Nullable
+        public List<DynamicVisualRendererRuleStyle> rendererSwitch;
+        @Nullable
         public DynamicVisualRendererByValueStyle rendererByValue;
 
         public static DynamicVisualStyle copyOf(@Nullable DynamicVisualStyle source) {
@@ -1036,6 +1038,12 @@ public final class MachineGuiStyleManager {
             copy.source = DynamicVisualSourceStyle.copyOf(source.source);
             copy.history = DynamicVisualHistoryStyle.copyOf(source.history);
             copy.renderer = DynamicVisualRendererStyle.copyOf(source.renderer);
+            if (source.rendererSwitch != null) {
+                copy.rendererSwitch = new ArrayList<DynamicVisualRendererRuleStyle>(source.rendererSwitch.size());
+                for (DynamicVisualRendererRuleStyle rule : source.rendererSwitch) {
+                    copy.rendererSwitch.add(DynamicVisualRendererRuleStyle.copyOf(rule));
+                }
+            }
             copy.rendererByValue = DynamicVisualRendererByValueStyle.copyOf(source.rendererByValue);
             return copy;
         }
@@ -1333,6 +1341,33 @@ public final class MachineGuiStyleManager {
             copy.color = DynamicVisualDrivenColorStyle.copyOf(source.color);
             copy.lineColor = DynamicVisualDrivenColorStyle.copyOf(source.lineColor);
             copy.gridColor = DynamicVisualDrivenColorStyle.copyOf(source.gridColor);
+            return copy;
+        }
+    }
+
+    public static class DynamicVisualRendererRuleStyle {
+        @Nullable
+        public Float min;
+        @Nullable
+        public Float max;
+        @Nullable
+        public Float equals;
+        @Nullable
+        public DynamicVisualSourceStyle source;
+        @Nullable
+        public DynamicVisualRendererStyle renderer;
+
+        @Nullable
+        public static DynamicVisualRendererRuleStyle copyOf(@Nullable DynamicVisualRendererRuleStyle source) {
+            if (source == null) {
+                return null;
+            }
+            DynamicVisualRendererRuleStyle copy = new DynamicVisualRendererRuleStyle();
+            copy.min = source.min;
+            copy.max = source.max;
+            copy.equals = source.equals;
+            copy.source = DynamicVisualSourceStyle.copyOf(source.source);
+            copy.renderer = DynamicVisualRendererStyle.copyOf(source.renderer);
             return copy;
         }
     }

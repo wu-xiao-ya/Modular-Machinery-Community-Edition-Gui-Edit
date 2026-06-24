@@ -609,6 +609,7 @@ EN: Common tweaks:
 - `transformByValue`: optional variable-driven transform object. Supported channels: `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`.
 - `visibleByValue`: optional variable-driven visibility object. Supports `min`, `max`, `equals`, `invert`, optional independent `source`.
 - `renderer`: renderer object.
+- `rendererSwitchByValue`: optional ordered renderer-switch rule array. Each rule supports `min`, `max`, `equals`, optional independent `source`, and its own `renderer`.
 - `rendererByValue`: optional variable-driven color object. Supported channels: `backgroundColor`, `fillColor`, `borderColor`, `color`, `lineColor`, `gridColor`.
 
 ### `source` fields / 数据源字段
@@ -741,6 +742,58 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
   - CN: 若只写了 `fromColor` 或 `toColor`，另一端会优先回退到静态 `renderer` 对应颜色；若静态颜色也没写，则退回已填写的那一端。
   - EN: If only one endpoint is provided, the other side first falls back to the matching static renderer color; if that is also missing, the provided endpoint is reused.
 
+### `rendererSwitchByValue` / 变量驱动整套 renderer 切换
+
+```json
+"rendererSwitchByValue": [
+  {
+    "max": 0.34,
+    "renderer": {
+      "type": "fill",
+      "backgroundColor": "22000000",
+      "fillColor": "FF44AAFF",
+      "borderColor": "FFFFFFFF",
+      "direction": "up"
+    }
+  },
+  {
+    "min": 0.34,
+    "max": 0.67,
+    "renderer": {
+      "type": "pie",
+      "mode": "ring",
+      "innerRadius": 8,
+      "backgroundColor": "22000000",
+      "color": "FFFFCC44"
+    }
+  },
+  {
+    "min": 0.67,
+    "renderer": {
+      "type": "textureSwitch",
+      "fallbackTexture": "pack:textures/gui/fan.png",
+      "frames": [
+        { "texture": "pack:textures/gui/fan.png" }
+      ]
+    }
+  }
+]
+```
+
+- rule fields / 规则字段
+  - `min`, `max`, `equals`
+    - CN: 对归一化后的输入值做匹配。
+    - EN: Match conditions against the normalized input value.
+  - `source`
+    - CN: 可选独立数据源；未写时默认复用该 visual 的主 `source`。
+    - EN: Optional independent source; otherwise the visual's main `source` is reused.
+  - `renderer`
+    - CN: 命中该规则后使用的完整 renderer 定义。
+    - EN: The full renderer definition used when the rule matches.
+- 规则 / rule
+  - CN: 按数组顺序首个命中的规则生效；若都不命中，则回退到静态 `renderer`；如果静态 `renderer` 也没写，则该 visual 不绘制。
+  - EN: The first matching rule in array order wins; if none matches, the static `renderer` is used as fallback; if no static `renderer` exists either, the visual is skipped.
+
 ### renderer: `textureSwitch`
 
 ```json
@@ -854,5 +907,58 @@ In this example, the static `pivotUnit` is `ratio`, so the dynamic `pivotX` / `p
       "toColor": "FFFF4444"
     }
   }
+}
+```
+
+### Combined example with renderer switching / 带整套 renderer 切换的综合示例
+
+```json
+{
+  "id": "mode_preview",
+  "x": 196,
+  "y": 28,
+  "width": 28,
+  "height": 28,
+  "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+  "renderer": {
+    "type": "fill",
+    "backgroundColor": "22000000",
+    "fillColor": "FF44AAFF",
+    "borderColor": "FFFFFFFF",
+    "direction": "up"
+  },
+  "rendererSwitchByValue": [
+    {
+      "max": 0.34,
+      "renderer": {
+        "type": "fill",
+        "backgroundColor": "22000000",
+        "fillColor": "FF44AAFF",
+        "borderColor": "FFFFFFFF",
+        "direction": "up"
+      }
+    },
+    {
+      "min": 0.34,
+      "max": 0.67,
+      "renderer": {
+        "type": "pie",
+        "mode": "ring",
+        "innerRadius": 8,
+        "backgroundColor": "22000000",
+        "color": "FFFFCC44"
+      }
+    },
+    {
+      "min": 0.67,
+      "renderer": {
+        "type": "textureSwitch",
+        "fallbackTexture": "pack:textures/gui/fan.png",
+        "frames": [
+          { "texture": "pack:textures/gui/fan.png" }
+        ]
+      }
+    }
+  ]
 }
 ```

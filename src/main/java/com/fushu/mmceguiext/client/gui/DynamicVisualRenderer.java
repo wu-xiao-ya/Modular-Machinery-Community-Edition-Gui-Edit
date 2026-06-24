@@ -59,6 +59,9 @@ public class DynamicVisualRenderer {
             }
             updateHistoryIfNeeded(visual, normalized, controller);
             MachineGuiStyleManager.DynamicVisualRendererStyle renderer = resolveRendererStyle(visual, normalized, controller, metricProvider);
+            if (renderer == null) {
+                continue;
+            }
             renderVisual(visual, renderer, raw, normalized, controller, metricProvider, originX, originY);
         }
     }
@@ -85,7 +88,10 @@ public class DynamicVisualRenderer {
         PagePredicate pagePredicate,
         int defaultPriority
     ) {
-        if (visual == null || visual.renderer == null) {
+        if (visual == null) {
+            return false;
+        }
+        if (visual.renderer == null && (visual.rendererSwitch == null || visual.rendererSwitch.isEmpty())) {
             return false;
         }
         if (visual.visible != null && !visual.visible.booleanValue()) {
@@ -221,15 +227,16 @@ public class DynamicVisualRenderer {
         return visible;
     }
 
+    @Nullable
     private MachineGuiStyleManager.DynamicVisualRendererStyle resolveRendererStyle(
         MachineGuiStyleManager.DynamicVisualStyle visual,
         float fallbackNormalized,
         @Nullable TileMultiblockMachineController controller,
         MetricProvider metricProvider
     ) {
-        MachineGuiStyleManager.DynamicVisualRendererStyle renderer = MachineGuiStyleManager.DynamicVisualRendererStyle.copyOf(visual.renderer);
+        MachineGuiStyleManager.DynamicVisualRendererStyle renderer = resolveRendererVariant(visual, fallbackNormalized, controller, metricProvider);
         if (renderer == null) {
-            renderer = new MachineGuiStyleManager.DynamicVisualRendererStyle();
+            return null;
         }
         MachineGuiStyleManager.DynamicVisualRendererByValueStyle dynamic = visual.rendererByValue;
         if (dynamic == null) {
@@ -242,6 +249,40 @@ public class DynamicVisualRenderer {
         renderer.lineColor = resolveDrivenColor(dynamic.lineColor, renderer.lineColor, fallbackNormalized, controller, metricProvider);
         renderer.gridColor = resolveDrivenColor(dynamic.gridColor, renderer.gridColor, fallbackNormalized, controller, metricProvider);
         return renderer;
+    }
+
+    @Nullable
+    private MachineGuiStyleManager.DynamicVisualRendererStyle resolveRendererVariant(
+        MachineGuiStyleManager.DynamicVisualStyle visual,
+        float fallbackNormalized,
+        @Nullable TileMultiblockMachineController controller,
+        MetricProvider metricProvider
+    ) {
+        if (visual.rendererSwitch != null) {
+            for (MachineGuiStyleManager.DynamicVisualRendererRuleStyle rule : visual.rendererSwitch) {
+                if (rule == null || rule.renderer == null) {
+                    continue;
+                }
+                float value = resolveNormalizedInput(rule.source, fallbackNormalized, controller, metricProvider);
+                if (matchesRendererRule(rule, value)) {
+                    return MachineGuiStyleManager.DynamicVisualRendererStyle.copyOf(rule.renderer);
+                }
+            }
+        }
+        return MachineGuiStyleManager.DynamicVisualRendererStyle.copyOf(visual.renderer);
+    }
+
+    private boolean matchesRendererRule(MachineGuiStyleManager.DynamicVisualRendererRuleStyle rule, float value) {
+        if (rule.equals != null && Math.abs(value - rule.equals.floatValue()) > EPSILON) {
+            return false;
+        }
+        if (rule.min != null && value < rule.min.floatValue()) {
+            return false;
+        }
+        if (rule.max != null && value > rule.max.floatValue()) {
+            return false;
+        }
+        return true;
     }
 
     private void drawResolvedVisual(
@@ -257,7 +298,7 @@ public class DynamicVisualRenderer {
         float alpha
     ) {
         if ("textureSwitch".equals(type)) {
-            drawTextureSwitch(visual, rawValue, x, y, width, height);
+            drawTextureSwitch(renderer, rawValue, x, y, width, height);
         } else if ("pie".equals(type)) {
             drawPie(renderer, normalized, x, y, width, height, alpha);
         } else if ("lineChart".equals(type)) {
@@ -457,8 +498,7 @@ public class DynamicVisualRenderer {
         }
     }
 
-    private void drawTextureSwitch(MachineGuiStyleManager.DynamicVisualStyle visual, float value, int x, int y, int width, int height) {
-        MachineGuiStyleManager.DynamicVisualRendererStyle renderer = visual.renderer;
+    private void drawTextureSwitch(MachineGuiStyleManager.DynamicVisualRendererStyle renderer, float value, int x, int y, int width, int height) {
         String texture = null;
         if (renderer.frames != null) {
             for (MachineGuiStyleManager.DynamicVisualFrameStyle frame : renderer.frames) {
@@ -478,8 +518,8 @@ public class DynamicVisualRenderer {
         if (resource == null) {
             return;
         }
-        int texW = renderer.textureWidth == null ? visual.width : Math.max(1, renderer.textureWidth.intValue());
-        int texH = renderer.textureHeight == null ? visual.height : Math.max(1, renderer.textureHeight.intValue());
+        int texW = renderer.textureWidth == null ? width : Math.max(1, renderer.textureWidth.intValue());
+        int texH = renderer.textureHeight == null ? height : Math.max(1, renderer.textureHeight.intValue());
         Minecraft.getMinecraft().getTextureManager().bindTexture(resource);
         GuiRenderUtils.drawTexturedRect(x, y, 0, 0, width, height, texW, texH);
     }

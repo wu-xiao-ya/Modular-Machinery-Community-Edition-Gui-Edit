@@ -186,7 +186,7 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 
 ## 9. 动态可视化组件
 
-`dynamicVisuals[]` 在普通控制器和集成控制器样式里都支持。它是变量驱动视觉的统一系统：`source` -> 归一化 -> 可选显隐 / 变换 / 颜色覆盖 -> 可选 `history` -> `renderer`。
+`dynamicVisuals[]` 在普通控制器和集成控制器样式里都支持。它是变量驱动视觉的统一系统：`source` -> 归一化 -> 可选显隐 / 变换 / renderer 切换 / 颜色覆盖 -> 可选 `history` -> `renderer`。
 
 当前 renderer 支持：`textureSwitch`、`fill`、`pie`/`ring`、`lineChart`。source 可以读取控制器 `customData` / Smart Interface 数值，也可以读取内置机器指标，例如 `recipeProgress`、`energyRatio`、`parallelism`、`threadCount`，以及工厂线程数量指标。
 
@@ -198,8 +198,10 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 
 还支持可选显隐 / 颜色覆盖：
 - `visibleByValue`：按归一化后的变量值决定是否显示。支持 `min`、`max`、`equals`、`invert`，也支持独立 `source`。
+- `rendererSwitchByValue`：按变量值切换整套 renderer 规则数组。每条规则支持 `min`、`max`、`equals`、独立 `source` 和自己的 `renderer`。
 - `rendererByValue`：对支持颜色的 renderer 做变量驱动颜色插值。支持通道：`backgroundColor`、`fillColor`、`borderColor`、`color`、`lineColor`、`gridColor`。
 - 每个 `rendererByValue` 通道可写 `{ "fromColor": ..., "toColor": ... }`，也可单独指定 `source`。
+- `rendererSwitchByValue` 按数组顺序首个命中规则生效；如果都不命中，则回退到静态 `renderer`；静态 `renderer` 也没写时就不绘制。
 - 如果少写了一端颜色，会优先回退到静态 `renderer` 对应颜色；静态颜色也没有时，就复用已填写的那一端。
 
 ```json
@@ -223,7 +225,7 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 ]
 ```
 
-`foreground`、`priority`、`page`、`visible`、`visibleByValue`、`rendererByValue` 与其他控制器组件规则一致。
+`foreground`、`priority`、`page`、`visible`、`visibleByValue`、`rendererSwitchByValue`、`rendererByValue` 与其他控制器组件规则一致。
 
 变量驱动旋转示例：
 
@@ -287,3 +289,58 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 ```
 
 这个示例在接近 0 时保持隐藏，随后会随着 `warning` 上升从绿色渐变到红色。
+
+整套 renderer 切换示例：
+
+```json
+{
+  "id": "mode_preview",
+  "x": 196,
+  "y": 28,
+  "width": 28,
+  "height": 28,
+  "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+  "renderer": {
+    "type": "fill",
+    "backgroundColor": "22000000",
+    "fillColor": "FF44AAFF",
+    "borderColor": "FFFFFFFF",
+    "direction": "up"
+  },
+  "rendererSwitchByValue": [
+    {
+      "max": 0.34,
+      "renderer": {
+        "type": "fill",
+        "backgroundColor": "22000000",
+        "fillColor": "FF44AAFF",
+        "borderColor": "FFFFFFFF",
+        "direction": "up"
+      }
+    },
+    {
+      "min": 0.34,
+      "max": 0.67,
+      "renderer": {
+        "type": "pie",
+        "mode": "ring",
+        "innerRadius": 8,
+        "backgroundColor": "22000000",
+        "color": "FFFFCC44"
+      }
+    },
+    {
+      "min": 0.67,
+      "renderer": {
+        "type": "textureSwitch",
+        "fallbackTexture": "pack:textures/gui/fan.png",
+        "frames": [
+          { "texture": "pack:textures/gui/fan.png" }
+        ]
+      }
+    }
+  ]
+}
+```
+
+这个示例会随着 `warning` 上升，把整套 renderer 从 fill -> ring -> texture 依次切换。

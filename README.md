@@ -418,9 +418,9 @@ See the MMCE source license. / 见 MMCE 源码许可。
 
 ## Dynamic visuals / 动态可视化组件
 
-`dynamicVisuals[]` can be used under both `machineController` and `factoryController`. It uses one unified pipeline: `source` -> normalized value -> optional visibility / transform / color overrides -> optional `history` -> `renderer`.
+`dynamicVisuals[]` can be used under both `machineController` and `factoryController`. It uses one unified pipeline: `source` -> normalized value -> optional visibility / transform / renderer selection / color overrides -> optional `history` -> `renderer`.
 
-Common fields: `id`, `x`, `y`, `width`, `height`, `priority`, `foreground`, `page`, `visible`, `visibleByValue`, `source`, `history`, `renderer`, `rendererByValue`, `transform`, `transformByValue`.
+Common fields: `id`, `x`, `y`, `width`, `height`, `priority`, `foreground`, `page`, `visible`, `visibleByValue`, `source`, `history`, `renderer`, `rendererSwitchByValue`, `rendererByValue`, `transform`, `transformByValue`.
 
 Supported sources:
 - `customData`: reads a numeric value from controller custom data / Smart Interface virtual key: `key`, `default`, `min`, `max`, `clamp`, `invert`.
@@ -440,8 +440,10 @@ Optional transforms:
 
 Optional visibility / color overrides:
 - `visibleByValue`: conditional visibility driven by the normalized value. Supports `min`, `max`, `equals`, `invert`, and optional independent `source`.
+- `rendererSwitchByValue`: ordered rules that can switch the whole renderer definition by value. Each rule supports `min`, `max`, `equals`, optional independent `source`, and its own `renderer`.
 - `rendererByValue`: variable-driven color interpolation for color-capable renderers. Supported channels: `backgroundColor`, `fillColor`, `borderColor`, `color`, `lineColor`, `gridColor`.
 - each `rendererByValue` channel accepts `{ "fromColor": ..., "toColor": ... }` and may define its own independent `source`.
+- `rendererSwitchByValue` uses first-match order. If nothing matches, it falls back to the static `renderer`; if that is also omitted, the visual is skipped.
 - when `rendererByValue` is used, static renderer colors remain the fallback endpoints if `fromColor` or `toColor` is omitted.
 
 Example:
@@ -528,9 +530,58 @@ Example:
         "toColor": "FFFF4444"
       }
     }
+  },
+  {
+    "id": "mode_preview",
+    "x": 196,
+    "y": 28,
+    "width": 28,
+    "height": 28,
+    "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+    "renderer": {
+      "type": "fill",
+      "backgroundColor": "22000000",
+      "fillColor": "FF44AAFF",
+      "borderColor": "FFFFFFFF",
+      "direction": "up"
+    },
+    "rendererSwitchByValue": [
+      {
+        "max": 0.34,
+        "renderer": {
+          "type": "fill",
+          "backgroundColor": "22000000",
+          "fillColor": "FF44AAFF",
+          "borderColor": "FFFFFFFF",
+          "direction": "up"
+        }
+      },
+      {
+        "min": 0.34,
+        "max": 0.67,
+        "renderer": {
+          "type": "pie",
+          "mode": "ring",
+          "innerRadius": 8,
+          "backgroundColor": "22000000",
+          "color": "FFFFCC44"
+        }
+      },
+      {
+        "min": 0.67,
+        "renderer": {
+          "type": "textureSwitch",
+          "fallbackTexture": "pack:textures/gui/fan.png",
+          "frames": [
+            { "texture": "pack:textures/gui/fan.png" }
+          ]
+        }
+      }
+    ]
   }
 ]
 ```
 
 In the example above, the static `transform.pivotUnit` is `ratio`, so the dynamic `pivotX` / `pivotY` values are also interpreted as relative `0..1` coordinates.
 `warning_ring` stays hidden near zero, then fades from green to red as `warning` rises.
+`mode_preview` switches the entire renderer mode from fill -> ring -> texture as `warning` grows.

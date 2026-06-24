@@ -186,7 +186,7 @@ Read from text lines pushed into MMCE's `ControllerGUIRenderEvent.extraInfo[]` (
 
 ## 9. Dynamic visuals
 
-`dynamicVisuals[]` works in both Machine and Factory controller styles. It is the unified system for variable-driven visuals: `source` -> normalization -> optional visibility / transform / color overrides -> optional `history` -> `renderer`.
+`dynamicVisuals[]` works in both Machine and Factory controller styles. It is the unified system for variable-driven visuals: `source` -> normalization -> optional visibility / transform / renderer selection / color overrides -> optional `history` -> `renderer`.
 
 Renderers supported now: `textureSwitch`, `fill`, `pie`/`ring`, and `lineChart`. Sources can read controller `customData` / Smart Interface numeric values, or built-in machine metrics such as `recipeProgress`, `energyRatio`, `parallelism`, `threadCount`, plus factory thread-count metrics.
 
@@ -198,8 +198,10 @@ Optional transforms are also supported:
 
 Optional visibility / color overrides are also supported:
 - `visibleByValue`: conditional visibility driven by the normalized value. Supports `min`, `max`, `equals`, `invert`, and an optional independent `source`.
+- `rendererSwitchByValue`: ordered rules that can switch the whole renderer definition by value. Each rule supports `min`, `max`, `equals`, an optional independent `source`, and its own `renderer`.
 - `rendererByValue`: variable-driven color interpolation for color-capable renderers. Supported channels: `backgroundColor`, `fillColor`, `borderColor`, `color`, `lineColor`, `gridColor`.
 - each `rendererByValue` channel accepts `{ "fromColor": ..., "toColor": ... }` and may define its own independent `source`.
+- `rendererSwitchByValue` uses first-match order. If nothing matches, it falls back to the static `renderer`; if that is also omitted, the visual is skipped.
 - if one color endpoint is omitted, the static renderer color is used as the fallback endpoint first; if that is also absent, the provided endpoint is reused.
 
 ```json
@@ -223,7 +225,7 @@ Optional visibility / color overrides are also supported:
 ]
 ```
 
-Use `foreground`, `priority`, `page`, `visible`, `visibleByValue`, and `rendererByValue` exactly like other controller widgets.
+Use `foreground`, `priority`, `page`, `visible`, `visibleByValue`, `rendererSwitchByValue`, and `rendererByValue` exactly like other controller widgets.
 
 Variable-driven rotation example:
 
@@ -287,3 +289,58 @@ Visibility + color example:
 ```
 
 This example stays hidden near zero, then fades from green to red as `warning` rises.
+
+Renderer-switch example:
+
+```json
+{
+  "id": "mode_preview",
+  "x": 196,
+  "y": 28,
+  "width": 28,
+  "height": 28,
+  "source": { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+  "renderer": {
+    "type": "fill",
+    "backgroundColor": "22000000",
+    "fillColor": "FF44AAFF",
+    "borderColor": "FFFFFFFF",
+    "direction": "up"
+  },
+  "rendererSwitchByValue": [
+    {
+      "max": 0.34,
+      "renderer": {
+        "type": "fill",
+        "backgroundColor": "22000000",
+        "fillColor": "FF44AAFF",
+        "borderColor": "FFFFFFFF",
+        "direction": "up"
+      }
+    },
+    {
+      "min": 0.34,
+      "max": 0.67,
+      "renderer": {
+        "type": "pie",
+        "mode": "ring",
+        "innerRadius": 8,
+        "backgroundColor": "22000000",
+        "color": "FFFFCC44"
+      }
+    },
+    {
+      "min": 0.67,
+      "renderer": {
+        "type": "textureSwitch",
+        "fallbackTexture": "pack:textures/gui/fan.png",
+        "frames": [
+          { "texture": "pack:textures/gui/fan.png" }
+        ]
+      }
+    }
+  ]
+}
+```
+
+This example switches the whole renderer from fill -> ring -> texture as `warning` grows.
