@@ -625,10 +625,10 @@ EN: Common tweaks:
 ```json
 "source": {
   "type": "combined",
-  "combine": "max",
+  "combine": "weightedSum",
   "sources": [
-    { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
-    { "type": "machine", "metric": "recipeProgress", "default": 0, "min": 0, "max": 1 }
+    { "type": "customData", "key": "heat", "default": 0, "weight": 0.0065 },
+    { "type": "customData", "key": "warning", "default": 0, "weight": 0.35 }
   ],
   "min": 0,
   "max": 1,
@@ -642,14 +642,20 @@ Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`
   - CN: 支持 `customData`、`machine`、`combined`。`combined` 用于多 source 组合。
   - EN: Supports `customData`, `machine`, and `combined`. Use `combined` for multi-source composition.
 - `combine`
-  - CN: 仅 `combined` 使用。支持 `sum`、`average`、`min`、`max`、`multiply`、`subtract`、`divide`、`first`、`last`。
-  - EN: Used by `combined` only. Supports `sum`, `average`, `min`, `max`, `multiply`, `subtract`, `divide`, `first`, and `last`.
+  - CN: 仅 `combined` 使用。支持 `sum`、`average`、`weightedSum`、`weightedAverage`、`min`、`max`、`multiply`、`subtract`、`divide`、`first`、`last`。
+  - EN: Used by `combined` only. Supports `sum`, `average`, `weightedSum`, `weightedAverage`, `min`, `max`, `multiply`, `subtract`, `divide`, `first`, and `last`.
 - `sources`
   - CN: 子 source 数组。每个子项都可以是 `customData`、`machine`，也可以继续嵌套 `combined`。
   - EN: Child source array. Each child may be `customData`, `machine`, or another nested `combined`.
+- `weight`
+  - CN: 仅子 source 使用。`weightedSum` / `weightedAverage` 会先用 `weight` 缩放每个子项的原始值，再参与组合；不写时默认 `1`。
+  - EN: Used on child sources. `weightedSum` / `weightedAverage` scale each child's raw value by `weight` before combining; defaults to `1`.
 - 规则 / rule
   - CN: 会先把各子 source 当作原始数值读取并完成组合，再对父级 source 执行 `min`、`max`、`clamp`、`invert`。
   - EN: Child sources are resolved as raw numeric values and combined first; then the parent source applies `min`, `max`, `clamp`, and `invert`.
+- `weightedSum` / `weightedAverage`
+  - CN: `weightedSum` 适合 mixed-scale 场景，先用 `weight` 对齐贡献量；`weightedAverage` 更适合同量纲的 `0..1` 信号加权混合，输出范围更直观。
+  - EN: `weightedSum` fits mixed-scale inputs where `weight` aligns contribution magnitudes; `weightedAverage` is usually better for already-normalized `0..1` signals when you want a weighted blend with a predictable range.
 - `subtract` / `divide`
   - CN: 以第一个子项为左操作数，后续子项依次参与减法/除法。
   - EN: Uses the first child as the left operand, then applies subtraction / division in order.

@@ -4,6 +4,7 @@ import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedInputBus;
 import com.fushu.mmceguiext.common.tile.TileCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.tile.TileCustomHatch;
+import com.fushu.mmceguiext.common.util.EnergyAccessHelper;
 import com.fushu.mmceguiext.common.util.UnitFormat;
 import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import mcjty.theoneprobe.api.IProbeHitData;
@@ -273,8 +274,8 @@ public class CustomHatchInfoProvider implements IProbeInfoProvider {
     }
 
     private static void addEnergyInfo(IProbeInfo box, TileCustomHatch hatch) {
-        long stored = hatch.getEnergyStoredLong();
-        long capacity = Math.max(1L, hatch.getEnergyCapacity());
+        long stored = EnergyAccessHelper.getStored(hatch);
+        long capacity = EnergyAccessHelper.getCapacity(hatch);
 
         box.text(TextFormatting.WHITE + "能量:" + TextFormatting.GREEN + UnitFormat.amountWithUnit(stored, "FE"));
         box.progress(

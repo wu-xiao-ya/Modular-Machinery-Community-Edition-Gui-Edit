@@ -195,7 +195,7 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 - `machine`
 - `combined`
 
-`combined` 会先把多个子 source 解析成原始数值并完成组合，然后再对父级 source 应用 `min`、`max`、`clamp`、`invert`。`combine` 支持：`sum`、`average`、`min`、`max`、`multiply`、`subtract`、`divide`、`first`、`last`。子项可以是 `customData`、`machine`，也可以继续嵌套 `combined`。
+`combined` 会先把多个子 source 解析成原始数值并完成组合，然后再对父级 source 应用 `min`、`max`、`clamp`、`invert`。`combine` 支持：`sum`、`average`、`weightedSum`、`weightedAverage`、`min`、`max`、`multiply`、`subtract`、`divide`、`first`、`last`。子项可以是 `customData`、`machine`，也可以继续嵌套 `combined`。每个子项还可以写 `weight`，供 `weightedSum` / `weightedAverage` 使用。
 
 还支持可选变换：
 - `transform`：静态 `offsetX`、`offsetY`、`scale`、`scaleX`、`scaleY`、`rotation`、`alpha`、`pivotX`、`pivotY`、`pivotUnit`，以及兼容旧写法的 `origin`（`topLeft`、`topCenter`、`topRight`、`centerLeft`、`center`、`centerRight`、`bottomLeft`、`bottomCenter`、`bottomRight`）。
@@ -308,10 +308,10 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
   "height": 8,
   "source": {
     "type": "combined",
-    "combine": "max",
+    "combine": "weightedSum",
     "sources": [
-      { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
-      { "type": "machine", "metric": "recipeProgress", "default": 0, "min": 0, "max": 1 }
+      { "type": "customData", "key": "heat", "default": 0, "weight": 0.0065 },
+      { "type": "customData", "key": "warning", "default": 0, "weight": 0.35 }
     ],
     "min": 0,
     "max": 1,
@@ -323,11 +323,24 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
     "fillColor": "FF55CCFF",
     "borderColor": "FFFFFFFF",
     "direction": "right"
+  },
+  "rendererByValue": {
+    "fillColor": {
+      "fromColor": "FF55CCFF",
+      "toColor": "FFFF8844"
+    }
   }
 }
 ```
 
-这个示例会取 `warning` 和 `recipeProgress` 中更高的那个值，驱动同一条填充条。
+这个示例会把 `heat` 和 `warning` 混合成同一条填充条，同时用子项 `weight` 把不同量纲对齐，并通过 `rendererByValue` 让填充色随着混合压力升高逐步偏向橙色。
+
+同一个 weighted combined source 还可以继续复用到：
+- `visibleByValue.source`，做混合阈值驱动的显隐
+- `transformByValue.<channel>.source`，做由混合信号驱动的位移 / 旋转 / 缩放 / 透明度
+- `rendererSwitchByValue[*].source`，让 renderer 模式跟随同一份聚合状态切换
+
+经验上，`weightedSum` 更适合先对齐 mixed-scale 原始值的场景；如果各子 source 本来就都在同一个 `0..1` 量纲里，通常优先用 `weightedAverage`，语义会更直观。
 
 整套 renderer 切换示例：
 

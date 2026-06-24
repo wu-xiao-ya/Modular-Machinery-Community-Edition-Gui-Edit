@@ -1187,6 +1187,8 @@ public final class MachineGuiStyleManager {
         @Nullable
         public String combine;
         @Nullable
+        public Float weight;
+        @Nullable
         public List<DynamicVisualSourceStyle> sources;
         @Nullable
         public String key;
@@ -1211,6 +1213,7 @@ public final class MachineGuiStyleManager {
             DynamicVisualSourceStyle copy = new DynamicVisualSourceStyle();
             copy.type = source.type;
             copy.combine = source.combine;
+            copy.weight = source.weight;
             if (source.sources != null) {
                 copy.sources = new ArrayList<DynamicVisualSourceStyle>(source.sources.size());
                 for (DynamicVisualSourceStyle child : source.sources) {

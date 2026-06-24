@@ -1,5 +1,6 @@
 package com.fushu.mmceguiext;
 
+import com.fushu.mmceguiext.common.energy.LongEnergyCapability;
 import com.fushu.mmceguiext.common.block.BlockCustomAEMixedInputBus;
 import com.fushu.mmceguiext.common.block.BlockCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.block.BlockCustomHatch;
@@ -14,6 +15,7 @@ import com.fushu.mmceguiext.common.container.ContainerCustomAEMixedOutputBus;
 import com.fushu.mmceguiext.common.container.ContainerFluidProcessorHatchCustom;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
 import com.fushu.mmceguiext.common.integration.crafttweaker.MMCEGEEvents;
+import com.fushu.mmceguiext.common.integration.cfn.CFNEnergyIntegration;
 import com.fushu.mmceguiext.common.network.PktControllerButtonAction;
 import com.fushu.mmceguiext.common.network.PktControllerCustomDataSync;
 import com.fushu.mmceguiext.common.network.PktCustomAEMixedSlotUpdate;
@@ -53,7 +55,7 @@ public class MMCEGuiExt {
     public static final String MODID = "mmceguiext";
     private static final Logger LOGGER = LogManager.getLogger(MODID);
     public static final String NAME = "Modular Machinery: Community Edition Gui Edit";
-    public static final String VERSION = "1.1.0-beta";
+    public static final String VERSION = "1.2.0";
     public static final int GUI_CUSTOM_HATCH = 1;
     public static final int GUI_CUSTOM_AE_MIXED_INPUT = 2;
     public static final int GUI_CUSTOM_AE_MIXED_OUTPUT = 3;
@@ -63,6 +65,7 @@ public class MMCEGuiExt {
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
+        LongEnergyCapability.register();
         NET_CHANNEL.registerMessage(
             PktControllerSmartInterfaceUpdate.class,
             PktControllerSmartInterfaceUpdate.class,
@@ -113,6 +116,7 @@ public class MMCEGuiExt {
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
+        CFNEnergyIntegration.registerIfPresent();
         if (Mods.TOP.isPresent()) {
             registerTopProvider();
         }

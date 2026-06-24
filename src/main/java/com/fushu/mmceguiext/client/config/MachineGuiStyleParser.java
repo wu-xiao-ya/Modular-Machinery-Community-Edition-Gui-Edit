@@ -1303,6 +1303,7 @@ final class MachineGuiStyleParser {
             || obj.has("sourceType")
             || obj.has("source_type")
             || obj.has("combine")
+            || obj.has("weight")
             || obj.has("sources")
             || obj.has("sourceList")
             || obj.has("source_list")
@@ -1336,6 +1337,7 @@ final class MachineGuiStyleParser {
             result,
             scope
         );
+        source.weight = getFloat(sourceObj, result, scope, "weight");
         source.sources = parseDynamicVisualSourceChildren(sourceObj, result, scope);
         source.key = getTrimmedString(
             sourceObj,
@@ -2422,6 +2424,16 @@ final class MachineGuiStyleParser {
         if ("average".equals(text) || "avg".equals(text) || "mean".equals(text)) {
             return "average";
         }
+        if ("weightedsum".equals(text) || "weighted_sum".equals(text) || "weighted-sum".equals(text)
+            || "wsum".equals(text)) {
+            return "weightedSum";
+        }
+        if ("weightedaverage".equals(text) || "weighted_average".equals(text) || "weighted-average".equals(text)
+            || "weightedavg".equals(text) || "weighted_avg".equals(text) || "weighted-avg".equals(text)
+            || "weightedmean".equals(text) || "weighted_mean".equals(text) || "weighted-mean".equals(text)
+            || "wavg".equals(text)) {
+            return "weightedAverage";
+        }
         if ("min".equals(text) || "minimum".equals(text)) {
             return "min";
         }
@@ -2443,7 +2455,7 @@ final class MachineGuiStyleParser {
         if ("last".equals(text)) {
             return "last";
         }
-        result.warnForMachine(scope, field(scope, "source.combine") + " must be sum, average, min, max, multiply, subtract, divide, first or last.");
+        result.warnForMachine(scope, field(scope, "source.combine") + " must be sum, average, weightedSum, weightedAverage, min, max, multiply, subtract, divide, first or last.");
         return null;
     }
 

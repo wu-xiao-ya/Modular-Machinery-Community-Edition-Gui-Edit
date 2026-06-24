@@ -4,6 +4,7 @@ import com.fushu.mmceguiext.MMCEGuiExt;
 import com.fushu.mmceguiext.common.network.PktCustomHatchEnergySync;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
 import com.fushu.mmceguiext.common.tile.TileCustomHatch;
+import com.fushu.mmceguiext.common.util.EnergyAccessHelper;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.inventory.IContainerListener;
@@ -91,9 +92,9 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
             return;
         }
         TileCustomHatch hatch = (TileCustomHatch) this.owner;
-        long capacity = hatch.getEnergyCapacity();
+        long capacity = EnergyAccessHelper.getCapacity(hatch);
         long transfer = hatch.getEnergyTransfer();
-        long stored = hatch.getEnergyStoredLong();
+        long stored = EnergyAccessHelper.getStored(hatch);
         if (capacity == this.lastEnergyCapacity && transfer == this.lastEnergyTransfer && stored == this.lastEnergyStored) {
             return;
         }
@@ -160,9 +161,9 @@ public class ContainerFluidProcessorHatchCustom extends hellfirepvp.modularmachi
             return;
         }
         TileCustomHatch hatch = (TileCustomHatch) this.owner;
-        long capacity = hatch.getEnergyCapacity();
+        long capacity = EnergyAccessHelper.getCapacity(hatch);
         long transfer = hatch.getEnergyTransfer();
-        long stored = hatch.getEnergyStoredLong();
+        long stored = EnergyAccessHelper.getStored(hatch);
         sendEnergyState(listener, capacity, transfer, stored);
         this.lastEnergyCapacity = capacity;
         this.lastEnergyTransfer = transfer;

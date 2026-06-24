@@ -4,6 +4,7 @@ import com.fushu.mmceguiext.MMCEGuiExtConfig;
 import com.fushu.mmceguiext.client.config.GlobalGuiStyleManager;
 import com.fushu.mmceguiext.common.container.ContainerFluidProcessorHatchCustom;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
+import com.fushu.mmceguiext.common.util.EnergyAccessHelper;
 import com.fushu.mmceguiext.common.util.UnitFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
@@ -766,23 +767,11 @@ public class GuiFluidProcessorHatchCustom extends GuiContainer {
     }
 
     private long getEnergyStored() {
-        try {
-            Method method = owner.getClass().getMethod("getEnergyStoredLong");
-            Object result = method.invoke(owner);
-            return result instanceof Number ? ((Number) result).longValue() : 0L;
-        } catch (Exception ignored) {
-            return 0L;
-        }
+        return EnergyAccessHelper.getStored(owner);
     }
 
     private long getEnergyCapacity() {
-        try {
-            Method method = owner.getClass().getMethod("getEnergyCapacity");
-            Object result = method.invoke(owner);
-            return result instanceof Number ? Math.max(1L, ((Number) result).longValue()) : 1L;
-        } catch (Exception ignored) {
-            return 1L;
-        }
+        return EnergyAccessHelper.getCapacity(owner);
     }
 
     private long getEnergyTransfer() {

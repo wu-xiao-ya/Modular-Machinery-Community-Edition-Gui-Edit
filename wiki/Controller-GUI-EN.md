@@ -195,7 +195,7 @@ Renderers supported now: `textureSwitch`, `fill`, `pie`/`ring`, and `lineChart`.
 - `machine`
 - `combined`
 
-`combined` first resolves multiple child sources as raw numeric values, then applies the parent source's `min`, `max`, `clamp`, and `invert`. Supported `combine` modes: `sum`, `average`, `min`, `max`, `multiply`, `subtract`, `divide`, `first`, `last`. Child entries may be `customData`, `machine`, or nested `combined`.
+`combined` first resolves multiple child sources as raw numeric values, then applies the parent source's `min`, `max`, `clamp`, and `invert`. Supported `combine` modes: `sum`, `average`, `weightedSum`, `weightedAverage`, `min`, `max`, `multiply`, `subtract`, `divide`, `first`, `last`. Child entries may be `customData`, `machine`, or nested `combined`. Each child may also define `weight`, used by `weightedSum` / `weightedAverage`.
 
 Optional transforms are also supported:
 - `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`, `pivotUnit`, and legacy `origin` (`topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`).
@@ -308,10 +308,10 @@ Multi-source example:
   "height": 8,
   "source": {
     "type": "combined",
-    "combine": "max",
+    "combine": "weightedSum",
     "sources": [
-      { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
-      { "type": "machine", "metric": "recipeProgress", "default": 0, "min": 0, "max": 1 }
+      { "type": "customData", "key": "heat", "default": 0, "weight": 0.0065 },
+      { "type": "customData", "key": "warning", "default": 0, "weight": 0.35 }
     ],
     "min": 0,
     "max": 1,
@@ -323,11 +323,24 @@ Multi-source example:
     "fillColor": "FF55CCFF",
     "borderColor": "FFFFFFFF",
     "direction": "right"
+  },
+  "rendererByValue": {
+    "fillColor": {
+      "fromColor": "FF55CCFF",
+      "toColor": "FFFF8844"
+    }
   }
 }
 ```
 
-This example uses the higher of `warning` and `recipeProgress` to drive one shared fill bar.
+This example blends `heat` and `warning` into one shared fill bar, while the child `weight` values keep the mixed scales aligned and `rendererByValue` shifts the fill toward orange as the combined pressure rises.
+
+The same weighted combined source can also be reused inside:
+- `visibleByValue.source` for threshold-based reveal / hide
+- `transformByValue.<channel>.source` for motion driven by the mixed signal
+- `rendererSwitchByValue[*].source` when renderer mode should follow the same aggregate state
+
+As a rule of thumb, use `weightedSum` when you are aligning mixed raw scales, and prefer `weightedAverage` when the child sources are already in the same `0..1` range and you want a stable weighted blend.
 
 Renderer-switch example:
 

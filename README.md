@@ -15,7 +15,7 @@ It started as a controller-GUI editor, but now bundles four subsystems:
 4. **Long-capacity recipe requirements** — fluid/gas recipe amounts beyond the vanilla `int` limit.
    **Long 容量配方需求** — 流体/气体配方量可突破原版 `int`（约 21 亿 mB）上限。
 
-Current version / 当前版本: **`1.1.0-beta`** · MC `1.12.2` · author / 作者: WuXiaoYa
+Current version / 当前版本: **`1.2.0`** · MC `1.12.2` · author / 作者: WuXiaoYa
 
 ---
 
@@ -48,7 +48,7 @@ From the repo root / 在仓库根目录执行：
 
 Output / 产物：
 
-- `mmce-gui-ext/build/libs/MMCEGE-1.1.0-beta.jar`
+- `mmce-gui-ext/build/libs/MMCEGE-1.2.0.jar`
 
 GitHub Actions also builds every push to `main` and every pull request. Open the latest **Build** workflow run on GitHub and download the `MMCEGE-<commit-sha>` artifact to let testers build without using the local machine.
 GitHub Actions 也会在每次推送到 `main` 和 PR 时构建。让测试者打开 GitHub 最新的 **Build** workflow 运行，下载 `MMCEGE-<commit-sha>` artifact 即可，不需要本机编译。
@@ -425,10 +425,10 @@ Common fields: `id`, `x`, `y`, `width`, `height`, `priority`, `foreground`, `pag
 Supported sources:
 - `customData`: reads a numeric value from controller custom data / Smart Interface virtual key: `key`, `default`, `min`, `max`, `clamp`, `invert`.
 - `machine`: built-in metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`, `energyRatio`, `parallelism`, `threadCount`, `activeThreadCount`, `idleThreadCount`; factory also supports `factoryThreadCount`, `factoryActiveThreadCount`, `factoryIdleThreadCount`.
-- `combined`: combines multiple child sources first, then applies the parent source's `min` / `max` / `clamp` / `invert`. Fields: `combine`, `sources[]`. Child entries can themselves be `customData`, `machine`, or nested `combined`.
+- `combined`: combines multiple child sources first, then applies the parent source's `min` / `max` / `clamp` / `invert`. Fields: `combine`, `sources[]`. Child entries can themselves be `customData`, `machine`, or nested `combined`. Each child may also define `weight`, used by `weightedSum` / `weightedAverage`.
 
 Supported combine modes:
-- `sum`, `average`, `min`, `max`, `multiply`
+- `sum`, `average`, `weightedSum`, `weightedAverage`, `min`, `max`, `multiply`
 - `subtract`, `divide` (left-associative, using the first child as the left operand)
 - `first`, `last`
 
@@ -496,10 +496,10 @@ Example:
     "height": 8,
     "source": {
       "type": "combined",
-      "combine": "max",
+      "combine": "weightedSum",
       "sources": [
-        { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
-        { "type": "machine", "metric": "recipeProgress", "default": 0, "min": 0, "max": 1 }
+        { "type": "customData", "key": "heat", "default": 0, "weight": 0.0065 },
+        { "type": "customData", "key": "warning", "default": 0, "weight": 0.35 }
       ],
       "min": 0,
       "max": 1,
@@ -511,6 +511,12 @@ Example:
       "fillColor": "FF55CCFF",
       "borderColor": "FFFFFFFF",
       "direction": "right"
+    },
+    "rendererByValue": {
+      "fillColor": {
+        "fromColor": "FF55CCFF",
+        "toColor": "FFFF8844"
+      }
     }
   },
   {
@@ -615,9 +621,15 @@ Example:
 
 `combined` source rule / `combined` 数据源规则：
 - child sources are resolved as raw numbers first, then combined
+- child `weight` scales each raw child value before `weightedSum` / `weightedAverage`
 - parent `min` / `max` / `clamp` / `invert` runs after the combination result is produced
 - `divide` returns the parent/default fallback when a later divisor is near zero
+- mixed-scale child sources should be aligned explicitly before using `weightedSum`, `weightedAverage`, `min`, or `max`
+- `weightedSum` is useful when child sources intentionally contribute uneven raw magnitudes
+- `weightedAverage` is usually better when child sources already share the same 0..1 scale and you want a weighted blend without changing the overall range
+
+This example blends `heat` and `warning` into one shared fill bar, while `rendererByValue` tints the fill as the combined pressure rises.
 
 In the example above, the static `transform.pivotUnit` is `ratio`, so the dynamic `pivotX` / `pivotY` values are also interpreted as relative `0..1` coordinates.
-`warning_ring` stays hidden near zero, then fades from green to red as `warning` rises.
-`mode_preview` switches the entire renderer mode from fill -> ring -> texture as `warning` grows.
+`warning_ring` can reuse the same weighted combined source and stay hidden until the mixed value crosses a threshold, then fade from green to red.
+`mode_preview` can also reuse that combined source to switch the entire renderer mode from fill -> ring -> texture.

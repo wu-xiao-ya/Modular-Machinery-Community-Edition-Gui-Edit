@@ -146,6 +146,7 @@ public class DynamicVisualRenderer {
         }
         String combine = source.combine == null ? "sum" : source.combine;
         float result = 0.0F;
+        float totalWeight = 0.0F;
         boolean found = false;
         int count = 0;
         if ("multiply".equals(combine)) {
@@ -163,6 +164,11 @@ public class DynamicVisualRenderer {
             if (!Float.isFinite(value)) {
                 continue;
             }
+            float weight = child.weight == null ? 1.0F : child.weight.floatValue();
+            if (!Float.isFinite(weight)) {
+                weight = 1.0F;
+            }
+            float weightedValue = value * weight;
             if (!found) {
                 found = true;
                 if ("min".equals(combine) || "max".equals(combine) || "first".equals(combine) || "last".equals(combine)
@@ -173,6 +179,9 @@ public class DynamicVisualRenderer {
             count++;
             if ("sum".equals(combine) || "average".equals(combine)) {
                 result += value;
+            } else if ("weightedSum".equals(combine) || "weightedAverage".equals(combine)) {
+                result += weightedValue;
+                totalWeight += weight;
             } else if ("min".equals(combine)) {
                 result = Math.min(result, value);
             } else if ("max".equals(combine)) {
@@ -206,6 +215,9 @@ public class DynamicVisualRenderer {
         }
         if ("average".equals(combine)) {
             return result / (float) count;
+        }
+        if ("weightedAverage".equals(combine)) {
+            return Math.abs(totalWeight) > EPSILON ? result / totalWeight : fallback;
         }
         return result;
     }

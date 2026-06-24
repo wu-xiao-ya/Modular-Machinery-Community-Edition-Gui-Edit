@@ -1,6 +1,8 @@
 package com.fushu.mmceguiext.common.tile;
 
 import com.fushu.mmceguiext.common.block.BlockCustomHatch;
+import com.fushu.mmceguiext.common.energy.ILongEnergyStorage;
+import com.fushu.mmceguiext.common.energy.LongEnergyCapability;
 import com.fushu.mmceguiext.common.requirement.LongFluidIOHandler;
 import com.fushu.mmceguiext.common.requirement.LongGasIOHandler;
 import com.fushu.mmceguiext.common.registry.CustomHatchRegistry;
@@ -20,12 +22,15 @@ import hellfirepvp.modularmachinery.common.tiles.base.SelectiveUpdateTileEntity;
 import hellfirepvp.modularmachinery.common.tiles.base.TileEntityRestrictedTick;
 import hellfirepvp.modularmachinery.common.util.IEnergyHandlerAsync;
 import hellfirepvp.modularmachinery.common.util.IOInventory;
+import mekanism.api.energy.IStrictEnergyAcceptor;
+import mekanism.api.energy.IStrictEnergyOutputter;
 import mekanism.api.gas.Gas;
 import mekanism.api.gas.IGasItem;
 import mekanism.api.gas.GasStack;
 import mekanism.api.gas.GasTankInfo;
 import mekanism.api.gas.IGasHandler;
 import mekanism.api.gas.ITubeConnection;
+import mcjty.lib.api.power.IBigPower;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -66,10 +71,13 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @Optional.InterfaceList({
+    @Optional.Interface(modid = "theoneprobe", iface = "mcjty.lib.api.power.IBigPower"),
+    @Optional.Interface(modid = "mekanism", iface = "mekanism.api.energy.IStrictEnergyAcceptor"),
+    @Optional.Interface(modid = "mekanism", iface = "mekanism.api.energy.IStrictEnergyOutputter"),
     @Optional.Interface(modid = "mekanism", iface = "mekanism.api.gas.IGasHandler"),
     @Optional.Interface(modid = "mekanism", iface = "mekanism.api.gas.ITubeConnection")
 })
-public class TileCustomHatch extends TileEntityRestrictedTick implements MachineComponentTile, github.kasuminova.mmce.common.tile.base.MachineCombinationComponent, SelectiveUpdateTileEntity, ReadWriteLockProvider, IGasHandler, ITubeConnection {
+public class TileCustomHatch extends TileEntityRestrictedTick implements MachineComponentTile, github.kasuminova.mmce.common.tile.base.MachineCombinationComponent, SelectiveUpdateTileEntity, ReadWriteLockProvider, IBigPower, IStrictEnergyAcceptor, IStrictEnergyOutputter, IGasHandler, ITubeConnection {
     public static final int INPUT_SLOT = 0;
     public static final int OUTPUT_SLOT = 1;
     private static final long GT_ENERGY_MULTIPLIER = 4L;
@@ -209,6 +217,12 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
 
     public long getEnergyTransfer() {
         return this.energyTransfer;
+    }
+
+    @Override
+    @Optional.Method(modid = "theoneprobe")
+    public long getStoredPower() {
+        return this.energy;
     }
 
     public double getFluidFillRatio() {
@@ -1092,6 +1106,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         return capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY && supportsExternalCapability(ExternalAccessKind.ITEM)
             || capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY && supportsExternalCapability(ExternalAccessKind.FLUID)
             || capability == CapabilityEnergy.ENERGY && supportsExternalCapability(ExternalAccessKind.ENERGY)
+            || capability == LongEnergyCapability.LONG_ENERGY && supportsExternalCapability(ExternalAccessKind.ENERGY)
             || isGregTechEnergyCapability(capability)
             || isDraconicOPCapability(capability)
             || isMekanismGasCapability(capability) && supportsExternalCapability(ExternalAccessKind.GAS)
@@ -1108,6 +1123,9 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return supportsExternalCapability(ExternalAccessKind.FLUID) ? (T) getExternalFluidCapability() : super.getCapability(capability, facing);
         }
         if (capability == CapabilityEnergy.ENERGY) {
+            return supportsExternalCapability(ExternalAccessKind.ENERGY) ? (T) this.energyHandler : super.getCapability(capability, facing);
+        }
+        if (capability == LongEnergyCapability.LONG_ENERGY) {
             return supportsExternalCapability(ExternalAccessKind.ENERGY) ? (T) this.energyHandler : super.getCapability(capability, facing);
         }
         if (isGregTechEnergyCapability(capability)) {
@@ -1221,6 +1239,38 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
             return false;
         }
         return ITubeConnection.class.getName().equals(capability.getName());
+    }
+
+    @Override
+    @Optional.Method(modid = "mekanism")
+    public double acceptEnergy(EnumFacing side, double maxReceive, boolean simulate) {
+        if (maxReceive <= 0D) {
+            return 0D;
+        }
+        long requested = maxReceive >= (double) Long.MAX_VALUE ? Long.MAX_VALUE : Math.max(0L, (long) Math.floor(maxReceive));
+        return (double) com.fushu.mmceguiext.common.util.EnergyAccessHelper.receive(this, requested, simulate);
+    }
+
+    @Override
+    @Optional.Method(modid = "mekanism")
+    public boolean canReceiveEnergy(EnumFacing side) {
+        return resolveExternalAccess(ExternalAccessKind.ENERGY).input;
+    }
+
+    @Override
+    @Optional.Method(modid = "mekanism")
+    public double pullEnergy(EnumFacing side, double maxExtract, boolean simulate) {
+        if (maxExtract <= 0D) {
+            return 0D;
+        }
+        long requested = maxExtract >= (double) Long.MAX_VALUE ? Long.MAX_VALUE : Math.max(0L, (long) Math.floor(maxExtract));
+        return (double) com.fushu.mmceguiext.common.util.EnergyAccessHelper.extract(this, requested, simulate);
+    }
+
+    @Override
+    @Optional.Method(modid = "mekanism")
+    public boolean canOutputEnergy(EnumFacing side) {
+        return resolveExternalAccess(ExternalAccessKind.ENERGY).output;
     }
 
     @Override
@@ -2376,7 +2426,7 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         }
     }
 
-    private class EnergyHandler implements IEnergyStorage, IEnergyHandlerAsync {
+    private class EnergyHandler implements IEnergyStorage, IEnergyHandlerAsync, ILongEnergyStorage {
         @Override
         public synchronized int receiveEnergy(int maxReceive, boolean simulate) {
             if (maxReceive <= 0 || !canReceive()) {
@@ -2443,6 +2493,58 @@ public class TileCustomHatch extends TileEntityRestrictedTick implements Machine
         @Override
         public synchronized long getMaxEnergy() {
             return energyCapacity;
+        }
+
+        @Override
+        public synchronized long receiveEnergyLong(long maxReceive, boolean simulate) {
+            if (maxReceive <= 0L || !canReceiveLong()) {
+                return 0L;
+            }
+            long accepted = Math.min(Math.min(maxReceive, energyTransfer), energyCapacity - energy);
+            if (accepted <= 0L) {
+                return 0L;
+            }
+            if (!simulate) {
+                energy += accepted;
+                markNoUpdateSync();
+            }
+            return accepted;
+        }
+
+        @Override
+        public synchronized long extractEnergyLong(long maxExtract, boolean simulate) {
+            if (maxExtract <= 0L || !canExtractLong()) {
+                return 0L;
+            }
+            long extracted = Math.min(Math.min(maxExtract, energyTransfer), energy);
+            if (extracted <= 0L) {
+                return 0L;
+            }
+            if (!simulate) {
+                energy -= extracted;
+                markNoUpdateSync();
+            }
+            return extracted;
+        }
+
+        @Override
+        public synchronized long getEnergyStoredLong() {
+            return energy;
+        }
+
+        @Override
+        public synchronized long getMaxEnergyStoredLong() {
+            return energyCapacity;
+        }
+
+        @Override
+        public boolean canExtractLong() {
+            return canExtract();
+        }
+
+        @Override
+        public boolean canReceiveLong() {
+            return canReceive();
         }
 
         @Override

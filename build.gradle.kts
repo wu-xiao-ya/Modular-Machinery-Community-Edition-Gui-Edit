@@ -1,11 +1,11 @@
-﻿plugins {
+plugins {
     id("java-library")
     id("maven-publish")
     id("com.gtnewhorizons.retrofuturagradle") version "1.4.1"
 }
 
 group = "com.fushu.mmce"
-version = "1.1.0-beta"
+version = "1.2.0"
 
 java {
     withSourcesJar()

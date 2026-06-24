@@ -58,6 +58,27 @@
           "thumbColor": "FFFFFFFF",
           "showText": false,
           "page": "main"
+        },
+        {
+          "id": "load_slider",
+          "x": 186,
+          "y": 96,
+          "width": 104,
+          "height": 12,
+          "key": "load",
+          "min": 0,
+          "max": 1,
+          "step": 0.05,
+          "value": 0.4,
+          "trackColor": "66000000",
+          "fillColor": "FFB56DFF",
+          "thumbColor": "FFFFFFFF",
+          "borderColor": "CC51307C",
+          "thumbWidth": 8,
+          "thumbHeight": 14,
+          "showText": true,
+          "textColor": "FFFFFFFF",
+          "page": "main"
         }
       ],
       "dynamicVisuals": [
@@ -97,21 +118,19 @@
           "height": 8,
           "source": {
             "type": "combined",
-            "combine": "max",
+            "combine": "weightedSum",
             "sources": [
               {
                 "type": "customData",
                 "key": "heat",
                 "default": 0,
-                "min": 0,
-                "max": 100
+                "weight": 0.0065
               },
               {
                 "type": "customData",
                 "key": "warning",
                 "default": 0,
-                "min": 0,
-                "max": 1
+                "weight": 0.35
               }
             ],
             "min": 0,
@@ -125,6 +144,33 @@
             "borderColor": "FFFFFFFF",
             "direction": "right"
           },
+          "rendererByValue": {
+            "fillColor": {
+              "fromColor": "FF55CCFF",
+              "toColor": "FFFF8844",
+              "source": {
+                "type": "combined",
+                "combine": "weightedAverage",
+                "sources": [
+                  {
+                    "type": "customData",
+                    "key": "warning",
+                    "default": 0,
+                    "weight": 0.65
+                  },
+                  {
+                    "type": "customData",
+                    "key": "load",
+                    "default": 0,
+                    "weight": 0.35
+                  }
+                ],
+                "min": 0,
+                "max": 1,
+                "clamp": true
+              }
+            }
+          },
           "page": "main"
         },
         {
@@ -134,14 +180,28 @@
           "width": 28,
           "height": 28,
           "source": {
-            "type": "customData",
-            "key": "warning",
-            "default": 0,
+            "type": "combined",
+            "combine": "weightedAverage",
+            "sources": [
+              {
+                "type": "customData",
+                "key": "warning",
+                "default": 0,
+                "weight": 0.65
+              },
+              {
+                "type": "customData",
+                "key": "load",
+                "default": 0,
+                "weight": 0.35
+              }
+            ],
             "min": 0,
-            "max": 1
+            "max": 1,
+            "clamp": true
           },
           "visibleByValue": {
-            "min": 0.05
+            "min": 0.45
           },
           "renderer": {
             "type": "pie",
@@ -179,11 +239,78 @@
           "transformByValue": {
             "rotation": {
               "min": 0,
-              "max": 360
+              "max": 540,
+              "source": {
+                "type": "combined",
+                "combine": "weightedSum",
+                "sources": [
+                  {
+                    "type": "customData",
+                    "key": "heat",
+                    "default": 0,
+                    "weight": 0.0065
+                  },
+                  {
+                    "type": "customData",
+                    "key": "warning",
+                    "default": 0,
+                    "weight": 0.35
+                  }
+                ],
+                "min": 0,
+                "max": 1,
+                "clamp": true
+              }
             },
             "scale": {
               "min": 0.85,
-              "max": 1.15
+              "max": 1.18,
+              "source": {
+                "type": "combined",
+                "combine": "weightedSum",
+                "sources": [
+                  {
+                    "type": "customData",
+                    "key": "heat",
+                    "default": 0,
+                    "weight": 0.0065
+                  },
+                  {
+                    "type": "customData",
+                    "key": "warning",
+                    "default": 0,
+                    "weight": 0.35
+                  }
+                ],
+                "min": 0,
+                "max": 1,
+                "clamp": true
+              }
+            },
+            "alpha": {
+              "min": 0.55,
+              "max": 1.0,
+              "source": {
+                "type": "combined",
+                "combine": "weightedSum",
+                "sources": [
+                  {
+                    "type": "customData",
+                    "key": "heat",
+                    "default": 0,
+                    "weight": 0.0065
+                  },
+                  {
+                    "type": "customData",
+                    "key": "warning",
+                    "default": 0,
+                    "weight": 0.35
+                  }
+                ],
+                "min": 0,
+                "max": 1,
+                "clamp": true
+              }
             }
           },
           "renderer": {
@@ -204,11 +331,25 @@
           "width": 28,
           "height": 28,
           "source": {
-            "type": "customData",
-            "key": "warning",
-            "default": 0,
+            "type": "combined",
+            "combine": "weightedSum",
+            "sources": [
+              {
+                "type": "customData",
+                "key": "heat",
+                "default": 0,
+                "weight": 0.0065
+              },
+              {
+                "type": "customData",
+                "key": "warning",
+                "default": 0,
+                "weight": 0.35
+              }
+            ],
             "min": 0,
-            "max": 1
+            "max": 1,
+            "clamp": true
           },
           "renderer": {
             "type": "fill",
