@@ -90,6 +90,44 @@
           "page": "main"
         },
         {
+          "id": "hybrid_fill",
+          "x": 186,
+          "y": 50,
+          "width": 104,
+          "height": 8,
+          "source": {
+            "type": "combined",
+            "combine": "max",
+            "sources": [
+              {
+                "type": "customData",
+                "key": "heat",
+                "default": 0,
+                "min": 0,
+                "max": 100
+              },
+              {
+                "type": "customData",
+                "key": "warning",
+                "default": 0,
+                "min": 0,
+                "max": 1
+              }
+            ],
+            "min": 0,
+            "max": 1,
+            "clamp": true
+          },
+          "renderer": {
+            "type": "fill",
+            "backgroundColor": "22000000",
+            "fillColor": "FF55CCFF",
+            "borderColor": "FFFFFFFF",
+            "direction": "right"
+          },
+          "page": "main"
+        },
+        {
           "id": "warning_ring",
           "x": 264,
           "y": 50,

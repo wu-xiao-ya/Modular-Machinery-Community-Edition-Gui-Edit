@@ -425,6 +425,12 @@ Common fields: `id`, `x`, `y`, `width`, `height`, `priority`, `foreground`, `pag
 Supported sources:
 - `customData`: reads a numeric value from controller custom data / Smart Interface virtual key: `key`, `default`, `min`, `max`, `clamp`, `invert`.
 - `machine`: built-in metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`, `energyRatio`, `parallelism`, `threadCount`, `activeThreadCount`, `idleThreadCount`; factory also supports `factoryThreadCount`, `factoryActiveThreadCount`, `factoryIdleThreadCount`.
+- `combined`: combines multiple child sources first, then applies the parent source's `min` / `max` / `clamp` / `invert`. Fields: `combine`, `sources[]`. Child entries can themselves be `customData`, `machine`, or nested `combined`.
+
+Supported combine modes:
+- `sum`, `average`, `min`, `max`, `multiply`
+- `subtract`, `divide` (left-associative, using the first child as the left operand)
+- `first`, `last`
 
 Supported renderers:
 - `textureSwitch`: ordered `frames[]` using `min`, `max`, `equals`, `texture`, plus optional `fallbackTexture`.
@@ -479,6 +485,31 @@ Example:
       "type": "fill",
       "backgroundTexture": "pack:textures/gui/bar_empty.png",
       "fillTexture": "pack:textures/gui/bar_full.png",
+      "direction": "right"
+    }
+  },
+  {
+    "id": "hybrid_fill",
+    "x": 92,
+    "y": 90,
+    "width": 64,
+    "height": 8,
+    "source": {
+      "type": "combined",
+      "combine": "max",
+      "sources": [
+        { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+        { "type": "machine", "metric": "recipeProgress", "default": 0, "min": 0, "max": 1 }
+      ],
+      "min": 0,
+      "max": 1,
+      "clamp": true
+    },
+    "renderer": {
+      "type": "fill",
+      "backgroundColor": "22000000",
+      "fillColor": "FF55CCFF",
+      "borderColor": "FFFFFFFF",
       "direction": "right"
     }
   },
@@ -581,6 +612,11 @@ Example:
   }
 ]
 ```
+
+`combined` source rule / `combined` 数据源规则：
+- child sources are resolved as raw numbers first, then combined
+- parent `min` / `max` / `clamp` / `invert` runs after the combination result is produced
+- `divide` returns the parent/default fallback when a later divisor is near zero
 
 In the example above, the static `transform.pivotUnit` is `ratio`, so the dynamic `pivotX` / `pivotY` values are also interpreted as relative `0..1` coordinates.
 `warning_ring` stays hidden near zero, then fades from green to red as `warning` rises.

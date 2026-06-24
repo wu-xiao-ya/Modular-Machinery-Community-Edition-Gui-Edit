@@ -1185,6 +1185,10 @@ public final class MachineGuiStyleManager {
         @Nullable
         public String type;
         @Nullable
+        public String combine;
+        @Nullable
+        public List<DynamicVisualSourceStyle> sources;
+        @Nullable
         public String key;
         @Nullable
         public String metric;
@@ -1206,6 +1210,13 @@ public final class MachineGuiStyleManager {
             }
             DynamicVisualSourceStyle copy = new DynamicVisualSourceStyle();
             copy.type = source.type;
+            copy.combine = source.combine;
+            if (source.sources != null) {
+                copy.sources = new ArrayList<DynamicVisualSourceStyle>(source.sources.size());
+                for (DynamicVisualSourceStyle child : source.sources) {
+                    copy.sources.add(DynamicVisualSourceStyle.copyOf(child));
+                }
+            }
             copy.key = source.key;
             copy.metric = source.metric;
             copy.defaultValue = source.defaultValue;

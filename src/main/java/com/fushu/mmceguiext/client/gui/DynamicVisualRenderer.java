@@ -120,6 +120,9 @@ public class DynamicVisualRenderer {
         if (source == null) {
             return fallback;
         }
+        if (source.sources != null && !source.sources.isEmpty()) {
+            return combineSourceValues(source, controller, metricProvider, fallback);
+        }
         String type = source.type == null ? "machine" : source.type;
         if ("customData".equals(type)) {
             if (source.key == null || source.key.trim().isEmpty()) {
@@ -130,6 +133,81 @@ public class DynamicVisualRenderer {
         }
         String metric = source.metric == null || source.metric.trim().isEmpty() ? "recipeProgress" : source.metric.trim();
         return metricProvider == null ? fallback : metricProvider.getMachineMetric(metric, fallback);
+    }
+
+    private float combineSourceValues(
+        MachineGuiStyleManager.DynamicVisualSourceStyle source,
+        @Nullable TileMultiblockMachineController controller,
+        MetricProvider metricProvider,
+        float fallback
+    ) {
+        if (source.sources == null || source.sources.isEmpty()) {
+            return fallback;
+        }
+        String combine = source.combine == null ? "sum" : source.combine;
+        float result = 0.0F;
+        boolean found = false;
+        int count = 0;
+        if ("multiply".equals(combine)) {
+            result = 1.0F;
+        }
+        for (MachineGuiStyleManager.DynamicVisualSourceStyle child : source.sources) {
+            if (child == null) {
+                continue;
+            }
+            float childFallback = child.defaultValue == null ? fallback : child.defaultValue.floatValue();
+            float value = resolveRawValue(child, controller, metricProvider);
+            if (!Float.isFinite(value)) {
+                value = childFallback;
+            }
+            if (!Float.isFinite(value)) {
+                continue;
+            }
+            if (!found) {
+                found = true;
+                if ("min".equals(combine) || "max".equals(combine) || "first".equals(combine) || "last".equals(combine)
+                    || "subtract".equals(combine) || "divide".equals(combine)) {
+                    result = value;
+                }
+            }
+            count++;
+            if ("sum".equals(combine) || "average".equals(combine)) {
+                result += value;
+            } else if ("min".equals(combine)) {
+                result = Math.min(result, value);
+            } else if ("max".equals(combine)) {
+                result = Math.max(result, value);
+            } else if ("multiply".equals(combine)) {
+                result *= value;
+            } else if ("subtract".equals(combine)) {
+                if (count == 1) {
+                    result = value;
+                } else {
+                    result -= value;
+                }
+            } else if ("divide".equals(combine)) {
+                if (count == 1) {
+                    result = value;
+                } else if (Math.abs(value) > EPSILON) {
+                    result /= value;
+                } else {
+                    return fallback;
+                }
+            } else if ("last".equals(combine)) {
+                result = value;
+            } else if ("first".equals(combine)) {
+                break;
+            } else {
+                result += value;
+            }
+        }
+        if (!found || count <= 0) {
+            return fallback;
+        }
+        if ("average".equals(combine)) {
+            return result / (float) count;
+        }
+        return result;
     }
 
     private float normalizeValue(float raw, @Nullable MachineGuiStyleManager.DynamicVisualSourceStyle source) {

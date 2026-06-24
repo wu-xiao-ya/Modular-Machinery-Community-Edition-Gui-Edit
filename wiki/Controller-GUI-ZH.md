@@ -190,6 +190,13 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 
 当前 renderer 支持：`textureSwitch`、`fill`、`pie`/`ring`、`lineChart`。source 可以读取控制器 `customData` / Smart Interface 数值，也可以读取内置机器指标，例如 `recipeProgress`、`energyRatio`、`parallelism`、`threadCount`，以及工厂线程数量指标。
 
+`source.type` 目前支持：
+- `customData`
+- `machine`
+- `combined`
+
+`combined` 会先把多个子 source 解析成原始数值并完成组合，然后再对父级 source 应用 `min`、`max`、`clamp`、`invert`。`combine` 支持：`sum`、`average`、`min`、`max`、`multiply`、`subtract`、`divide`、`first`、`last`。子项可以是 `customData`、`machine`，也可以继续嵌套 `combined`。
+
 还支持可选变换：
 - `transform`：静态 `offsetX`、`offsetY`、`scale`、`scaleX`、`scaleY`、`rotation`、`alpha`、`pivotX`、`pivotY`、`pivotUnit`，以及兼容旧写法的 `origin`（`topLeft`、`topCenter`、`topRight`、`centerLeft`、`center`、`centerRight`、`bottomLeft`、`bottomCenter`、`bottomRight`）。
 - `transformByValue`：按变量驱动 `offsetX`、`offsetY`、`scale`、`scaleX`、`scaleY`、`rotation`、`alpha`、`pivotX`、`pivotY`。
@@ -289,6 +296,38 @@ MMCEGE 挂接 Forge 的 `GuiOpenEvent`，在 MMCE 打开原版 `GuiMachineContro
 ```
 
 这个示例在接近 0 时保持隐藏，随后会随着 `warning` 上升从绿色渐变到红色。
+
+多 source 示例：
+
+```json
+{
+  "id": "hybrid_fill",
+  "x": 196,
+  "y": 64,
+  "width": 64,
+  "height": 8,
+  "source": {
+    "type": "combined",
+    "combine": "max",
+    "sources": [
+      { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+      { "type": "machine", "metric": "recipeProgress", "default": 0, "min": 0, "max": 1 }
+    ],
+    "min": 0,
+    "max": 1,
+    "clamp": true
+  },
+  "renderer": {
+    "type": "fill",
+    "backgroundColor": "22000000",
+    "fillColor": "FF55CCFF",
+    "borderColor": "FFFFFFFF",
+    "direction": "right"
+  }
+}
+```
+
+这个示例会取 `warning` 和 `recipeProgress` 中更高的那个值，驱动同一条填充条。
 
 整套 renderer 切换示例：
 

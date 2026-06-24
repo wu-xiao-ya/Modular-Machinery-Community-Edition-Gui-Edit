@@ -1302,6 +1302,10 @@ final class MachineGuiStyleParser {
         return obj.has("type")
             || obj.has("sourceType")
             || obj.has("source_type")
+            || obj.has("combine")
+            || obj.has("sources")
+            || obj.has("sourceList")
+            || obj.has("source_list")
             || obj.has("key")
             || obj.has("customKey")
             || obj.has("custom_key")
@@ -1327,6 +1331,12 @@ final class MachineGuiStyleParser {
         }
         MachineGuiStyleManager.DynamicVisualSourceStyle source = new MachineGuiStyleManager.DynamicVisualSourceStyle();
         source.type = normalizeDynamicSourceType(getTrimmedString(sourceObj, result, scope, "type", "sourceType", "source_type"), result, scope);
+        source.combine = normalizeDynamicSourceCombine(
+            getTrimmedString(sourceObj, result, scope, "combine", "combineMode", "combine_mode", "operation", "op"),
+            result,
+            scope
+        );
+        source.sources = parseDynamicVisualSourceChildren(sourceObj, result, scope);
         source.key = getTrimmedString(
             sourceObj,
             result,
@@ -1345,8 +1355,19 @@ final class MachineGuiStyleParser {
         source.max = getFloat(sourceObj, result, scope, "max", "maximum");
         source.clamp = getBoolean(sourceObj, result, scope, "clamp", "bounded");
         source.invert = getBoolean(sourceObj, result, scope, "invert", "inverted", "reverse");
+        if (source.sources != null && !source.sources.isEmpty()) {
+            if (source.combine == null) {
+                source.combine = "sum";
+            }
+            if (source.type == null) {
+                source.type = "combined";
+            }
+        }
         if (source.type == null) {
             source.type = source.key == null || source.key.isEmpty() ? "machine" : "customData";
+        }
+        if ("combined".equals(source.type) && (source.sources == null || source.sources.isEmpty())) {
+            result.warnForMachine(scope, field(scope, "source.sources") + " is required for combined dynamic visuals.");
         }
         if ("customData".equals(source.type) && (source.key == null || source.key.isEmpty())) {
             result.warnForMachine(scope, field(scope, "source.key") + " is required for customData dynamic visuals.");
@@ -1355,6 +1376,38 @@ final class MachineGuiStyleParser {
             source.metric = "recipeProgress";
         }
         return source;
+    }
+
+    @Nullable
+    private static List<MachineGuiStyleManager.DynamicVisualSourceStyle> parseDynamicVisualSourceChildren(
+        JsonObject sourceObj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        MatchedElement match = findElement(sourceObj, "sources", "sourceList", "source_list");
+        if (match == null) {
+            return null;
+        }
+        if (!match.element.isJsonArray()) {
+            result.warnForMachine(scope, field(scope, match.key) + " must be an array.");
+            return null;
+        }
+        JsonArray array = match.element.getAsJsonArray();
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        List<MachineGuiStyleManager.DynamicVisualSourceStyle> out = new ArrayList<MachineGuiStyleManager.DynamicVisualSourceStyle>();
+        for (int i = 0; i < limit; i++) {
+            JsonElement child = array.get(i);
+            String itemScope = field(scope, match.key + "[" + i + "]");
+            if (child == null || !child.isJsonObject()) {
+                result.warnForMachine(scope, itemScope + " must be an object.");
+                continue;
+            }
+            MachineGuiStyleManager.DynamicVisualSourceStyle parsed = parseDynamicVisualSource(child.getAsJsonObject(), result, itemScope);
+            if (parsed != null) {
+                out.add(parsed);
+            }
+        }
+        return out.isEmpty() ? null : out;
     }
 
     @Nullable
@@ -2346,7 +2399,51 @@ final class MachineGuiStyleParser {
         if ("machine".equals(text) || "metric".equals(text) || "builtin".equals(text) || "built_in".equals(text)) {
             return "machine";
         }
-        result.warnForMachine(scope, field(scope, "source.type") + " must be customData or machine.");
+        if ("combined".equals(text) || "combine".equals(text) || "composite".equals(text) || "multi".equals(text)) {
+            return "combined";
+        }
+        result.warnForMachine(scope, field(scope, "source.type") + " must be customData, machine or combined.");
+        return null;
+    }
+
+    @Nullable
+    private static String normalizeDynamicSourceCombine(
+        @Nullable String raw,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        String text = safeTrim(raw).toLowerCase(Locale.ROOT);
+        if (text.isEmpty()) {
+            return null;
+        }
+        if ("sum".equals(text) || "add".equals(text) || "plus".equals(text)) {
+            return "sum";
+        }
+        if ("average".equals(text) || "avg".equals(text) || "mean".equals(text)) {
+            return "average";
+        }
+        if ("min".equals(text) || "minimum".equals(text)) {
+            return "min";
+        }
+        if ("max".equals(text) || "maximum".equals(text)) {
+            return "max";
+        }
+        if ("multiply".equals(text) || "mul".equals(text) || "product".equals(text)) {
+            return "multiply";
+        }
+        if ("subtract".equals(text) || "sub".equals(text) || "minus".equals(text) || "difference".equals(text)) {
+            return "subtract";
+        }
+        if ("divide".equals(text) || "div".equals(text) || "ratio".equals(text)) {
+            return "divide";
+        }
+        if ("first".equals(text)) {
+            return "first";
+        }
+        if ("last".equals(text)) {
+            return "last";
+        }
+        result.warnForMachine(scope, field(scope, "source.combine") + " must be sum, average, min, max, multiply, subtract, divide, first or last.");
         return null;
     }
 

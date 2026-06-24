@@ -190,6 +190,13 @@ Read from text lines pushed into MMCE's `ControllerGUIRenderEvent.extraInfo[]` (
 
 Renderers supported now: `textureSwitch`, `fill`, `pie`/`ring`, and `lineChart`. Sources can read controller `customData` / Smart Interface numeric values, or built-in machine metrics such as `recipeProgress`, `energyRatio`, `parallelism`, `threadCount`, plus factory thread-count metrics.
 
+`source.type` currently supports:
+- `customData`
+- `machine`
+- `combined`
+
+`combined` first resolves multiple child sources as raw numeric values, then applies the parent source's `min`, `max`, `clamp`, and `invert`. Supported `combine` modes: `sum`, `average`, `min`, `max`, `multiply`, `subtract`, `divide`, `first`, `last`. Child entries may be `customData`, `machine`, or nested `combined`.
+
 Optional transforms are also supported:
 - `transform`: static `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`, `pivotUnit`, and legacy `origin` (`topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`).
 - `transformByValue`: variable-driven `offsetX`, `offsetY`, `scale`, `scaleX`, `scaleY`, `rotation`, `alpha`, `pivotX`, `pivotY`.
@@ -289,6 +296,38 @@ Visibility + color example:
 ```
 
 This example stays hidden near zero, then fades from green to red as `warning` rises.
+
+Multi-source example:
+
+```json
+{
+  "id": "hybrid_fill",
+  "x": 196,
+  "y": 64,
+  "width": 64,
+  "height": 8,
+  "source": {
+    "type": "combined",
+    "combine": "max",
+    "sources": [
+      { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+      { "type": "machine", "metric": "recipeProgress", "default": 0, "min": 0, "max": 1 }
+    ],
+    "min": 0,
+    "max": 1,
+    "clamp": true
+  },
+  "renderer": {
+    "type": "fill",
+    "backgroundColor": "22000000",
+    "fillColor": "FF55CCFF",
+    "borderColor": "FFFFFFFF",
+    "direction": "right"
+  }
+}
+```
+
+This example uses the higher of `warning` and `recipeProgress` to drive one shared fill bar.
 
 Renderer-switch example:
 

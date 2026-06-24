@@ -622,7 +622,40 @@ EN: Common tweaks:
 "source": { "type": "machine", "metric": "recipeProgress", "default": 0, "min": 0, "max": 1 }
 ```
 
+```json
+"source": {
+  "type": "combined",
+  "combine": "max",
+  "sources": [
+    { "type": "customData", "key": "warning", "default": 0, "min": 0, "max": 1 },
+    { "type": "machine", "metric": "recipeProgress", "default": 0, "min": 0, "max": 1 }
+  ],
+  "min": 0,
+  "max": 1,
+  "clamp": true
+}
+```
+
 Metrics: `recipeProgress`, `recipeMaxProgress`, `energyStored`, `energyCapacity`, `energyRatio`, `parallelism`, `threadCount`, `activeThreadCount`, `idleThreadCount`; factory additionally accepts `factoryThreadCount`, `factoryActiveThreadCount`, `factoryIdleThreadCount`.
+
+- `type`
+  - CN: 支持 `customData`、`machine`、`combined`。`combined` 用于多 source 组合。
+  - EN: Supports `customData`, `machine`, and `combined`. Use `combined` for multi-source composition.
+- `combine`
+  - CN: 仅 `combined` 使用。支持 `sum`、`average`、`min`、`max`、`multiply`、`subtract`、`divide`、`first`、`last`。
+  - EN: Used by `combined` only. Supports `sum`, `average`, `min`, `max`, `multiply`, `subtract`, `divide`, `first`, and `last`.
+- `sources`
+  - CN: 子 source 数组。每个子项都可以是 `customData`、`machine`，也可以继续嵌套 `combined`。
+  - EN: Child source array. Each child may be `customData`, `machine`, or another nested `combined`.
+- 规则 / rule
+  - CN: 会先把各子 source 当作原始数值读取并完成组合，再对父级 source 执行 `min`、`max`、`clamp`、`invert`。
+  - EN: Child sources are resolved as raw numeric values and combined first; then the parent source applies `min`, `max`, `clamp`, and `invert`.
+- `subtract` / `divide`
+  - CN: 以第一个子项为左操作数，后续子项依次参与减法/除法。
+  - EN: Uses the first child as the left operand, then applies subtraction / division in order.
+- `first` / `last`
+  - CN: 轻量选择器，适合做多来源兜底或覆盖顺序。
+  - EN: Lightweight selectors, useful for simple fallback / override chains.
 
 ### `transform` / 静态变换
 
