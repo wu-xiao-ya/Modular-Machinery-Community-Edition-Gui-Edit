@@ -61,7 +61,7 @@ public abstract class MixinRequirementFluid extends ComponentRequirement.MultiCo
 
     @Inject(method = "copyComponents", at = @At("HEAD"), cancellable = true)
     private void mmceguiext$copyLongHandlers(List<ProcessingComponent<?>> components, CallbackInfoReturnable<List<ProcessingComponent<?>>> cir) {
-        if (LongRequirementIO.hasLongFluidHandler(components)) {
+        if (mmceguiext$shouldUseLongFluidPath(components)) {
             cir.setReturnValue(LongRequirementIO.copyFluidComponents(components));
         }
     }
@@ -69,7 +69,7 @@ public abstract class MixinRequirementFluid extends ComponentRequirement.MultiCo
     @Inject(method = "canStartCrafting(Ljava/util/List;Lhellfirepvp/modularmachinery/common/crafting/helper/RecipeCraftingContext;)Lhellfirepvp/modularmachinery/common/crafting/helper/CraftCheck;",
         at = @At("HEAD"), cancellable = true)
     private void mmceguiext$canStartLong(List<ProcessingComponent<?>> components, RecipeCraftingContext context, CallbackInfoReturnable<CraftCheck> cir) {
-        if (LongRequirementIO.hasLongFluidHandler(components)) {
+        if (mmceguiext$shouldUseLongFluidPath(components)) {
             cir.setReturnValue(mmceguiext$doFluidIO(components, context));
         }
     }
@@ -77,7 +77,7 @@ public abstract class MixinRequirementFluid extends ComponentRequirement.MultiCo
     @Inject(method = "startCrafting(Ljava/util/List;Lhellfirepvp/modularmachinery/common/crafting/helper/RecipeCraftingContext;Lhellfirepvp/modularmachinery/common/util/ResultChance;)V",
         at = @At("HEAD"), cancellable = true)
     private void mmceguiext$startLong(List<ProcessingComponent<?>> components, RecipeCraftingContext context, ResultChance chance, CallbackInfo ci) {
-        if (this.actionType == IOType.INPUT && LongRequirementIO.hasLongFluidHandler(components)) {
+        if (this.actionType == IOType.INPUT && mmceguiext$shouldUseLongFluidPath(components)) {
             if (chance.canWork(RecipeModifier.applyModifiers(context, (RequirementFluid) (Object) this, this.chance, true))) {
                 mmceguiext$doFluidIO(components, context);
             }
@@ -88,7 +88,7 @@ public abstract class MixinRequirementFluid extends ComponentRequirement.MultiCo
     @Inject(method = "finishCrafting(Ljava/util/List;Lhellfirepvp/modularmachinery/common/crafting/helper/RecipeCraftingContext;Lhellfirepvp/modularmachinery/common/util/ResultChance;)V",
         at = @At("HEAD"), cancellable = true)
     private void mmceguiext$finishLong(List<ProcessingComponent<?>> components, RecipeCraftingContext context, ResultChance chance, CallbackInfo ci) {
-        if (this.actionType == IOType.OUTPUT && LongRequirementIO.hasLongFluidHandler(components)) {
+        if (this.actionType == IOType.OUTPUT && mmceguiext$shouldUseLongFluidPath(components)) {
             if (chance.canWork(RecipeModifier.applyModifiers(context, (RequirementFluid) (Object) this, this.chance, true))) {
                 mmceguiext$doFluidIO(components, context);
             }
@@ -98,7 +98,7 @@ public abstract class MixinRequirementFluid extends ComponentRequirement.MultiCo
 
     @Inject(method = "getMaxParallelism", at = @At("HEAD"), cancellable = true)
     private void mmceguiext$getMaxParallelismLong(List<ProcessingComponent<?>> components, RecipeCraftingContext context, int maxParallelism, CallbackInfoReturnable<Integer> cir) {
-        if (!LongRequirementIO.hasLongFluidHandler(components)) {
+        if (!mmceguiext$shouldUseLongFluidPath(components)) {
             return;
         }
         if (this.ignoreOutputCheck && this.actionType == IOType.OUTPUT) {
@@ -140,6 +140,12 @@ public abstract class MixinRequirementFluid extends ComponentRequirement.MultiCo
         }
         LongRequirementIO.doFluid(stack, fluidHandlers, totalIO, this.actionType);
         return (int) Math.min((long) Integer.MAX_VALUE, totalIO / required);
+    }
+
+    @Unique
+    private boolean mmceguiext$shouldUseLongFluidPath(List<ProcessingComponent<?>> components) {
+        return mmceguiext$getRequiredAmountLong() > Integer.MAX_VALUE
+            && LongRequirementIO.hasLongFluidHandler(components);
     }
 
     @Unique

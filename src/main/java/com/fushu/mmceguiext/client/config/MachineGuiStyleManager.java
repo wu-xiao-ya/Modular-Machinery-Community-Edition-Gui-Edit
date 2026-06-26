@@ -765,6 +765,8 @@ public final class MachineGuiStyleManager {
         @Nullable
         public String hoverTexture;
         @Nullable
+        public String pressedTexture;
+        @Nullable
         public String disabledTexture;
         @Nullable
         public Integer textureWidth;
@@ -779,6 +781,10 @@ public final class MachineGuiStyleManager {
         @Nullable
         public Integer hoverV;
         @Nullable
+        public Integer pressedU;
+        @Nullable
+        public Integer pressedV;
+        @Nullable
         public Integer disabledU;
         @Nullable
         public Integer disabledV;
@@ -786,6 +792,53 @@ public final class MachineGuiStyleManager {
         public Boolean useNineSlice;
         @Nullable
         public Integer corner;
+        @Nullable
+        public Integer textColor;
+        @Nullable
+        public Integer hoverTextColor;
+        @Nullable
+        public Integer disabledTextColor;
+        @Nullable
+        public Boolean drawLabel;
+        @Nullable
+        public Boolean cycleWrap;
+        @Nullable
+        public List<ButtonCycleStateStyle> cycleStates;
+    }
+
+    public static class ButtonCycleStateStyle {
+        @Nullable
+        public Float value;
+        @Nullable
+        public String label;
+        @Nullable
+        public String texture;
+        @Nullable
+        public String hoverTexture;
+        @Nullable
+        public String pressedTexture;
+        @Nullable
+        public String disabledTexture;
+        @Nullable
+        public Integer textureWidth;
+        @Nullable
+        public Integer textureHeight;
+        @Nullable
+        public Integer u;
+        @Nullable
+        public Integer v;
+        @Nullable
+        public Integer hoverU;
+        @Nullable
+        public Integer hoverV;
+        @Nullable
+        public Integer pressedU;
+        @Nullable
+        public Integer pressedV;
+        @Nullable
+        public Integer disabledU;
+        @Nullable
+        public Integer disabledV;
         @Nullable
         public Integer textColor;
         @Nullable

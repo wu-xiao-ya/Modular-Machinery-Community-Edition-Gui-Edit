@@ -15,11 +15,15 @@ public class GuiTexturedButton extends GuiButton {
     @Nullable
     private final ResourceLocation hoverTexture;
     @Nullable
+    private final ResourceLocation pressedTexture;
+    @Nullable
     private final ResourceLocation disabledTexture;
     private final int u;
     private final int v;
     private final int hoverU;
     private final int hoverV;
+    private final int pressedU;
+    private final int pressedV;
     private final int disabledU;
     private final int disabledV;
     private final int textureWidth;
@@ -35,11 +39,14 @@ public class GuiTexturedButton extends GuiButton {
         super(builder.id, builder.x, builder.y, builder.width, builder.height, builder.label == null ? "" : builder.label);
         this.texture = builder.texture;
         this.hoverTexture = builder.hoverTexture;
+        this.pressedTexture = builder.pressedTexture;
         this.disabledTexture = builder.disabledTexture;
         this.u = builder.u;
         this.v = builder.v;
         this.hoverU = builder.hoverU;
         this.hoverV = builder.hoverV;
+        this.pressedU = builder.pressedU;
+        this.pressedV = builder.pressedV;
         this.disabledU = builder.disabledU;
         this.disabledV = builder.disabledV;
         this.textureWidth = Math.max(1, builder.textureWidth);
@@ -67,8 +74,9 @@ public class GuiTexturedButton extends GuiButton {
     ) {
         ResourceLocation texture = GuiRenderUtils.parseOptionalTexture(style.texture);
         ResourceLocation hoverTexture = GuiRenderUtils.parseOptionalTexture(style.hoverTexture);
+        ResourceLocation pressedTexture = GuiRenderUtils.parseOptionalTexture(style.pressedTexture);
         ResourceLocation disabledTexture = GuiRenderUtils.parseOptionalTexture(style.disabledTexture);
-        if (texture == null && hoverTexture == null && disabledTexture == null) {
+        if (texture == null && hoverTexture == null && pressedTexture == null && disabledTexture == null) {
             return new GuiButton(id, x, y, width, height, label);
         }
 
@@ -78,6 +86,8 @@ public class GuiTexturedButton extends GuiButton {
         int normalV = style.v == null ? 0 : Math.max(0, style.v.intValue());
         int hoverU = style.hoverU == null ? normalU : Math.max(0, style.hoverU.intValue());
         int hoverV = style.hoverV == null ? normalV : Math.max(0, style.hoverV.intValue());
+        int pressedU = style.pressedU == null ? hoverU : Math.max(0, style.pressedU.intValue());
+        int pressedV = style.pressedV == null ? hoverV : Math.max(0, style.pressedV.intValue());
         int disabledU = style.disabledU == null ? normalU : Math.max(0, style.disabledU.intValue());
         int disabledV = style.disabledV == null ? normalV : Math.max(0, style.disabledV.intValue());
         int normalTextColor = style.textColor == null ? 0xE0E0E0 : style.textColor.intValue();
@@ -90,9 +100,11 @@ public class GuiTexturedButton extends GuiButton {
         return builder(id, x, y, width, height, label)
             .texture(texture)
             .hoverTexture(hoverTexture)
+            .pressedTexture(pressedTexture)
             .disabledTexture(disabledTexture)
             .uv(normalU, normalV)
             .hoverUv(hoverU, hoverV)
+            .pressedUv(pressedU, pressedV)
             .disabledUv(disabledU, disabledV)
             .textureSize(textureWidth, textureHeight)
             .nineSlice(useNineSlice, corner)
@@ -101,12 +113,50 @@ public class GuiTexturedButton extends GuiButton {
             .build();
     }
 
+    public static GuiButton forStyle(
+        int id,
+        int x,
+        int y,
+        int width,
+        int height,
+        @Nullable String label,
+        MachineGuiStyleManager.ButtonStyle style,
+        @Nullable MachineGuiStyleManager.ButtonCycleStateStyle stateStyle
+    ) {
+        if (stateStyle == null) {
+            return forStyle(id, x, y, width, height, label, style);
+        }
+        MachineGuiStyleManager.ButtonStyle merged = new MachineGuiStyleManager.ButtonStyle();
+        merged.texture = stateStyle.texture != null ? stateStyle.texture : style.texture;
+        merged.hoverTexture = stateStyle.hoverTexture != null ? stateStyle.hoverTexture : style.hoverTexture;
+        merged.pressedTexture = stateStyle.pressedTexture != null ? stateStyle.pressedTexture : style.pressedTexture;
+        merged.disabledTexture = stateStyle.disabledTexture != null ? stateStyle.disabledTexture : style.disabledTexture;
+        merged.textureWidth = stateStyle.textureWidth != null ? stateStyle.textureWidth : style.textureWidth;
+        merged.textureHeight = stateStyle.textureHeight != null ? stateStyle.textureHeight : style.textureHeight;
+        merged.u = stateStyle.u != null ? stateStyle.u : style.u;
+        merged.v = stateStyle.v != null ? stateStyle.v : style.v;
+        merged.hoverU = stateStyle.hoverU != null ? stateStyle.hoverU : style.hoverU;
+        merged.hoverV = stateStyle.hoverV != null ? stateStyle.hoverV : style.hoverV;
+        merged.pressedU = stateStyle.pressedU != null ? stateStyle.pressedU : style.pressedU;
+        merged.pressedV = stateStyle.pressedV != null ? stateStyle.pressedV : style.pressedV;
+        merged.disabledU = stateStyle.disabledU != null ? stateStyle.disabledU : style.disabledU;
+        merged.disabledV = stateStyle.disabledV != null ? stateStyle.disabledV : style.disabledV;
+        merged.useNineSlice = style.useNineSlice;
+        merged.corner = style.corner;
+        merged.textColor = stateStyle.textColor != null ? stateStyle.textColor : style.textColor;
+        merged.hoverTextColor = stateStyle.hoverTextColor != null ? stateStyle.hoverTextColor : style.hoverTextColor;
+        merged.disabledTextColor = stateStyle.disabledTextColor != null ? stateStyle.disabledTextColor : style.disabledTextColor;
+        merged.drawLabel = stateStyle.drawLabel != null ? stateStyle.drawLabel : style.drawLabel;
+        String effectiveLabel = stateStyle.label != null ? stateStyle.label : label;
+        return forStyle(id, x, y, width, height, effectiveLabel, merged);
+    }
+
     @Override
     public void drawButton(Minecraft mc, int mouseX, int mouseY, float partialTicks) {
         if (!this.visible) {
             return;
         }
-        if (this.texture == null && this.hoverTexture == null && this.disabledTexture == null) {
+        if (this.texture == null && this.hoverTexture == null && this.pressedTexture == null && this.disabledTexture == null) {
             super.drawButton(mc, mouseX, mouseY, partialTicks);
             return;
         }
@@ -143,6 +193,9 @@ public class GuiTexturedButton extends GuiButton {
         if (!this.enabled && this.disabledTexture != null) {
             return this.disabledTexture;
         }
+        if (isPressedState() && this.pressedTexture != null) {
+            return this.pressedTexture;
+        }
         if (this.enabled && this.hovered && this.hoverTexture != null) {
             return this.hoverTexture;
         }
@@ -150,35 +203,39 @@ public class GuiTexturedButton extends GuiButton {
     }
 
     private int selectU() {
-        if (!this.enabled && this.disabledTexture == null) {
-            return this.disabledU;
-        }
         if (!this.enabled && this.disabledTexture != null) {
             return this.disabledU;
         }
-        if (this.enabled && this.hovered && this.hoverTexture == null) {
-            return this.hoverU;
+        if (!this.enabled) {
+            return this.disabledU;
         }
-        if (this.enabled && this.hovered && this.hoverTexture != null) {
+        if (isPressedState()) {
+            return this.pressedU;
+        }
+        if (this.enabled && this.hovered) {
             return this.hoverU;
         }
         return this.u;
     }
 
     private int selectV() {
-        if (!this.enabled && this.disabledTexture == null) {
-            return this.disabledV;
-        }
         if (!this.enabled && this.disabledTexture != null) {
             return this.disabledV;
         }
-        if (this.enabled && this.hovered && this.hoverTexture == null) {
-            return this.hoverV;
+        if (!this.enabled) {
+            return this.disabledV;
         }
-        if (this.enabled && this.hovered && this.hoverTexture != null) {
+        if (isPressedState()) {
+            return this.pressedV;
+        }
+        if (this.enabled && this.hovered) {
             return this.hoverV;
         }
         return this.v;
+    }
+
+    private boolean isPressedState() {
+        return this.enabled && this.hovered && org.lwjgl.input.Mouse.isButtonDown(0);
     }
 
     public static final class Builder {
@@ -194,11 +251,15 @@ public class GuiTexturedButton extends GuiButton {
         @Nullable
         private ResourceLocation hoverTexture;
         @Nullable
+        private ResourceLocation pressedTexture;
+        @Nullable
         private ResourceLocation disabledTexture;
         private int u;
         private int v;
         private int hoverU;
         private int hoverV;
+        private int pressedU;
+        private int pressedV;
         private int disabledU;
         private int disabledV;
         private int textureWidth;
@@ -220,6 +281,7 @@ public class GuiTexturedButton extends GuiButton {
             this.textureWidth = width;
             this.textureHeight = height;
             this.hoverU = width;
+            this.pressedU = width;
             this.disabledU = width * 2;
         }
 
@@ -230,6 +292,11 @@ public class GuiTexturedButton extends GuiButton {
 
         public Builder hoverTexture(@Nullable ResourceLocation value) {
             this.hoverTexture = value;
+            return this;
+        }
+
+        public Builder pressedTexture(@Nullable ResourceLocation value) {
+            this.pressedTexture = value;
             return this;
         }
 
@@ -247,6 +314,12 @@ public class GuiTexturedButton extends GuiButton {
         public Builder hoverUv(int valueU, int valueV) {
             this.hoverU = valueU;
             this.hoverV = valueV;
+            return this;
+        }
+
+        public Builder pressedUv(int valueU, int valueV) {
+            this.pressedU = valueU;
+            this.pressedV = valueV;
             return this;
         }
 

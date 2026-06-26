@@ -4290,10 +4290,16 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
                 button.visible = visible;
                 button.hotkeys = style.hotkeys == null ? Collections.<String>emptyList() : new ArrayList<String>(style.hotkeys);
                 button.consumeHotkey = style.consumeHotkey == null || style.consumeHotkey.booleanValue();
+                button.baseStyle = style;
+                button.cycleStates = style.cycleStates == null ? Collections.<MachineGuiStyleManager.ButtonCycleStateStyle>emptyList() : new ArrayList<MachineGuiStyleManager.ButtonCycleStateStyle>(style.cycleStates);
+                button.cycleWrap = style.cycleWrap == null || style.cycleWrap.booleanValue();
                 if (visible && (hasLabel || hasTexture)) {
-                    button.button = GuiTexturedButton.forStyle(
-                        buttonId++, this.guiLeft + x, this.guiTop + y, width, height, style.label, style
-                    );
+                    button.guiButtonId = buttonId++;
+                    button.buttonX = this.guiLeft + x;
+                    button.buttonY = this.guiTop + y;
+                    button.buttonWidth = width;
+                    button.buttonHeight = height;
+                    button.button = buildCustomButtonWidget(button, resolveCycleStateIndex(button));
                 }
                 this.customButtons.add(button);
             }
@@ -4311,6 +4317,7 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             if (!isPageVisible(button.page) || button.button == null) {
                 continue;
             }
+            refreshCustomButtonVisual(button);
             button.button.enabled = !"page".equals(button.action) || !button.targetPage.equals(this.activePageId);
             button.button.drawButton(this.mc, mouseX, mouseY, 0F);
         }
@@ -4493,6 +4500,10 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             MMCEGuiExt.NET_CHANNEL.sendToServer(PktControllerButtonAction.event(this.factory.getPos(), button.buttonId));
             return;
         }
+        if ("cycle".equals(button.action)) {
+            activateCycleButton(button);
+            return;
+        }
         if (!"smart_set".equals(button.action) && !"smart_add".equals(button.action)) {
             return;
         }
@@ -4519,6 +4530,85 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
             button.min,
             button.max
         ));
+    }
+
+    private void activateCycleButton(CustomButton button) {
+        if (button.key == null || button.key.trim().isEmpty() || button.cycleStates.isEmpty()) {
+            return;
+        }
+        int currentIndex = resolveCycleStateIndex(button);
+        int nextIndex = currentIndex + 1;
+        if (nextIndex >= button.cycleStates.size()) {
+            nextIndex = button.cycleWrap ? 0 : button.cycleStates.size() - 1;
+        }
+        nextIndex = MathHelper.clamp(nextIndex, 0, Math.max(0, button.cycleStates.size() - 1));
+        MachineGuiStyleManager.ButtonCycleStateStyle state = button.cycleStates.get(nextIndex);
+        float nextValue = state.value == null ? (float) nextIndex : state.value.floatValue();
+        MMCEGuiExt.NET_CHANNEL.sendToServer(PktControllerButtonAction.smart(
+            this.factory.getPos(),
+            button.key,
+            false,
+            nextValue,
+            null,
+            null
+        ));
+        ControllerCustomDataAccess.writeNumber(this.factory, button.key, nextValue);
+        refreshCustomButtonVisual(button);
+    }
+
+    private int resolveCycleStateIndex(CustomButton button) {
+        if (button.cycleStates.isEmpty()) {
+            return -1;
+        }
+        if (button.key == null || button.key.trim().isEmpty()) {
+            return 0;
+        }
+        Float current = ControllerCustomDataAccess.readNumber(this.factory, button.key);
+        if (current == null || !Float.isFinite(current.floatValue())) {
+            return 0;
+        }
+        float value = current.floatValue();
+        for (int i = 0; i < button.cycleStates.size(); i++) {
+            MachineGuiStyleManager.ButtonCycleStateStyle state = button.cycleStates.get(i);
+            float stateValue = state.value == null ? (float) i : state.value.floatValue();
+            if (Math.abs(stateValue - value) <= 0.0001F) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    private void refreshCustomButtonVisual(CustomButton button) {
+        if (button.button == null || button.baseStyle == null || button.cycleStates.isEmpty()) {
+            return;
+        }
+        GuiButton rebuilt = buildCustomButtonWidget(button, resolveCycleStateIndex(button));
+        if (rebuilt != null) {
+            rebuilt.visible = button.button.visible;
+            rebuilt.enabled = button.button.enabled;
+            button.button = rebuilt;
+        }
+    }
+
+    @Nullable
+    private GuiButton buildCustomButtonWidget(CustomButton button, int cycleIndex) {
+        if (button.baseStyle == null) {
+            return button.button;
+        }
+        MachineGuiStyleManager.ButtonCycleStateStyle state = cycleIndex >= 0 && cycleIndex < button.cycleStates.size()
+            ? button.cycleStates.get(cycleIndex)
+            : null;
+        String label = state != null && state.label != null ? state.label : button.baseStyle.label;
+        return GuiTexturedButton.forStyle(
+            button.guiButtonId,
+            button.buttonX,
+            button.buttonY,
+            button.buttonWidth,
+            button.buttonHeight,
+            label,
+            button.baseStyle,
+            state
+        );
     }
 
     // Picks the value to apply based on held modifier keys (data-port smart actions).
@@ -5110,6 +5200,15 @@ public class GuiFactoryControllerResizable extends GuiContainerBase<ContainerFac
         private boolean visible = true;
         private List<String> hotkeys = Collections.emptyList();
         private boolean consumeHotkey = true;
+        @Nullable
+        private MachineGuiStyleManager.ButtonStyle baseStyle;
+        private List<MachineGuiStyleManager.ButtonCycleStateStyle> cycleStates = Collections.emptyList();
+        private boolean cycleWrap = true;
+        private int guiButtonId;
+        private int buttonX;
+        private int buttonY;
+        private int buttonWidth;
+        private int buttonHeight;
         @Nullable
         private GuiButton button;
     }

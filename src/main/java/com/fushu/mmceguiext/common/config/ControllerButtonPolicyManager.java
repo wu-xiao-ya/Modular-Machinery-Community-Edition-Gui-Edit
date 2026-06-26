@@ -511,7 +511,7 @@ public final class ControllerButtonPolicyManager {
             String targetPage = getString(obj, "targetPage", "target_page", "pageTarget", "page_target");
             action = targetPage == null ? null : "page";
         }
-        if (!"event".equals(action) && !"smart_set".equals(action) && !"smart_add".equals(action)) {
+        if (!"event".equals(action) && !"smart_set".equals(action) && !"smart_add".equals(action) && !"cycle".equals(action)) {
             return null;
         }
 
@@ -556,6 +556,9 @@ public final class ControllerButtonPolicyManager {
         if ("event".equals(action)) {
             return policy.buttonId == null ? null : policy;
         }
+        if ("cycle".equals(action)) {
+            return policy.key == null ? null : policy;
+        }
         if (policy.key == null) {
             return null;
         }
@@ -596,6 +599,10 @@ public final class ControllerButtonPolicyManager {
             || "data_add".equals(text) || "data-port-add".equals(text) || "data_port_add".equals(text)
             || "port_add".equals(text) || "port-add".equals(text)) {
             return "smart_add";
+        }
+        if ("cycle".equals(text) || "cycle_mode".equals(text) || "mode_cycle".equals(text)
+            || "switch_mode".equals(text) || "next_mode".equals(text)) {
+            return "cycle";
         }
         return null;
     }

@@ -722,6 +722,7 @@ final class MachineGuiStyleParser {
         String label = getTrimmedString(obj, result, itemScope, "label", "text", "title");
         String texture = getTrimmedString(obj, result, itemScope, "texture", "buttonTexture", "button_texture", "backgroundTexture", "background_texture");
         String hoverTexture = getTrimmedString(obj, result, itemScope, "hoverTexture", "hover_texture", "highlightTexture", "highlight_texture");
+        String pressedTexture = getTrimmedString(obj, result, itemScope, "pressedTexture", "pressed_texture", "clickTexture", "click_texture", "activeTexture", "active_texture");
         String disabledTexture = getTrimmedString(obj, result, itemScope, "disabledTexture", "disabled_texture", "inactiveTexture", "inactive_texture");
         String action = getTrimmedString(obj, result, itemScope, "action", "mode", "type");
         String buttonId = getTrimmedString(obj, result, itemScope, "buttonId", "button_id", "eventId", "event_id", "id", "name");
@@ -805,9 +806,18 @@ final class MachineGuiStyleParser {
         List<String> hotkeys = parseHotkeys(obj, result, itemScope, hotkeyOnly);
         boolean hasButtonTexture = (texture != null && !texture.isEmpty())
             || (hoverTexture != null && !hoverTexture.isEmpty())
+            || (pressedTexture != null && !pressedTexture.isEmpty())
             || (disabledTexture != null && !disabledTexture.isEmpty());
+        List<MachineGuiStyleManager.ButtonCycleStateStyle> cycleStates = parseButtonCycleStates(obj, result, itemScope);
+        boolean hasCycleStateVisual = cycleStates != null && !cycleStates.isEmpty();
         if (!hotkeyOnly && (x == null || y == null || ((label == null || label.isEmpty()) && !hasButtonTexture))) {
-            result.warnForMachine(itemScope, itemScope + " is missing required fields x, y, and label or texture.");
+            if (!hasCycleStateVisual) {
+                result.warnForMachine(itemScope, itemScope + " is missing required fields x, y, and label or texture.");
+                return null;
+            }
+        }
+        if (!hotkeyOnly && (x == null || y == null)) {
+            result.warnForMachine(itemScope, itemScope + " is missing required fields x and y.");
             return null;
         }
         if (hotkeyOnly && hotkeys.isEmpty()) {
@@ -837,6 +847,10 @@ final class MachineGuiStyleParser {
         }
         if ("subgui".equals(normalizedAction) && (targetSubGui == null || targetSubGui.isEmpty())) {
             result.warnForMachine(itemScope, itemScope + " subgui action requires targetSubGui.");
+            return null;
+        }
+        if ("cycle".equals(normalizedAction) && (key == null || key.isEmpty())) {
+            result.warnForMachine(itemScope, itemScope + " cycle action requires key.");
             return null;
         }
         if (("smart_set".equals(normalizedAction) || "smart_add".equals(normalizedAction))
@@ -882,6 +896,7 @@ final class MachineGuiStyleParser {
         button.page = getTrimmedString(obj, result, itemScope, "page", "pageId", "page_id", "tab", "state", "stateId", "state_id", "guiState", "gui_state");
         button.texture = texture;
         button.hoverTexture = hoverTexture;
+        button.pressedTexture = pressedTexture;
         button.disabledTexture = disabledTexture;
         button.textureWidth = validateRangeInt(getInt(obj, result, itemScope, "textureWidth", "texture_width", "texW"), 1, MAX_COMPONENT_SIZE, result, itemScope, "textureWidth");
         button.textureHeight = validateRangeInt(getInt(obj, result, itemScope, "textureHeight", "texture_height", "texH"), 1, MAX_COMPONENT_SIZE, result, itemScope, "textureHeight");
@@ -889,6 +904,8 @@ final class MachineGuiStyleParser {
         button.v = validateMinInt(getInt(obj, result, itemScope, "v", "textureV", "texture_v"), 0, result, itemScope, "v");
         button.hoverU = validateMinInt(getInt(obj, result, itemScope, "hoverU", "hover_u", "textureHoverU", "texture_hover_u"), 0, result, itemScope, "hoverU");
         button.hoverV = validateMinInt(getInt(obj, result, itemScope, "hoverV", "hover_v", "textureHoverV", "texture_hover_v"), 0, result, itemScope, "hoverV");
+        button.pressedU = validateMinInt(getInt(obj, result, itemScope, "pressedU", "pressed_u", "texturePressedU", "texture_pressed_u", "clickU", "click_u"), 0, result, itemScope, "pressedU");
+        button.pressedV = validateMinInt(getInt(obj, result, itemScope, "pressedV", "pressed_v", "texturePressedV", "texture_pressed_v", "clickV", "click_v"), 0, result, itemScope, "pressedV");
         button.disabledU = validateMinInt(getInt(obj, result, itemScope, "disabledU", "disabled_u", "textureDisabledU", "texture_disabled_u"), 0, result, itemScope, "disabledU");
         button.disabledV = validateMinInt(getInt(obj, result, itemScope, "disabledV", "disabled_v", "textureDisabledV", "texture_disabled_v"), 0, result, itemScope, "disabledV");
         button.useNineSlice = getBoolean(obj, result, itemScope, "useNineSlice", "use_nine_slice", "nineSlice", "nine_slice");
@@ -897,6 +914,8 @@ final class MachineGuiStyleParser {
         button.hoverTextColor = getColor(obj, result, itemScope, "hoverTextColor", "hover_text_color", "labelHoverColor", "label_hover_color");
         button.disabledTextColor = getColor(obj, result, itemScope, "disabledTextColor", "disabled_text_color", "labelDisabledColor", "label_disabled_color");
         button.drawLabel = getBoolean(obj, result, itemScope, "drawLabel", "draw_label", "showLabel", "show_label");
+        button.cycleWrap = getBoolean(obj, result, itemScope, "cycleWrap", "cycle_wrap", "wrap");
+        button.cycleStates = cycleStates;
         return button;
     }
 
@@ -1992,7 +2011,61 @@ final class MachineGuiStyleParser {
             || "data_add".equals(text) || "data_port_add".equals(text) || "port_add".equals(text)) {
             return "smart_add";
         }
+        if ("cycle".equals(text) || "cycle_mode".equals(text) || "mode_cycle".equals(text)
+            || "switch_mode".equals(text) || "next_mode".equals(text)) {
+            return "cycle";
+        }
         return null;
+    }
+
+    @Nullable
+    private static List<MachineGuiStyleManager.ButtonCycleStateStyle> parseButtonCycleStates(
+        JsonObject obj,
+        MachineFileParseResult result,
+        String scope
+    ) {
+        MatchedElement match = findElement(obj, "cycleStates", "cycle_states", "states", "modes", "modeStates", "mode_states");
+        if (match == null || !match.element.isJsonArray()) {
+            return null;
+        }
+        JsonArray array = match.element.getAsJsonArray();
+        if (array.size() <= 0) {
+            return null;
+        }
+        List<MachineGuiStyleManager.ButtonCycleStateStyle> out = new ArrayList<MachineGuiStyleManager.ButtonCycleStateStyle>();
+        int limit = cappedArraySize(array, result, scope, match.key, MAX_ARRAY_ENTRIES);
+        for (int i = 0; i < limit; i++) {
+            JsonElement element = array.get(i);
+            if (element == null || !element.isJsonObject()) {
+                result.warnForMachine(field(scope, match.key + "[" + i + "]"), "cycle state must be an object.");
+                continue;
+            }
+            String itemScope = field(scope, match.key + "[" + i + "]");
+            JsonObject stateObj = element.getAsJsonObject();
+            MachineGuiStyleManager.ButtonCycleStateStyle state = new MachineGuiStyleManager.ButtonCycleStateStyle();
+            state.value = getOptionalFloat(stateObj, "value", "mode", "index");
+            state.label = getTrimmedString(stateObj, result, itemScope, "label", "text");
+            state.texture = getTrimmedString(stateObj, result, itemScope, "texture");
+            state.hoverTexture = getTrimmedString(stateObj, result, itemScope, "hoverTexture", "hover_texture");
+            state.pressedTexture = getTrimmedString(stateObj, result, itemScope, "pressedTexture", "pressed_texture");
+            state.disabledTexture = getTrimmedString(stateObj, result, itemScope, "disabledTexture", "disabled_texture");
+            state.textureWidth = validateRangeInt(getInt(stateObj, result, itemScope, "textureWidth", "texture_width", "texW"), 1, MAX_COMPONENT_SIZE, result, itemScope, "textureWidth");
+            state.textureHeight = validateRangeInt(getInt(stateObj, result, itemScope, "textureHeight", "texture_height", "texH"), 1, MAX_COMPONENT_SIZE, result, itemScope, "textureHeight");
+            state.u = validateMinInt(getInt(stateObj, result, itemScope, "u", "textureU", "texture_u"), 0, result, itemScope, "u");
+            state.v = validateMinInt(getInt(stateObj, result, itemScope, "v", "textureV", "texture_v"), 0, result, itemScope, "v");
+            state.hoverU = validateMinInt(getInt(stateObj, result, itemScope, "hoverU", "hover_u", "textureHoverU", "texture_hover_u"), 0, result, itemScope, "hoverU");
+            state.hoverV = validateMinInt(getInt(stateObj, result, itemScope, "hoverV", "hover_v", "textureHoverV", "texture_hover_v"), 0, result, itemScope, "hoverV");
+            state.pressedU = validateMinInt(getInt(stateObj, result, itemScope, "pressedU", "pressed_u", "texturePressedU", "texture_pressed_u"), 0, result, itemScope, "pressedU");
+            state.pressedV = validateMinInt(getInt(stateObj, result, itemScope, "pressedV", "pressed_v", "texturePressedV", "texture_pressed_v"), 0, result, itemScope, "pressedV");
+            state.disabledU = validateMinInt(getInt(stateObj, result, itemScope, "disabledU", "disabled_u", "textureDisabledU", "texture_disabled_u"), 0, result, itemScope, "disabledU");
+            state.disabledV = validateMinInt(getInt(stateObj, result, itemScope, "disabledV", "disabled_v", "textureDisabledV", "texture_disabled_v"), 0, result, itemScope, "disabledV");
+            state.textColor = getColor(stateObj, result, itemScope, "textColor", "text_color", "labelColor", "label_color");
+            state.hoverTextColor = getColor(stateObj, result, itemScope, "hoverTextColor", "hover_text_color", "labelHoverColor", "label_hover_color");
+            state.disabledTextColor = getColor(stateObj, result, itemScope, "disabledTextColor", "disabled_text_color", "labelDisabledColor", "label_disabled_color");
+            state.drawLabel = getBoolean(stateObj, result, itemScope, "drawLabel", "draw_label", "showLabel", "show_label");
+            out.add(state);
+        }
+        return out.isEmpty() ? null : out;
     }
 
     @Nullable
