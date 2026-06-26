@@ -95,10 +95,12 @@ dependencies {
         compileOnly(files(localCraftTweakerJars))
     }
     compileOnly(rfg.deobf("curse.maven:the-one-probe-245211:2667280"))
+    testCompileOnly(rfg.deobf("curse.maven:the-one-probe-245211:2667280"))
     compileOnly(rfg.deobf("curse.maven:ae2-extended-life-570458:6302098"))
     compileOnly(rfg.deobf("curse.maven:ae2-fluid-crafting-rework-623955:5504001"))
     testImplementation(rfg.deobf("curse.maven:ae2-extended-life-570458:6302098"))
     compileOnly(rfg.deobf("curse.maven:Mekanism-268560:2835175"))
+    testCompileOnly(rfg.deobf("curse.maven:Mekanism-268560:2835175"))
     compileOnly(rfg.deobf("curse.maven:mekanism-energistics-1027681:5408319"))
     compileOnly(rfg.deobf("curse.maven:had-enough-items-557549:4810661"))
     val localGregTech = fileTree("${System.getProperty("user.home")}/.gradle/caches/modules-2/files-2.1/curse.maven/gregtech-ce-unofficial-557242/5322654") {
@@ -106,13 +108,17 @@ dependencies {
     }.files.firstOrNull()
     if (localGregTech != null) {
         compileOnly(files(localGregTech))
+        testCompileOnly(files(localGregTech))
     } else {
         compileOnly(rfg.deobf("curse.maven:gregtech-ce-unofficial-557242:5322654"))
+        testCompileOnly(rfg.deobf("curse.maven:gregtech-ce-unofficial-557242:5322654"))
     }
     // Optional Draconic Evolution / BrandonsCore integration. The 1.12.2 jars on this branch
     // expose int RF/FE only; TileCustomHatch probes newer OP long APIs reflectively if present.
     compileOnly(rfg.deobf("curse.maven:brandonscore-231382:3051539"))
     compileOnly(rfg.deobf("curse.maven:draconicevolution-223565:3051542"))
+    testCompileOnly(rfg.deobf("curse.maven:brandonscore-231382:3051539"))
+    testCompileOnly(rfg.deobf("curse.maven:draconicevolution-223565:3051542"))
     compileOnly("software.bernie.geckolib:geckolib-forge-1.12.2:3.0.31")
     testImplementation("software.bernie.geckolib:geckolib-forge-1.12.2:3.0.31")
 
