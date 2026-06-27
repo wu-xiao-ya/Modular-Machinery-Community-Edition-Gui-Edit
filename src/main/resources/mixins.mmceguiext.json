@@ -7,9 +7,7 @@
   "priority": 1001,
   "mixins": [
     "MixinRecipeCraftingContext",
-    "MixinRequirementFluid",
     "MixinRequirementGas",
-    "MixinRequirementTypeFluid",
     "MixinRequirementTypeGas",
     "MixinTileMultiblockMachineController"
   ]
