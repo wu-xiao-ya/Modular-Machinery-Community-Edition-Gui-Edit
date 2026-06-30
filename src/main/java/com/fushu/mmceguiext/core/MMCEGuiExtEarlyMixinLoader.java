@@ -28,10 +28,22 @@ public class MMCEGuiExtEarlyMixinLoader implements IFMLLoadingPlugin {
     @Override
     public void injectData(final Map<String, Object> data) {
         Mixins.addConfiguration("mixins.mmceguiext.json");
+        if (isClassPresent("mekanism.api.gas.GasStack")) {
+            Mixins.addConfiguration("mixins.mmceguiext.mekanism.json");
+        }
     }
 
     @Override
     public String getAccessTransformerClass() {
         return null;
+    }
+
+    private static boolean isClassPresent(final String className) {
+        try {
+            Class.forName(className, false, MMCEGuiExtEarlyMixinLoader.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException | LinkageError ignored) {
+            return false;
+        }
     }
 }

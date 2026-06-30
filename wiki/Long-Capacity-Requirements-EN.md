@@ -40,7 +40,7 @@ Vanilla, small-amount recipes are unaffected — they keep using the original `i
 }
 ```
 
-Both parse and run as `long`. The same applies to per-tick fluid/gas requirements.
+Both parse and run as `long`. Note: this fix covers normal `fluid` / `gas` requirements; per-tick fluid/gas requirements are not claimed as supported yet and will be handled separately.
 
 ## Why it matters here
 
